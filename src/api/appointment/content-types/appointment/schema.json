@@ -24,6 +24,12 @@
     },
     "date": {
       "type": "datetime"
+    },
+    "specialty_profile": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::specialty-profile.specialty-profile",
+      "inversedBy": "appointments"
     }
   }
 }

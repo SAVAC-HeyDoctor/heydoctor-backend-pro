@@ -38,6 +38,12 @@
       "relation": "manyToMany",
       "target": "api::doctor.doctor",
       "mappedBy": "specialty_profiles"
+    },
+    "appointments": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::appointment.appointment",
+      "mappedBy": "specialty_profile"
     }
   }
 }
