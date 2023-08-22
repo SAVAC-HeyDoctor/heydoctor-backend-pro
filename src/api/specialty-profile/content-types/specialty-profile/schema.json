@@ -44,6 +44,18 @@
       "relation": "oneToMany",
       "target": "api::appointment.appointment",
       "mappedBy": "specialty_profile"
+    },
+    "icon": {
+      "allowedTypes": [
+        "images"
+      ],
+      "type": "media",
+      "multiple": false,
+      "pluginOptions": {
+        "i18n": {
+          "localized": false
+        }
+      }
     }
   }
 }

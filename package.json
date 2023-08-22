@@ -11,14 +11,14 @@
   },
   "devDependencies": {},
   "dependencies": {
-    "@strapi/plugin-documentation": "^4.12.4",
-    "@strapi/plugin-i18n": "4.12.4",
-    "@strapi/plugin-users-permissions": "4.12.4",
-    "@strapi/strapi": "4.12.4",
+    "@strapi/plugin-documentation": "^4.12.5",
+    "@strapi/plugin-i18n": "4.12.5",
+    "@strapi/plugin-users-permissions": "4.12.5",
+    "@strapi/strapi": "4.12.5",
     "@surunnuage/strapi-plugin-expo-notifications": "^1.0.7",
-    "pg": "8.11.2",
+    "pg": "8.11.3",
     "strapi-content-type-explorer": "^0.1.1",
-    "strapi-plugin-import-export-entries": "^1.21.0"
+    "strapi-plugin-import-export-entries": "^1.21.1"
   },
   "author": {
     "name": "A Strapi developer"
