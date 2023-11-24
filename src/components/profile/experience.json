@@ -1,0 +1,32 @@
+{
+  "collectionName": "components_profile_experiences",
+  "info": {
+    "displayName": "experience",
+    "icon": "doctor"
+  },
+  "options": {},
+  "attributes": {
+    "title": {
+      "type": "string"
+    },
+    "files": {
+      "allowedTypes": [
+        "files",
+        "images"
+      ],
+      "type": "media",
+      "multiple": true,
+      "required": true
+    },
+    "title_type": {
+      "type": "enumeration",
+      "enum": [
+        "associate",
+        "bachelor",
+        "master",
+        "doctoral"
+      ],
+      "default": "bachelor"
+    }
+  }
+}

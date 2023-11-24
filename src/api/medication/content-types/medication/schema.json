@@ -4,7 +4,8 @@
   "info": {
     "singularName": "medication",
     "pluralName": "medications",
-    "displayName": "medication"
+    "displayName": "medication",
+    "description": ""
   },
   "options": {
     "draftAndPublish": false
@@ -21,7 +22,8 @@
           "localized": true
         }
       },
-      "type": "string"
+      "type": "string",
+      "unique": true
     },
     "specialty_profiles": {
       "type": "relation",
@@ -34,6 +36,20 @@
       "relation": "manyToMany",
       "target": "api::treatment.treatment",
       "mappedBy": "medications"
+    },
+    "laboratory": {
+      "pluginOptions": {
+        "i18n": {
+          "localized": true
+        }
+      },
+      "type": "string"
+    },
+    "diagnostic": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::diagnostic.diagnostic",
+      "inversedBy": "medications"
     }
   }
 }

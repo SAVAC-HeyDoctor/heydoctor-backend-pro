@@ -48,6 +48,33 @@
       "relation": "oneToOne",
       "target": "api::videocall.videocall",
       "mappedBy": "appointment"
+    },
+    "payment": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::payment.payment",
+      "mappedBy": "appointment"
+    },
+    "confirmed": {
+      "type": "boolean",
+      "default": false
+    },
+    "appointment_reason": {
+      "type": "text"
+    },
+    "files": {
+      "allowedTypes": [
+        "images",
+        "files"
+      ],
+      "type": "media",
+      "multiple": true
+    },
+    "diagnostic": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::diagnostic.diagnostic",
+      "mappedBy": "appointment"
     }
   }
 }

@@ -123,6 +123,12 @@
         ]
       },
       "customField": "plugin::encryptable-field.encryptable-field"
+    },
+    "diagnostics": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::diagnostic.diagnostic",
+      "mappedBy": "clinical_record"
     }
   }
 }

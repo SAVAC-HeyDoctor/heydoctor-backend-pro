@@ -1,0 +1,14 @@
+{
+  "collectionName": "components_profile_payment_methods",
+  "info": {
+    "displayName": "paymentMethods",
+    "icon": "house"
+  },
+  "options": {},
+  "attributes": {
+    "active": {
+      "type": "boolean",
+      "default": false
+    }
+  }
+}

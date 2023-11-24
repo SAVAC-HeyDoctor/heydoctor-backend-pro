@@ -1,0 +1,24 @@
+{
+  "collectionName": "components_profile_account_settings",
+  "info": {
+    "displayName": "accountSettings",
+    "icon": "cog"
+  },
+  "options": {},
+  "attributes": {
+    "payment_type": {
+      "type": "enumeration",
+      "enum": [
+        "daily",
+        "weekly",
+        "monthly"
+      ]
+    },
+    "payment_method": {
+      "displayName": "paymentMethods",
+      "type": "component",
+      "repeatable": true,
+      "component": "profile.payment-methods"
+    }
+  }
+}

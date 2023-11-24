@@ -1,0 +1,34 @@
+{
+  "kind": "collectionType",
+  "collectionName": "service_settings",
+  "info": {
+    "singularName": "service-setting",
+    "pluralName": "service-settings",
+    "displayName": "service settings",
+    "description": ""
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "predefined_messages": {
+      "displayName": "messages",
+      "type": "component",
+      "repeatable": true,
+      "component": "profile.messages"
+    },
+    "doctor": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::doctor.doctor",
+      "inversedBy": "service_settings"
+    },
+    "account_preferences": {
+      "displayName": "accountSettings",
+      "type": "component",
+      "repeatable": false,
+      "component": "profile.account-settings"
+    }
+  }
+}

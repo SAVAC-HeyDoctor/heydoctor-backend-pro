@@ -52,6 +52,75 @@
       "relation": "oneToMany",
       "target": "api::appointment.appointment",
       "mappedBy": "doctor"
+    },
+    "services": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::service.service",
+      "mappedBy": "doctor"
+    },
+    "non_validated_experience": {
+      "type": "media",
+      "multiple": true,
+      "required": false,
+      "allowedTypes": [
+        "images",
+        "files"
+      ]
+    },
+    "profile_description": {
+      "type": "text"
+    },
+    "registration_number": {
+      "type": "string"
+    },
+    "registration_issuer": {
+      "type": "string"
+    },
+    "country": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::country.country"
+    },
+    "stamp": {
+      "type": "media",
+      "multiple": false,
+      "required": false,
+      "allowedTypes": [
+        "images"
+      ]
+    },
+    "signature": {
+      "type": "media",
+      "multiple": false,
+      "required": false,
+      "allowedTypes": [
+        "images"
+      ]
+    },
+    "languages": {
+      "displayName": "languages",
+      "type": "component",
+      "repeatable": true,
+      "component": "profile.languages"
+    },
+    "validated_experience": {
+      "displayName": "experience",
+      "type": "component",
+      "repeatable": true,
+      "component": "profile.experience"
+    },
+    "payments": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::payment.payment",
+      "mappedBy": "doctor"
+    },
+    "service_settings": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::service-setting.service-setting",
+      "mappedBy": "doctor"
     }
   }
 }

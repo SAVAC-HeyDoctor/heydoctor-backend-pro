@@ -1,0 +1,34 @@
+{
+  "kind": "collectionType",
+  "collectionName": "services",
+  "info": {
+    "singularName": "service",
+    "pluralName": "services",
+    "displayName": "service",
+    "description": ""
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "name": {
+      "type": "string"
+    },
+    "doctor": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::doctor.doctor",
+      "inversedBy": "services"
+    },
+    "specialty_profile": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::specialty-profile.specialty-profile",
+      "inversedBy": "services"
+    },
+    "price": {
+      "type": "decimal"
+    }
+  }
+}

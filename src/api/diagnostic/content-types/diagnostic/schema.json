@@ -1,0 +1,58 @@
+{
+  "kind": "collectionType",
+  "collectionName": "diagnostics",
+  "info": {
+    "singularName": "diagnostic",
+    "pluralName": "diagnostics",
+    "displayName": "diagnostic",
+    "description": ""
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "doctor": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::doctor.doctor"
+    },
+    "patient": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::patient.patient"
+    },
+    "medications": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::medication.medication",
+      "mappedBy": "diagnostic"
+    },
+    "cie_10_code": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::cie-10-code.cie-10-code"
+    },
+    "clinical_record": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::clinical-record.clinical-record",
+      "inversedBy": "diagnostics"
+    },
+    "appointment": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::appointment.appointment",
+      "inversedBy": "diagnostic"
+    },
+    "diagnostic_date": {
+      "type": "date",
+      "required": true
+    },
+    "diagnosis_details": {
+      "type": "text",
+      "minLength": 20,
+      "private": true
+    }
+  }
+}

@@ -4,7 +4,8 @@
   "info": {
     "singularName": "country",
     "pluralName": "countries",
-    "displayName": "country"
+    "displayName": "country",
+    "description": ""
   },
   "options": {
     "draftAndPublish": false
@@ -19,8 +20,11 @@
       "type": "uid",
       "targetField": "name"
     },
-    "timezone": {
-      "type": "string"
+    "language": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::language.language",
+      "inversedBy": "countries"
     }
   }
 }

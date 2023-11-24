@@ -1,0 +1,28 @@
+{
+  "collectionName": "components_profile_languages",
+  "info": {
+    "displayName": "languages",
+    "icon": "earth",
+    "description": ""
+  },
+  "options": {},
+  "attributes": {
+    "proficiency": {
+      "type": "enumeration",
+      "enum": [
+        "beginner",
+        "intermediate",
+        "advanced",
+        "native"
+      ]
+    },
+    "primary_language": {
+      "type": "boolean"
+    },
+    "language": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::language.language"
+    }
+  }
+}

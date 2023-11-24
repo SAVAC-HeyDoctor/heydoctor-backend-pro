@@ -1,0 +1,22 @@
+{
+  "collectionName": "components_profile_messages",
+  "info": {
+    "displayName": "messages",
+    "icon": "message",
+    "description": ""
+  },
+  "options": {},
+  "attributes": {
+    "text": {
+      "type": "text"
+    },
+    "duration": {
+      "type": "biginteger"
+    },
+    "services": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::service.service"
+    }
+  }
+}

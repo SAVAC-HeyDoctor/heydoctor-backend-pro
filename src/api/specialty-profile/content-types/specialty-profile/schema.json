@@ -63,6 +63,12 @@
       "relation": "manyToMany",
       "target": "api::medication.medication",
       "mappedBy": "specialty_profiles"
+    },
+    "services": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::service.service",
+      "mappedBy": "specialty_profile"
     }
   }
 }
