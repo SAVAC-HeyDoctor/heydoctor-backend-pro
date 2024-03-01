@@ -1,0 +1,26 @@
+{
+  "kind": "collectionType",
+  "collectionName": "connections",
+  "info": {
+    "singularName": "connection",
+    "pluralName": "connections",
+    "displayName": "connection",
+    "description": ""
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "socketID": {
+      "type": "string"
+    },
+    "isConnected": {
+      "type": "boolean",
+      "default": true
+    },
+    "userID": {
+      "type": "biginteger"
+    }
+  }
+}

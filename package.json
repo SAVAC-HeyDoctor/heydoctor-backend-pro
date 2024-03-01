@@ -12,22 +12,28 @@
   "devDependencies": {},
   "dependencies": {
     "@creazy231/strapi-plugin-apollo-sandbox": "^0.0.13",
-    "@strapi/plugin-documentation": "^4.17.1",
-    "@strapi/plugin-graphql": "4.17.1",
-    "@strapi/plugin-i18n": "4.17.1",
-    "@strapi/plugin-users-permissions": "4.17.1",
-    "@strapi/provider-upload-cloudinary": "^4.17.1",
-    "@strapi/strapi": "4.17.1",
+    "@socket.io/sticky": "^1.0.4",
+    "@strapi/plugin-documentation": "^4.20.3",
+    "@strapi/plugin-graphql": "4.20.3",
+    "@strapi/plugin-i18n": "4.20.3",
+    "@strapi/plugin-users-permissions": "4.20.3",
+    "@strapi/provider-upload-cloudinary": "^4.20.3",
+    "@strapi/strapi": "4.20.3",
     "@surunnuage/strapi-plugin-expo-notifications": "^2.0.4",
+    "axios": "^1.6.7",
+    "ioredis": "^5.3.2",
     "pg": "8.11.3",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-router-dom": "^6.21.3",
+    "react-router-dom": "^5.3.4",
+    "socket.io": "^4.7.4",
+    "socket.io-redis": "^6.1.1",
     "strapi-chatgpt": "^1.0.2",
-    "strapi-content-type-explorer": "^0.1.1",
+    "strapi-content-type-explorer": "^0.2.2",
     "strapi-plugin-encryptable-field": "^1.1.4",
     "strapi-plugin-graphs-builder": "^1.0.0",
     "strapi-plugin-import-export-entries": "^1.23.1",
+    "strapi-plugin-transformer": "^3.1.2",
     "styled-components": "^6.1.8"
   },
   "author": {
@@ -37,7 +43,7 @@
     "uuid": "a67ebc51-045c-4ac9-aad3-a5b33bb71173"
   },
   "engines": {
-    "node": ">=14.19.1 <=18.x.x",
+    "node": ">=18.0.0 <=20.x.x",
     "npm": ">=6.0.0"
   },
   "license": "MIT"

@@ -96,6 +96,12 @@
     "uid": {
       "type": "uid",
       "targetField": "expoPushToken"
+    },
+    "notifications": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::notification.notification",
+      "mappedBy": "user"
     }
   }
 }

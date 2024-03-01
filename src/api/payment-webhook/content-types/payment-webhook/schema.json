@@ -14,6 +14,12 @@
   "attributes": {
     "notification": {
       "type": "json"
+    },
+    "payment": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::payment.payment",
+      "mappedBy": "payment_data"
     }
   }
 }

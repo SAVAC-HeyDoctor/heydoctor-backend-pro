@@ -110,12 +110,6 @@
       "repeatable": true,
       "component": "profile.experience"
     },
-    "payments": {
-      "type": "relation",
-      "relation": "oneToMany",
-      "target": "api::payment.payment",
-      "mappedBy": "doctor"
-    },
     "service_settings": {
       "type": "relation",
       "relation": "oneToMany",

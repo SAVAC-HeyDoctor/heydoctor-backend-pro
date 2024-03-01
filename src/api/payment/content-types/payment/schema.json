@@ -22,13 +22,7 @@
       "type": "decimal"
     },
     "timestamp": {
-      "type": "datetime"
-    },
-    "doctor": {
-      "type": "relation",
-      "relation": "manyToOne",
-      "target": "api::doctor.doctor",
-      "inversedBy": "payments"
+      "type": "date"
     },
     "order": {
       "type": "biginteger",
@@ -37,10 +31,14 @@
     },
     "status": {
       "type": "string",
-      "required": true
+      "required": true,
+      "default": "pending"
     },
     "payment_data": {
-      "type": "json"
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::payment-webhook.payment-webhook",
+      "inversedBy": "payment"
     }
   }
 }

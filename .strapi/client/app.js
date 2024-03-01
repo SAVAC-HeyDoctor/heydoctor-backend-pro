@@ -9,7 +9,7 @@ import i18N from "@strapi/plugin-i18n/strapi-admin";
 import usersPermissions from "@strapi/plugin-users-permissions/strapi-admin";
 import expoNotifications from "@surunnuage/strapi-plugin-expo-notifications/strapi-admin";
 import strapiChatgpt from "strapi-chatgpt/strapi-admin";
-import contentTypeExplorer from "strapi-content-type-explorer/strapi-admin";
+import strapiContentTypeExplorer from "strapi-content-type-explorer/strapi-admin";
 import encryptableField from "strapi-plugin-encryptable-field/strapi-admin";
 import graphsBuilder from "strapi-plugin-graphs-builder/strapi-admin";
 import importExportEntries from "strapi-plugin-import-export-entries/strapi-admin";
@@ -24,7 +24,7 @@ renderAdmin(document.getElementById("strapi"), {
     "users-permissions": usersPermissions,
     "expo-notifications": expoNotifications,
     "strapi-chatgpt": strapiChatgpt,
-    "content-type-explorer": contentTypeExplorer,
+    "strapi-content-type-explorer": strapiContentTypeExplorer,
     "encryptable-field": encryptableField,
     "graphs-builder": graphsBuilder,
     "import-export-entries": importExportEntries,
