@@ -1,10 +1,7 @@
 const httpServer = require("http").createServer();
 const Redis = require("ioredis");
 const redisClient = new Redis();
-const io = require("socket.io")(httpServer, {
-  cors: {
-    origin: "http://localhost:8080",
-  },
+const io = require("socket.io")(strapi.server.httpServer, {
   adapter: require("socket.io-redis")({
     pubClient: redisClient,
     subClient: redisClient.duplicate(),
