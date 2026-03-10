@@ -1,0 +1,41 @@
+{
+  "kind": "collectionType",
+  "collectionName": "doctor_applications",
+  "info": {
+    "singularName": "doctor-application",
+    "pluralName": "doctor-applications",
+    "displayName": "doctor application",
+    "description": "Solicitudes de verificación de perfil médico (formulario for-doctors)"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "name": {
+      "type": "string",
+      "required": true,
+      "maxLength": 255
+    },
+    "email": {
+      "type": "email",
+      "required": true
+    },
+    "specialty": {
+      "type": "string",
+      "required": true,
+      "maxLength": 255
+    },
+    "country": {
+      "type": "string",
+      "required": true,
+      "maxLength": 100
+    },
+    "medical_license": {
+      "type": "media",
+      "multiple": false,
+      "required": true,
+      "allowedTypes": ["images", "files"]
+    }
+  }
+}

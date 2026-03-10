@@ -7,7 +7,7 @@ module.exports = {
   register(/*{ strapi }*/) {},
 
   async bootstrap({ strapi }) {
-    initSentry();
+    initSentry(strapi);
     await initialize(strapi);
   },
 };

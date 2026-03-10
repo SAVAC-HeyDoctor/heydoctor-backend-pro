@@ -2,10 +2,11 @@
 
 let Sentry = null;
 
-function initSentry() {
+function initSentry(strapi) {
+  const log = strapi?.log ?? console;
   const dsn = process.env.SENTRY_DSN;
   if (!dsn) {
-    strapi.log.info("Sentry: SENTRY_DSN not set, skipping initialization");
+    log.info("Sentry: SENTRY_DSN not set, skipping initialization");
     return;
   }
 
@@ -19,9 +20,9 @@ function initSentry() {
       enabled: process.env.NODE_ENV === "production",
     });
 
-    strapi.log.info("Sentry: initialized successfully");
+    log.info("Sentry: initialized successfully");
   } catch (err) {
-    strapi.log.error("Sentry: failed to initialize", err);
+    log.error("Sentry: failed to initialize", err);
   }
 }
 
