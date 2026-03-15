@@ -1,0 +1,1 @@
+export { useClinicalShortcuts } from './useClinicalShortcuts';

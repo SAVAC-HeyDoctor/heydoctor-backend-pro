@@ -239,7 +239,21 @@ Principios aplicados:
 
 ---
 
-## 7. Archivos del frontend
+## 7. Funcionalidades de productividad
+
+Ver **[DOCTOR-PRODUCTIVITY.md](./DOCTOR-PRODUCTIVITY.md)** para:
+
+- One-Click Clinical Notes
+- Smart Diagnosis Picker
+- Auto Treatment Suggestions
+- Patient Timeline
+- Follow-Up Suggestions
+- Quick Orders
+- Clinical Shortcuts (Ctrl+D, T, N)
+
+---
+
+## 8. Archivos del frontend
 
 ```
 frontend/
@@ -254,6 +268,16 @@ frontend/
 │   ├── DoctorDashboardPanels.tsx
 │   ├── PatientInsightsPanel.tsx
 │   ├── MedicalSearch.tsx
+│   ├── GenerateClinicalNoteButton.tsx
+│   ├── ClinicalNoteEditor.tsx
+│   ├── SmartDiagnosisPicker.tsx
+│   ├── AutoTreatmentSuggestions.tsx
+│   ├── PatientTimeline.tsx
+│   ├── FollowUpSuggestions.tsx
+│   ├── QuickOrders.tsx
+│   └── index.ts
+├── hooks/
+│   ├── useClinicalShortcuts.ts
 │   └── index.ts
 └── context/
     └── ClinicContext.tsx  # Proporciona clinicId
@@ -261,7 +285,7 @@ frontend/
 
 ---
 
-## 8. Requisitos de integración
+## 9. Requisitos de integración
 
 1. **ClinicContext** – El frontend debe proveer `clinicId` (ej. desde `ClinicProvider`).
 2. **Autenticación** – JWT en `localStorage` (`jwt` o `token`) para las llamadas a la API.
@@ -270,7 +294,7 @@ frontend/
 
 ---
 
-## 9. Ejemplo de integración completa
+## 10. Ejemplo de integración completa
 
 ```tsx
 // Página de consulta (ejemplo)

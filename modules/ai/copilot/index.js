@@ -83,8 +83,51 @@ ${input}`;
   }
 }
 
+/**
+ * Genera una nota clínica estructurada (Chief Complaint, HPI, Assessment, Plan).
+ * Usa AI Copilot + Clinical Intelligence.
+ */
+async function generateClinicalNote({ messages = [], clinicalNotes = null, patientHistory = null, symptoms = [] } = {}) {
+  if (!isEnabled()) return null;
+
+  const { messagesText, notesText, historyText } = analyzeConsultationContext({ messages, clinicalNotes, patientHistory });
+  const symptomText = Array.isArray(symptoms) ? symptoms.join(", ") : String(symptoms || "");
+  const input = [messagesText, notesText, historyText, symptomText ? `Síntomas/motivo: ${symptomText}` : ""].filter(Boolean).join("\n---\n");
+  if (!input.trim()) return null;
+
+  const prompt = `Eres un asistente médico. Genera una nota clínica estructurada en español a partir del siguiente contexto de consulta (anonimizado).
+Responde ÚNICAMENTE con un JSON válido, sin markdown ni texto adicional.
+Formato:
+{
+  "chief_complaint": "Motivo de consulta en 1-2 frases",
+  "history_of_present_illness": "Historia de la enfermedad actual, evolución, síntomas asociados",
+  "assessment": "Evaluación clínica, impresión diagnóstica",
+  "plan": "Plan de manejo: tratamiento, estudios, seguimiento"
+}
+
+Contexto de consulta:
+${input}`;
+
+  const content = await provider.chatCompletion([{ role: "user", content: prompt }], { max_tokens: 1024 });
+  if (!content) return null;
+
+  try {
+    const json = content.replace(/```json?\s*|\s*```/g, "").trim();
+    const parsed = JSON.parse(json);
+    return {
+      chief_complaint: String(parsed.chief_complaint ?? "").trim(),
+      history_of_present_illness: String(parsed.history_of_present_illness ?? "").trim(),
+      assessment: String(parsed.assessment ?? "").trim(),
+      plan: String(parsed.plan ?? "").trim(),
+    };
+  } catch {
+    return null;
+  }
+}
+
 module.exports = {
   isEnabled,
   analyzeConsultationContext,
   generateSuggestions,
+  generateClinicalNote,
 };

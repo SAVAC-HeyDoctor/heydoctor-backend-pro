@@ -47,3 +47,14 @@ export async function fetchClinicMe() {
   const json = await res.json();
   return json.data ?? json;
 }
+
+/** Registro médico del paciente (consultas, diagnósticos, tratamientos) */
+export async function fetchPatientMedicalRecord(patientId: number | string) {
+  const base = getApiBase();
+  const res = await fetch(`${base}/api/patients/${patientId}/medical-record`, {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) throw new Error('Failed to fetch medical record');
+  const json = await res.json();
+  return json.data ?? json;
+}

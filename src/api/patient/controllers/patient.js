@@ -62,7 +62,11 @@ module.exports = createCoreController('api::patient.patient', ({ strapi }) => ({
 
     const clinicalRecord = patient.clinical_record
       ? await strapi.entityService.findOne('api::clinical-record.clinical-record', patient.clinical_record.id ?? patient.clinical_record, {
-          populate: ['appointments', 'diagnostics', 'treatments'],
+          populate: {
+            appointments: true,
+            diagnostics: { populate: { cie_10_code: true } },
+            treatments: true,
+          },
         })
       : null;
 
@@ -88,6 +92,8 @@ module.exports = createCoreController('api::patient.patient', ({ strapi }) => ({
             habits: clinicalRecord.habits,
             admission_reason: clinicalRecord.admission_reason,
             allergies: clinicalRecord.allergies,
+            diagnostics: clinicalRecord.diagnostics ?? [],
+            treatments: clinicalRecord.treatments ?? [],
           }
         : null,
       appointments,

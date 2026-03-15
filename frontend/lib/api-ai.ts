@@ -78,3 +78,47 @@ export async function searchMedical(
   if (!res.ok) throw new Error('Failed to search');
   return res.json();
 }
+
+/** Generar nota clínica (Chief Complaint, HPI, Assessment, Plan) */
+export async function generateClinicalNote(params: {
+  consultationId?: number | string;
+  symptoms?: string[];
+  clinicalNotes?: string;
+  patientHistory?: Record<string, unknown>;
+  messages?: Array<{ role: string; content: string }>;
+}) {
+  const base = getApiBase();
+  const res = await fetch(`${base}/api/copilot/generate-clinical-note`, {
+    method: 'POST',
+    headers: jsonHeaders(),
+    body: JSON.stringify({
+      consultationId: params.consultationId,
+      consultation_id: params.consultationId,
+      symptoms: params.symptoms ?? [],
+      clinical_notes: params.clinicalNotes,
+      patient_history: params.patientHistory,
+      messages: params.messages ?? [],
+    }),
+  });
+  if (!res.ok) throw new Error('Failed to generate clinical note');
+  return res.json();
+}
+
+/** Sugerencias de tratamiento por diagnóstico (CDSS + Predictive Medicine) */
+export async function fetchTreatmentSuggestions(
+  diagnosisCodeOrDescription: string,
+  context?: Record<string, unknown>
+) {
+  const symptoms = [diagnosisCodeOrDescription];
+  const [cdssRes, predRes] = await Promise.all([
+    evaluateCdss(symptoms, context),
+    fetchPredictiveRisk(symptoms, context),
+  ]);
+  return {
+    treatment_recommendations: cdssRes?.treatment_recommendations ?? [],
+    preventive_actions: [
+      ...(cdssRes?.preventive_actions ?? []),
+      ...(predRes?.preventive_actions ?? []),
+    ],
+  };
+}

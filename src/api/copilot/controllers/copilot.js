@@ -72,4 +72,74 @@ module.exports = {
       meta: { ai_enabled: true, status: "ready" },
     });
   },
+
+  async generateClinicalNote(ctx) {
+    const user = ctx.state?.user;
+    if (!user) return ctx.unauthorized("Autenticación requerida");
+
+    const body = ctx.request?.body ?? {};
+    const consultationId = body.consultationId ?? body.consultation_id;
+    const symptoms = body.symptoms ?? [];
+    const clinicalNotes = body.clinical_notes ?? body.clinicalNotes ?? null;
+    const patientHistory = body.patient_history ?? body.patientHistory ?? null;
+    const messages = body.messages ?? [];
+
+    const strapi = global.strapi;
+    if (!strapi) return ctx.internalServerError("Servicio no disponible");
+
+    let messagesData = [];
+    let notesData = clinicalNotes;
+    let historyData = patientHistory;
+    let symptomsData = Array.isArray(symptoms) ? symptoms : symptoms ? [String(symptoms)] : [];
+
+    if (consultationId) {
+      const apt = await strapi.entityService.findOne("api::appointment.appointment", consultationId, {
+        populate: ["clinic", "patient", "clinical_record"],
+      });
+      if (!apt) return ctx.notFound("Consulta no encontrada");
+      if (!ensureClinicAccess(ctx, apt)) return ctx.forbidden("No tiene acceso a esta consulta");
+
+      if (apt.appointment_reason) symptomsData = [apt.appointment_reason, ...symptomsData];
+      if (apt.clinical_record) {
+        const cr = await strapi.entityService.findOne("api::clinical-record.clinical-record", apt.clinical_record.id ?? apt.clinical_record, {
+          populate: [],
+        });
+        if (cr) {
+          notesData = [cr.observations, cr.admission_reason, cr.clinical_judgement].filter(Boolean).join("\n");
+          historyData = cr;
+        }
+      }
+      const msgRes = await strapi.entityService.findMany("api::message.message", {
+        filters: { appointment: consultationId },
+        limit: 50,
+      });
+      if (msgRes?.length) messagesData = msgRes.map((m) => ({ role: m.user ? "assistant" : "user", content: m.message ?? m.content ?? "" }));
+    }
+
+    if (!copilot.isEnabled()) {
+      return ctx.send({
+        data: null,
+        meta: { ai_enabled: false, message: "AI Copilot no está configurado" },
+      });
+    }
+
+    const note = await copilot.generateClinicalNote({
+      messages: messages.length ? messages : messagesData,
+      clinicalNotes: notesData,
+      patientHistory: historyData,
+      symptoms: symptomsData,
+    });
+
+    if (!note) {
+      return ctx.send({
+        data: null,
+        meta: { ai_enabled: true, status: "error", message: "No se pudo generar la nota" },
+      });
+    }
+
+    return ctx.send({
+      data: note,
+      meta: { ai_enabled: true, status: "ready" },
+    });
+  },
 };
