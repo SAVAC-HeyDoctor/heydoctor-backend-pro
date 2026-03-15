@@ -3,6 +3,7 @@
 const cache = require("../../../../modules/ai/copilot/cache");
 const copilot = require("../../../../modules/ai/copilot");
 const medicalAiEngine = require("../../../../modules/medical-ai-engine");
+const predictiveMedicine = require("../../../../modules/predictive-medicine");
 const { ensureClinicAccess } = require("../../../../utils/tenant-scope");
 const { enqueueCopilotAnalysis } = require("../../../../modules/jobs/queues");
 
@@ -49,6 +50,10 @@ module.exports = {
         ...suggestions,
         ...base,
       });
+    }
+    if (predictiveMedicine.isEnabled() && suggestions.symptoms_detected?.length > 0) {
+      const clinicId = apt.clinic?.id ?? apt.clinic;
+      suggestions = await predictiveMedicine.enrichSuggestions(suggestions.symptoms_detected, clinicId, suggestions);
     }
 
     return ctx.send({

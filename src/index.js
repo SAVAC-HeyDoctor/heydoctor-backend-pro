@@ -15,7 +15,7 @@ const { setupIndexes } = require("../modules/search/setup");
 const { registerAnalyticsListeners } = require("../modules/analytics/analytics.events");
 const { ensureTable: ensureAnalyticsTable } = require("../modules/analytics/clickhouse");
 const { ensureTable: ensureKnowledgeGraphTable } = require("../modules/knowledge-graph/clickhouse");
-const { enqueueAiInsights, startCopilotScheduler, getKnowledgeGraphQueue, getAiModelRefreshQueue } = require("../modules/jobs/queues");
+const { enqueueAiInsights, startCopilotScheduler, getKnowledgeGraphQueue, getAiModelRefreshQueue, getPredictiveModelRefreshQueue } = require("../modules/jobs/queues");
 const ai = require("../modules/ai");
 const { registerCopilotListeners } = require("../modules/ai/copilot/copilot.events");
 
@@ -66,6 +66,31 @@ async function ensureSearchPermission(strapi) {
     strapi.log.info("search: permiso find asignado a Authenticated");
   } catch (err) {
     strapi.log.warn("search: no se pudo asignar permiso", err.message);
+  }
+}
+
+async function ensurePredictiveMedicinePermission(strapi) {
+  try {
+    const [authRole] = await strapi.entityService.findMany(
+      "plugin::users-permissions.role",
+      { filters: { type: "authenticated" } }
+    );
+    if (!authRole) return;
+    const role = await strapi.entityService.findOne(
+      "plugin::users-permissions.role",
+      authRole.id,
+      { populate: ["permissions"] }
+    );
+    const action = "api::predictive-medicine.predictive-medicine.risk";
+    const hasPermission = role.permissions?.some((p) => p.action === action);
+    if (hasPermission) return;
+    await strapi.entityService.create(
+      "plugin::users-permissions.permission",
+      { data: { action, role: role.id } }
+    );
+    strapi.log.info("predictive-medicine: permiso risk asignado a Authenticated");
+  } catch (err) {
+    strapi.log.warn("predictive-medicine: no se pudo asignar permiso", err.message);
   }
 }
 
@@ -197,6 +222,7 @@ module.exports = {
     await ensureClinicalIntelligencePermission(strapi);
     await ensureKnowledgeGraphPermission(strapi);
     await ensureMedicalAiPermission(strapi);
+    await ensurePredictiveMedicinePermission(strapi);
     if (ai.isEnabled() && process.env.REDIS_URL) {
       const q = require("../modules/jobs/queues").getAiInsightsQueue();
       await q.add("generate", { days: 7 }, { repeat: { pattern: "0 9 * * 1" } }).catch(() => {});
@@ -207,6 +233,10 @@ module.exports = {
       await kgq.add("build", {}, { repeat: { pattern: "0 3 * * 0" } }).catch(() => {});
       const refreshq = getAiModelRefreshQueue();
       await refreshq.add("refresh", {}, { repeat: { pattern: "0 4 * * *" } }).catch(() => {});
+    }
+    if (process.env.REDIS_URL) {
+      const predq = getPredictiveModelRefreshQueue();
+      await predq.add("refresh", {}, { repeat: { pattern: "0 5 * * *" } }).catch(() => {});
     }
   },
 };

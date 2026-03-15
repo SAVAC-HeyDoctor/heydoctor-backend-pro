@@ -13,6 +13,7 @@ const QUEUE_NAMES = {
   AI_COPILOT: "ai-copilot",
   KNOWLEDGE_GRAPH: "knowledge-graph-build",
   AI_MODEL_REFRESH: "ai-model-refresh",
+  PREDICTIVE_MODEL_REFRESH: "predictive-model-refresh",
 };
 
 function getPdfQueue() {
@@ -133,4 +134,6 @@ module.exports = {
   enqueueKnowledgeGraphBuild,
   getAiModelRefreshQueue,
   enqueueAiModelRefresh,
+  getPredictiveModelRefreshQueue,
+  enqueuePredictiveModelRefresh,
 };

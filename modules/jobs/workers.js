@@ -98,6 +98,14 @@ async function processAiModelRefresh(job) {
   return result;
 }
 
+async function processPredictiveModelRefresh(job) {
+  const pm = require("../predictive-medicine");
+  if (!pm.isEnabled()) return { skipped: true, reason: "Predictive Medicine not configured" };
+  const { clinicId } = job.data || {};
+  const patterns = await pm.detectClinicalPatterns(clinicId, { days: 30 });
+  return { ok: true, patterns_detected: patterns.symptom_clusters?.length ?? 0 };
+}
+
 async function processCopilotAnalysis(job) {
   const copilot = require("../ai/copilot");
   const cache = require("../ai/copilot/cache");
@@ -144,7 +152,8 @@ function startWorkers(strapi) {
   });
   jobs.createWorker("knowledge-graph-build", processKnowledgeGraphBuild);
   jobs.createWorker("ai-model-refresh", processAiModelRefresh);
-  strapi?.log?.info("Jobs: workers started (pdf, email, image, webhook, analytics, ai-summary, ai-insights, ai-copilot, knowledge-graph, ai-model-refresh)");
+  jobs.createWorker("predictive-model-refresh", processPredictiveModelRefresh);
+  strapi?.log?.info("Jobs: workers started (pdf, email, image, webhook, analytics, ai-summary, ai-insights, ai-copilot, knowledge-graph, ai-model-refresh, predictive-model-refresh)");
 }
 
 module.exports = { startWorkers, processPdf, processEmail, processImage, processWebhook, processAnalytics, processAiSummary, processAiInsights, processCopilotAnalysis, processCopilotScheduler, processKnowledgeGraphBuild };
