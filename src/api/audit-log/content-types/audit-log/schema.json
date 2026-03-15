@@ -30,6 +30,13 @@
     },
     "metadata": {
       "type": "json"
+    },
+    "clinic": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::clinic.clinic",
+      "inversedBy": "audit_logs",
+      "description": "Clínica para aislamiento multi-tenant"
     }
   }
 }

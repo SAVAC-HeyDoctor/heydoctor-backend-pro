@@ -26,7 +26,16 @@ function createConsultationsService(strapi) {
     },
 
     async create(data) {
-      return strapi.entityService.create('api::appointment.appointment', { data });
+      const result = await strapi.entityService.create('api::appointment.appointment', { data });
+      eventBus.emit('appointment_created', {
+        appointmentId: result.id,
+        patientId: result.patient?.id ?? result.patient,
+        doctorId: result.doctor?.id ?? result.doctor,
+        clinicId: result.clinic?.id ?? result.clinic,
+        patientEmail: data.patientEmail,
+        patientPhone: data.patientPhone,
+      });
+      return result;
     },
 
     async update(id, data) {
@@ -55,7 +64,8 @@ function createConsultationsService(strapi) {
         data: { status: 'in_progress' },
       });
 
-      eventBus.emit('CONSULTATION_STARTED', { consultationId: id, appointmentId: id });
+      const clinicId = apt.clinic?.id ?? apt.clinic;
+      eventBus.emit('CONSULTATION_STARTED', { consultationId: id, appointmentId: id, clinicId });
       return updated;
     },
 
@@ -87,6 +97,7 @@ function createConsultationsService(strapi) {
         throw new Error('La consulta no está activa');
       }
 
+      eventBus.emit('consultation_joined', { consultationId: id, appointmentId: id, doctorId, role: 'doctor', clinicId: apt.clinic?.id ?? apt.clinic });
       return apt;
     },
 
@@ -102,6 +113,7 @@ function createConsultationsService(strapi) {
         throw new Error('La consulta no está activa');
       }
 
+      eventBus.emit('consultation_joined', { consultationId: id, appointmentId: id, patientId, role: 'patient', clinicId: apt.clinic?.id ?? apt.clinic });
       return apt;
     },
   };

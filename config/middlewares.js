@@ -3,6 +3,7 @@ const ALLOWED_ORIGINS = (process.env.CORS_ORIGINS || "https://heydoctor.health,h
 module.exports = [
   "global::health",
   "global::sentry",
+  "global::request-logger",
   "global::rate-limit",
   "global::tenant-resolver",
   "strapi::errors",

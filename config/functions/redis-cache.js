@@ -1,5 +1,10 @@
 "use strict";
 
+/**
+ * Redis cache module - usado por rate-limit, WebSocket adapter, doctor/specialty cache.
+ * Fallback automático: cuando REDIS_URL no está definido, getClient() retorna null.
+ * En ese caso: cache.get retorna null, cache.set no hace nada, getOrSet retorna datos frescos.
+ */
 const DEFAULT_TTL = parseInt(process.env.REDIS_CACHE_TTL || "300", 10);
 
 let client = null;
@@ -108,4 +113,9 @@ async function getOrSet(key, fetcher, ttl) {
   return fresh;
 }
 
-module.exports = { getClient, get, set, del, delPattern, getOrSet };
+function isAvailable() {
+  const c = getClient();
+  return !!c;
+}
+
+module.exports = { getClient, get, set, del, delPattern, getOrSet, isAvailable };

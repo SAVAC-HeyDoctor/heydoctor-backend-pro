@@ -78,6 +78,7 @@ async function migrate() {
       { table: 'diagnostics', col: 'clinic_id' },
       { table: 'videocalls', col: 'clinic_id' },
       { table: 'payments', col: 'clinic_id' },
+      { table: 'audit_logs', col: 'clinic_id' },
     ];
 
     for (const { table, col } of tables) {

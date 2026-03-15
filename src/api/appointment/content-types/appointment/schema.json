@@ -98,6 +98,13 @@
       "relation": "manyToOne",
       "target": "api::clinic.clinic",
       "inversedBy": "appointments"
+    },
+    "messages": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::message.message",
+      "mappedBy": "appointment",
+      "description": "Mensajes del chat de la consulta"
     }
   }
 }

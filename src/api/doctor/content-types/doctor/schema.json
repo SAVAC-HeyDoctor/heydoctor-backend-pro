@@ -131,6 +131,13 @@
     },
     "profile_title": {
       "type": "string"
+    },
+    "favorite_patients": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::patient.patient",
+      "mappedBy": "favorite_doctors",
+      "description": "Pacientes que tienen este doctor como favorito"
     }
   }
 }

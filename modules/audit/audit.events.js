@@ -16,6 +16,7 @@ function registerAuditListeners(strapi) {
         ip_address: null,
         user_agent: null,
         metadata: payload,
+        clinic: payload.clinicId ?? null,
       },
     }).catch((err) => strapi.log.warn('audit DOCUMENT_SIGNED failed:', err.message));
   });
@@ -30,6 +31,7 @@ function registerAuditListeners(strapi) {
         ip_address: null,
         user_agent: null,
         metadata: payload,
+        clinic: payload.clinicId ?? null,
       },
     }).catch((err) => strapi.log.warn('audit CONSULTATION_STARTED failed:', err.message));
   });
@@ -44,6 +46,7 @@ function registerAuditListeners(strapi) {
         ip_address: null,
         user_agent: null,
         metadata: payload,
+        clinic: payload.clinicId ?? null,
       },
     }).catch((err) => strapi.log.warn('audit IMAGE_CAPTURED failed:', err.message));
   });

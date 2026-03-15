@@ -19,6 +19,13 @@
     "message": {
       "type": "text",
       "required": true
+    },
+    "appointment": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::appointment.appointment",
+      "inversedBy": "messages",
+      "description": "Consulta médica asociada al mensaje"
     }
   }
 }

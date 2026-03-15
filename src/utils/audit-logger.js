@@ -21,6 +21,7 @@ async function auditLogger(strapi, action, ctx, extra = {}) {
         ip_address: ip,
         user_agent: userAgent,
         metadata: { ...extra },
+        clinic: extra.clinic_id ?? extra.clinicId ?? ctx?.state?.clinicId ?? null,
       },
     });
   } catch (err) {

@@ -35,7 +35,7 @@ El backend está bien estructurado y la mayoría de los módulos funcionan corre
 
 | Import | Archivo(s) | En package.json |
 |--------|------------|-----------------|
-| crypto | file-encryption, encryption, chat-sockets | ✅ Built-in |
+| crypto | file-encryption, encryption | ✅ Built-in |
 | path, fs | secure-file | ✅ Built-in |
 | axios | secure-file, payment-webhook | ✅ |
 | @strapi/strapi | Todos los controllers/services | ✅ |
@@ -140,10 +140,8 @@ connection: {
 
 ## 6. CÓDIGO LEGACY / NO CARGADO
 
-### config/functions/chat-sockets/index.js
-- **Problema:** Usa `socket.io-redis` (deprecado, paquete no en package.json)
-- **Estado:** **No se carga** en el bootstrap (`src/index.js`). Solo se usa `config/functions/websockets.js` que usa `@socket.io/redis-adapter`
-- **Recomendación:** Eliminar o migrar a @socket.io/redis-adapter si se va a usar
+### chat-sockets
+- **Estado:** Eliminado (legacy). WebSockets vía `config/functions/websockets.js` con @socket.io/redis-adapter.
 
 ---
 
@@ -179,7 +177,7 @@ Strapi **no expone** `/._health` por defecto. Railway espera 200 en esa ruta par
 |---|----------|-----------|
 | 1 | uuid, pdfkit, web-push, qrcode no declarados explícitamente; pueden causar ERR_MODULE_NOT_FOUND en Railway | Alta |
 | 2 | Healthcheck `/._health` no existe; Railway puede marcar el servicio como unhealthy | Media |
-| 3 | chat-sockets usa socket.io-redis (deprecado, no instalado); archivo no se carga pero puede confundir | Baja |
+| 3 | chat-sockets eliminado | Resuelto |
 | 4 | FILE_ENCRYPTION_KEY opcional; sin ella el cifrado de archivos está deshabilitado | Info |
 | 5 | REDIS_URL opcional; sin ella el cache y WebSocket scaling no funcionan en producción | Info |
 
@@ -199,9 +197,8 @@ Añadido a `package.json` en `dependencies`:
 ### 9.2 Endpoint de health para Railway ✅ IMPLEMENTADO
 Se añadió middleware `src/middlewares/health.js` que responde `GET /._health` con `{ "status": "ok" }` y status 200. Registrado en `config/middlewares.js` como `global::health`.
 
-### 9.3 Eliminar o actualizar chat-sockets
-- Opción A: Eliminar `config/functions/chat-sockets/` si no se usa
-- Opción B: Migrar a @socket.io/redis-adapter (como websockets.js)
+### 9.3 chat-sockets
+- Eliminado. WebSockets vía websockets.js con @socket.io/redis-adapter.
 
 ### 9.4 Variables de entorno en Railway
 Asegurar que estén configuradas:
@@ -264,7 +261,7 @@ npm ls
 - [ ] Ejecutar `npm install` o `npm ci`
 - [ ] Crear endpoint /._health para Railway
 - [ ] Verificar variables de entorno en Railway
-- [ ] Eliminar o actualizar chat-sockets (opcional)
+- [x] chat-sockets eliminado
 - [ ] Probar `npm run develop` localmente
 - [ ] Probar `npm run build && npm start` localmente
 - [ ] Desplegar en Railway y verificar logs

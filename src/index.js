@@ -5,6 +5,8 @@ const { initSentry } = require("../config/functions/sentry");
 const { registerAuditListeners } = require("../modules/audit/audit.events");
 const { registerMediaListeners } = require("../modules/media/media.events");
 const { registerClinicalListeners } = require("../modules/clinical/clinical.events");
+const { startWorkers } = require("../modules/jobs/workers");
+const { registerListeners: registerNotificationListeners } = require("../modules/notifications");
 
 async function ensureDoctorApplicationPublicPermission(strapi) {
   try {
@@ -41,5 +43,7 @@ module.exports = {
     registerAuditListeners(strapi);
     registerMediaListeners(strapi);
     registerClinicalListeners(strapi);
+    startWorkers(strapi);
+    registerNotificationListeners(strapi);
   },
 };

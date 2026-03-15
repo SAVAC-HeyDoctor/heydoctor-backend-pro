@@ -15,6 +15,12 @@ module.exports = {
         appointmentId: result.id,
         imageId,
       });
+      eventBus.emit('document_uploaded', {
+        appointmentId: result.id,
+        consultationId: result.id,
+        fileId: imageId,
+        clinicId: result.clinic?.id ?? result.clinic,
+      });
     }
   },
 };

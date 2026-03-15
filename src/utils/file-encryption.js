@@ -1,5 +1,9 @@
 'use strict';
 
+/**
+ * Cifrado de archivos clínicos (AES-256-GCM).
+ * Usa crypto nativo de Node.js. Activo cuando FILE_ENCRYPTION_KEY está definido (64 hex chars).
+ */
 const crypto = require('crypto');
 
 const ALGORITHM = 'aes-256-gcm';
