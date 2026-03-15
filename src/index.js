@@ -9,6 +9,8 @@ const { startWorkers } = require("../modules/jobs/workers");
 const { registerListeners: registerNotificationListeners } = require("../modules/notifications");
 const { up: runDbIndexMigration } = require("../database/migrations/20250315000000_add_performance_indexes");
 const { registerSlowQueryMonitor } = require("../modules/observability/db-monitor");
+const { registerPoolMonitor } = require("../modules/observability/db-pool-monitor");
+const { initReadReplica } = require("../modules/database");
 
 async function ensureDoctorApplicationPublicPermission(strapi) {
   try {
@@ -49,5 +51,7 @@ module.exports = {
     registerNotificationListeners(strapi);
     await runDbIndexMigration(strapi);
     registerSlowQueryMonitor(strapi);
+    registerPoolMonitor(strapi);
+    initReadReplica(strapi);
   },
 };
