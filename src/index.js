@@ -69,6 +69,31 @@ async function ensureSearchPermission(strapi) {
   }
 }
 
+async function ensureCdssPermission(strapi) {
+  try {
+    const [authRole] = await strapi.entityService.findMany(
+      "plugin::users-permissions.role",
+      { filters: { type: "authenticated" } }
+    );
+    if (!authRole) return;
+    const role = await strapi.entityService.findOne(
+      "plugin::users-permissions.role",
+      authRole.id,
+      { populate: ["permissions"] }
+    );
+    const action = "api::cdss.cdss.evaluate";
+    const hasPermission = role.permissions?.some((p) => p.action === action);
+    if (hasPermission) return;
+    await strapi.entityService.create(
+      "plugin::users-permissions.permission",
+      { data: { action, role: role.id } }
+    );
+    strapi.log.info("cdss: permiso evaluate asignado a Authenticated");
+  } catch (err) {
+    strapi.log.warn("cdss: no se pudo asignar permiso", err.message);
+  }
+}
+
 async function ensurePredictiveMedicinePermission(strapi) {
   try {
     const [authRole] = await strapi.entityService.findMany(
@@ -223,6 +248,7 @@ module.exports = {
     await ensureKnowledgeGraphPermission(strapi);
     await ensureMedicalAiPermission(strapi);
     await ensurePredictiveMedicinePermission(strapi);
+    await ensureCdssPermission(strapi);
     if (ai.isEnabled() && process.env.REDIS_URL) {
       const q = require("../modules/jobs/queues").getAiInsightsQueue();
       await q.add("generate", { days: 7 }, { repeat: { pattern: "0 9 * * 1" } }).catch(() => {});

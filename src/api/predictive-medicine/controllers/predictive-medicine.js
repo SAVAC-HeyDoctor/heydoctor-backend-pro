@@ -1,6 +1,7 @@
 "use strict";
 
 const predictiveMedicine = require("../../../../modules/predictive-medicine");
+const cdss = require("../../../../modules/cdss");
 
 module.exports = {
   async risk(ctx) {
@@ -32,7 +33,20 @@ module.exports = {
       });
     }
 
-    const result = await predictiveMedicine.predictHealthRisks(symptoms, clinicId, { limit: 15 });
+    const predResult = await predictiveMedicine.predictHealthRisks(symptoms, clinicId, { limit: 15 });
+    let result = { ...predResult };
+
+    if (cdss.isEnabled()) {
+      const enriched = await cdss.enrichWithCdss(symptoms, clinicId, {
+        suggested_diagnoses: (predResult.predicted_conditions ?? []).map((c) => ({ code: c.code, confidence: c.risk_score })),
+        suggested_treatments: (predResult.suggested_treatments ?? []).map((t) => ({ name: t.name, confidence: t.confidence })),
+        preventive_actions: predResult.preventive_actions ?? [],
+        risk_levels: predResult.risk_scores ?? [],
+      });
+      result.alerts = enriched.alerts ?? [];
+      result.risk_levels = enriched.risk_levels ?? result.risk_scores ?? [];
+      if ((enriched.preventive_actions ?? []).length > 0) result.preventive_actions = enriched.preventive_actions;
+    }
 
     const strapi = global.strapi;
     const codeToDesc = {};
@@ -55,6 +69,8 @@ module.exports = {
       predicted_conditions,
       risk_scores: result.risk_scores ?? [],
       preventive_actions: result.preventive_actions ?? [],
+      alerts: result.alerts ?? [],
+      risk_levels: result.risk_levels ?? result.risk_scores ?? [],
       meta: { engine_enabled: true },
     });
   },

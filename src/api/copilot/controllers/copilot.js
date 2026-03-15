@@ -4,6 +4,7 @@ const cache = require("../../../../modules/ai/copilot/cache");
 const copilot = require("../../../../modules/ai/copilot");
 const medicalAiEngine = require("../../../../modules/medical-ai-engine");
 const predictiveMedicine = require("../../../../modules/predictive-medicine");
+const cdss = require("../../../../modules/cdss");
 const { ensureClinicAccess } = require("../../../../utils/tenant-scope");
 const { enqueueCopilotAnalysis } = require("../../../../modules/jobs/queues");
 
@@ -54,6 +55,16 @@ module.exports = {
     if (predictiveMedicine.isEnabled() && suggestions.symptoms_detected?.length > 0) {
       const clinicId = apt.clinic?.id ?? apt.clinic;
       suggestions = await predictiveMedicine.enrichSuggestions(suggestions.symptoms_detected, clinicId, suggestions);
+    }
+    if (cdss.isEnabled() && suggestions.symptoms_detected?.length > 0) {
+      const clinicId = apt.clinic?.id ?? apt.clinic;
+      const base = {
+        suggested_diagnoses: (suggestions.suggested_diagnoses ?? suggestions.possible_diagnoses ?? []).map((d) =>
+          typeof d === "string" ? { code: d, description: d } : d
+        ),
+        suggested_treatments: suggestions.suggested_treatments ?? [],
+      };
+      suggestions = await cdss.enrichWithCdss(suggestions.symptoms_detected, clinicId, { ...suggestions, ...base });
     }
 
     return ctx.send({
