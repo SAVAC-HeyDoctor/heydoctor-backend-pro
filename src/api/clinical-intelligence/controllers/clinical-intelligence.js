@@ -1,6 +1,7 @@
 "use strict";
 
 const clinicalIntelligence = require("../../../../modules/clinical-intelligence");
+const knowledgeGraph = require("../../../../modules/knowledge-graph");
 
 module.exports = {
   async suggest(ctx) {
@@ -19,9 +20,15 @@ module.exports = {
       clinicalIntelligence.suggestTreatments(symptoms, clinicId, 15),
     ]);
 
-    return ctx.send({
+    let result = {
       suggested_diagnoses: suggestedDiagnoses,
       suggested_treatments: suggestedTreatments,
-    });
+    };
+
+    if (knowledgeGraph.isEnabled()) {
+      result = await knowledgeGraph.enrichClinicalSuggestions(symptoms, clinicId, result);
+    }
+
+    return ctx.send(result);
   },
 };

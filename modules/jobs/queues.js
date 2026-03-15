@@ -11,6 +11,7 @@ const QUEUE_NAMES = {
   AI_SUMMARY: "ai-consultation-summary",
   AI_INSIGHTS: "ai-weekly-insights",
   AI_COPILOT: "ai-copilot",
+  KNOWLEDGE_GRAPH: "knowledge-graph-build",
 };
 
 function getPdfQueue() {
@@ -90,6 +91,15 @@ async function startCopilotScheduler() {
   await q.add("scheduler", {}, { repeat: { every: 30000, key: "copilot-scheduler" } }).catch(() => {});
 }
 
+function getKnowledgeGraphQueue() {
+  return jobs.createQueue(QUEUE_NAMES.KNOWLEDGE_GRAPH);
+}
+
+async function enqueueKnowledgeGraphBuild(data = {}) {
+  const q = getKnowledgeGraphQueue();
+  return q.add("build", data);
+}
+
 module.exports = {
   QUEUE_NAMES,
   getPdfQueue,
@@ -109,4 +119,6 @@ module.exports = {
   getAiCopilotQueue,
   enqueueCopilotAnalysis,
   startCopilotScheduler,
+  getKnowledgeGraphQueue,
+  enqueueKnowledgeGraphBuild,
 };

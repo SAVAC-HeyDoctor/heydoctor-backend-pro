@@ -14,7 +14,8 @@ const { initReadReplica } = require("../modules/database");
 const { setupIndexes } = require("../modules/search/setup");
 const { registerAnalyticsListeners } = require("../modules/analytics/analytics.events");
 const { ensureTable: ensureAnalyticsTable } = require("../modules/analytics/clickhouse");
-const { enqueueAiInsights, startCopilotScheduler } = require("../modules/jobs/queues");
+const { ensureTable: ensureKnowledgeGraphTable } = require("../modules/knowledge-graph/clickhouse");
+const { enqueueAiInsights, startCopilotScheduler, getKnowledgeGraphQueue } = require("../modules/jobs/queues");
 const ai = require("../modules/ai");
 const { registerCopilotListeners } = require("../modules/ai/copilot/copilot.events");
 
@@ -65,6 +66,32 @@ async function ensureSearchPermission(strapi) {
     strapi.log.info("search: permiso find asignado a Authenticated");
   } catch (err) {
     strapi.log.warn("search: no se pudo asignar permiso", err.message);
+  }
+}
+
+async function ensureKnowledgeGraphPermission(strapi) {
+  try {
+    const [authRole] = await strapi.entityService.findMany(
+      "plugin::users-permissions.role",
+      { filters: { type: "authenticated" } }
+    );
+    if (!authRole) return;
+    const role = await strapi.entityService.findOne(
+      "plugin::users-permissions.role",
+      authRole.id,
+      { populate: ["permissions"] }
+    );
+    for (const action of ["api::knowledge-graph.knowledge-graph.query", "api::knowledge-graph.knowledge-graph.build"]) {
+      const hasPermission = role.permissions?.some((p) => p.action === action);
+      if (hasPermission) continue;
+      await strapi.entityService.create(
+        "plugin::users-permissions.permission",
+        { data: { action, role: role.id } }
+      );
+    }
+    strapi.log.info("knowledge-graph: permisos query y build asignados a Authenticated");
+  } catch (err) {
+    strapi.log.warn("knowledge-graph: no se pudo asignar permiso", err.message);
   }
 }
 
@@ -139,13 +166,19 @@ module.exports = {
     await setupIndexes(strapi);
     registerAnalyticsListeners(strapi);
     await ensureAnalyticsTable();
+    await ensureKnowledgeGraphTable();
     registerCopilotListeners(strapi);
     await ensureCopilotPermission(strapi);
     await ensureClinicalIntelligencePermission(strapi);
+    await ensureKnowledgeGraphPermission(strapi);
     if (ai.isEnabled() && process.env.REDIS_URL) {
       const q = require("../modules/jobs/queues").getAiInsightsQueue();
       await q.add("generate", { days: 7 }, { repeat: { pattern: "0 9 * * 1" } }).catch(() => {});
       await startCopilotScheduler();
+    }
+    if (process.env.CLICKHOUSE_URL && process.env.REDIS_URL) {
+      const kgq = getKnowledgeGraphQueue();
+      await kgq.add("build", {}, { repeat: { pattern: "0 3 * * 0" } }).catch(() => {});
     }
   },
 };

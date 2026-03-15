@@ -80,6 +80,14 @@ async function processCopilotScheduler(job) {
   return { processed: (appointments || []).length };
 }
 
+async function processKnowledgeGraphBuild(job) {
+  const kg = require("../knowledge-graph");
+  if (!kg.isEnabled()) return { skipped: true, reason: "ClickHouse not configured" };
+  const { clinicId } = job.data || {};
+  const result = await kg.buildKnowledgeGraph({ clinicId, clear: true });
+  return result;
+}
+
 async function processCopilotAnalysis(job) {
   const copilot = require("../ai/copilot");
   const cache = require("../ai/copilot/cache");
@@ -124,7 +132,8 @@ function startWorkers(strapi) {
     if (job.name === "scheduler") return processCopilotScheduler(job);
     return processCopilotAnalysis(job);
   });
-  strapi?.log?.info("Jobs: workers started (pdf, email, image, webhook, analytics, ai-summary, ai-insights, ai-copilot)");
+  jobs.createWorker("knowledge-graph-build", processKnowledgeGraphBuild);
+  strapi?.log?.info("Jobs: workers started (pdf, email, image, webhook, analytics, ai-summary, ai-insights, ai-copilot, knowledge-graph)");
 }
 
-module.exports = { startWorkers, processPdf, processEmail, processImage, processWebhook, processAnalytics, processAiSummary, processAiInsights, processCopilotAnalysis, processCopilotScheduler };
+module.exports = { startWorkers, processPdf, processEmail, processImage, processWebhook, processAnalytics, processAiSummary, processAiInsights, processCopilotAnalysis, processCopilotScheduler, processKnowledgeGraphBuild };
