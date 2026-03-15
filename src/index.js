@@ -11,6 +11,7 @@ const { up: runDbIndexMigration } = require("../database/migrations/202503150000
 const { registerSlowQueryMonitor } = require("../modules/observability/db-monitor");
 const { registerPoolMonitor } = require("../modules/observability/db-pool-monitor");
 const { initReadReplica } = require("../modules/database");
+const { setupIndexes } = require("../modules/search/setup");
 
 async function ensureDoctorApplicationPublicPermission(strapi) {
   try {
@@ -37,6 +38,31 @@ async function ensureDoctorApplicationPublicPermission(strapi) {
   }
 }
 
+async function ensureSearchPermission(strapi) {
+  try {
+    const [authRole] = await strapi.entityService.findMany(
+      "plugin::users-permissions.role",
+      { filters: { type: "authenticated" } }
+    );
+    if (!authRole) return;
+    const role = await strapi.entityService.findOne(
+      "plugin::users-permissions.role",
+      authRole.id,
+      { populate: ["permissions"] }
+    );
+    const action = "api::search.search.find";
+    const hasPermission = role.permissions?.some((p) => p.action === action);
+    if (hasPermission) return;
+    await strapi.entityService.create(
+      "plugin::users-permissions.permission",
+      { data: { action, role: role.id } }
+    );
+    strapi.log.info("search: permiso find asignado a Authenticated");
+  } catch (err) {
+    strapi.log.warn("search: no se pudo asignar permiso", err.message);
+  }
+}
+
 module.exports = {
   register(/*{ strapi }*/) {},
 
@@ -44,6 +70,7 @@ module.exports = {
     initSentry(strapi);
     await initialize(strapi);
     await ensureDoctorApplicationPublicPermission(strapi);
+    await ensureSearchPermission(strapi);
     registerAuditListeners(strapi);
     registerMediaListeners(strapi);
     registerClinicalListeners(strapi);
@@ -53,5 +80,7 @@ module.exports = {
     registerSlowQueryMonitor(strapi);
     registerPoolMonitor(strapi);
     initReadReplica(strapi);
+    global.strapi = strapi;
+    await setupIndexes(strapi);
   },
 };
