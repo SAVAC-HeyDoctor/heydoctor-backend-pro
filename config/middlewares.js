@@ -1,6 +1,7 @@
 const ALLOWED_ORIGINS = (process.env.CORS_ORIGINS || "https://heydoctor.health,https://www.heydoctor.health").split(",").map(s => s.trim());
 
 module.exports = [
+  "global::health",
   "global::sentry",
   "global::rate-limit",
   "global::tenant-resolver",
