@@ -5,6 +5,7 @@ const copilot = require("../../../../modules/ai/copilot");
 const medicalAiEngine = require("../../../../modules/medical-ai-engine");
 const predictiveMedicine = require("../../../../modules/predictive-medicine");
 const cdss = require("../../../../modules/cdss");
+const clinicalSafety = require("../../../../modules/clinical-safety");
 const { ensureClinicAccess } = require("../../../../utils/tenant-scope");
 const { enqueueCopilotAnalysis } = require("../../../../modules/jobs/queues");
 
@@ -67,8 +68,21 @@ module.exports = {
       suggestions = await cdss.enrichWithCdss(suggestions.symptoms_detected, clinicId, { ...suggestions, ...base });
     }
 
+    const analytics = require("../../../../modules/analytics");
+    if (analytics.isEnabled()) {
+      analytics.trackEvent("copilot_suggestions_used", {
+        clinicId: apt.clinic?.id ?? apt.clinic,
+        userId: null,
+        entityId: consultationId,
+        metadata: { consultationId, appointmentId: consultationId },
+      });
+    }
+
+    const safetyContext = { clinic_id: apt.clinic?.id ?? apt.clinic, consultationId };
+    const enrichedSuggestions = clinicalSafety.enrichSuggestions(suggestions, safetyContext);
+
     return ctx.send({
-      data: suggestions,
+      data: enrichedSuggestions,
       meta: { ai_enabled: true, status: "ready" },
     });
   },
@@ -137,6 +151,17 @@ module.exports = {
       });
     }
 
+    const analytics = require("../../../../modules/analytics");
+    if (analytics.isEnabled()) {
+      const apt = consultationId ? await strapi.entityService.findOne("api::appointment.appointment", consultationId, { populate: ["clinic"] }) : null;
+      const doctor = user ? await strapi.db.query("api::doctor.doctor").findOne({ where: { user: user.id } }) : null;
+      analytics.trackEvent("clinical_note_generated", {
+        clinicId: apt?.clinic?.id ?? apt?.clinic ?? ctx.state?.clinicId,
+        userId: doctor?.id,
+        entityId: consultationId,
+        metadata: { consultationId },
+      });
+    }
     return ctx.send({
       data: note,
       meta: { ai_enabled: true, status: "ready" },

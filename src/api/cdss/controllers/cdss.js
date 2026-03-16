@@ -1,6 +1,7 @@
 "use strict";
 
 const cdss = require("../../../../modules/cdss");
+const clinicalSafety = require("../../../../modules/clinical-safety");
 
 module.exports = {
   async evaluate(ctx) {
@@ -53,10 +54,14 @@ module.exports = {
       description: d.description || codeToDesc[d.code] || "",
     }));
 
+    const safetyContext = { clinic_id: clinicId, ...context };
+    const toEnrich = { suggested_diagnoses, treatment_recommendations: result.treatment_recommendations ?? [] };
+    const enriched = clinicalSafety.enrichSuggestions(toEnrich, safetyContext);
+
     return ctx.send({
       alerts: result.alerts ?? [],
-      suggested_diagnoses,
-      treatment_recommendations: result.treatment_recommendations ?? [],
+      suggested_diagnoses: enriched.suggested_diagnoses ?? suggested_diagnoses,
+      treatment_recommendations: enriched.treatment_recommendations ?? result.treatment_recommendations ?? [],
       preventive_actions: result.preventive_actions ?? [],
       risk_levels: result.risk_levels ?? [],
       meta: { ...(result.meta ?? {}), cdss_enabled: true },

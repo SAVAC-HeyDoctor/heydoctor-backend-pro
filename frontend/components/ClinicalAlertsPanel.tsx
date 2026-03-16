@@ -12,6 +12,7 @@ export interface ClinicalAlert {
   treatment?: string;
   condition_code?: string;
   action_type?: string;
+  explanation?: string;
 }
 
 interface ClinicalAlertsPanelProps {
@@ -76,6 +77,12 @@ export function ClinicalAlertsPanel({ alerts, isLoading, className = '' }: Clini
               {typeLabels[alert.type] ?? alert.type}
             </span>
             <p className="mt-0.5">{alert.message}</p>
+            {alert.confidence != null && (
+              <p className="text-xs mt-0.5 opacity-80">{Math.round(alert.confidence * 100)}% confidence</p>
+            )}
+            {alert.explanation && (
+              <p className="text-xs mt-0.5 italic">Explanation: {alert.explanation}</p>
+            )}
           </div>
         ))}
       </div>

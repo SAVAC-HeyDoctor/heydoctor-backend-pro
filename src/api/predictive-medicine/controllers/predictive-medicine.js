@@ -24,6 +24,18 @@ module.exports = {
 
     const clinicId = ctx.state?.clinicId ?? context.clinic_id ?? null;
 
+    const analytics = require("../../../../modules/analytics");
+    const strapi = global.strapi;
+    if (analytics.isEnabled() && strapi) {
+      const doctor = ctx.state?.user ? await strapi.db.query("api::doctor.doctor").findOne({ where: { user: ctx.state.user.id } }) : null;
+      analytics.trackEvent("predictive_medicine_used", {
+        clinicId,
+        userId: doctor?.id,
+        entityId: null,
+        metadata: { symptoms_count: symptoms.length },
+      });
+    }
+
     if (!predictiveMedicine.isEnabled()) {
       return ctx.send({
         predicted_conditions: [],

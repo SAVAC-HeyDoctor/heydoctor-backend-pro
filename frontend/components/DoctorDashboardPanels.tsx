@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { evaluateCdss } from '../lib/api-ai';
 import { fetchAppointments, fetchPatients } from '../lib/api-clinic';
 import { ClinicalAlertsPanel } from './ClinicalAlertsPanel';
+import { DoctorAnalyticsPanel } from './DoctorAnalyticsPanel';
 
 interface DoctorDashboardPanelsProps {
   clinicId: number | null;
@@ -92,11 +93,8 @@ export function DoctorDashboardPanels({
         <ClinicalAlertsPanel alerts={cdssAlerts} isLoading={false} />
       </section>
 
-      <section className="md:col-span-2 lg:col-span-4 rounded-lg border border-gray-200 p-4 bg-gray-50">
-        <h3 className="font-medium text-gray-700 mb-2">Tendencias de clínica</h3>
-        <p className="text-sm text-gray-500">
-          Integrar con endpoint de analytics cuando esté disponible.
-        </p>
+      <section className="md:col-span-2 lg:col-span-4">
+        <DoctorAnalyticsPanel days={7} />
       </section>
     </div>
   );

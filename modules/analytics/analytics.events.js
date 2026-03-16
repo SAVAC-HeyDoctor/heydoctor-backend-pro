@@ -32,6 +32,7 @@ function registerAnalyticsListeners(strapi) {
 
   eventBus.on("consultation_ended", (payload) => {
     analytics.trackConsultation("consultation_ended", toEventPayload(payload));
+    analytics.trackConsultation("consultation_completed", toEventPayload(payload));
     const ai = require("../ai");
     if (ai.isEnabled()) {
       const { enqueueAiSummary } = require("../jobs/queues");

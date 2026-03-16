@@ -66,13 +66,16 @@ export function AutoTreatmentSuggestions({
               <button
                 type="button"
                 onClick={() => onSelectTreatment?.(t.name)}
-                className="text-sm text-indigo-600 hover:underline"
+                className="text-sm text-indigo-600 hover:underline text-left"
               >
                 {t.name}
                 {t.confidence != null && (
-                  <span className="text-gray-500 ml-1">({Math.round((t.confidence ?? 0) * 100)}%)</span>
+                  <span className="text-indigo-600 ml-1">({Math.round((t.confidence ?? 0) * 100)}% confidence)</span>
                 )}
               </button>
+              {(t as { explanation?: string }).explanation && (
+                <p className="text-xs text-gray-500 mt-0.5 ml-2">Explanation: {(t as { explanation?: string }).explanation}</p>
+              )}
             </li>
           ))}
         </ul>

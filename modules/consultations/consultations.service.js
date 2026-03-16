@@ -69,7 +69,8 @@ function createConsultationsService(strapi) {
       });
 
       const clinicId = apt.clinic?.id ?? apt.clinic;
-      eventBus.emit('CONSULTATION_STARTED', { consultationId: id, appointmentId: id, clinicId });
+      const aptDoctorId = apt.doctor?.id ?? apt.doctor;
+      eventBus.emit('CONSULTATION_STARTED', { consultationId: id, appointmentId: id, clinicId, doctorId: aptDoctorId ?? doctorId });
       return updated;
     },
 
