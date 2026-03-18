@@ -1,0 +1,19 @@
+import { TypeOrmModuleOptions } from '@nestjs/typeorm';
+
+const baseConfig: TypeOrmModuleOptions = {
+  type: 'postgres',
+  entities: [__dirname + '/../**/*.entity{.ts,.js}'],
+  synchronize: process.env.NODE_ENV !== 'production',
+  logging: process.env.NODE_ENV === 'development',
+};
+
+export const typeOrmConfig: TypeOrmModuleOptions = process.env.DATABASE_URL
+  ? { ...baseConfig, url: process.env.DATABASE_URL }
+  : {
+      ...baseConfig,
+      host: process.env.DB_HOST || 'localhost',
+      port: parseInt(process.env.DB_PORT || '5432', 10),
+      username: process.env.DB_USERNAME || 'postgres',
+      password: process.env.DB_PASSWORD || 'postgres',
+      database: process.env.DB_DATABASE || 'nest_backend',
+    };
