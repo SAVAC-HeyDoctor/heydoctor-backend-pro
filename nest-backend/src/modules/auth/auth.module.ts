@@ -10,7 +10,7 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
     JwtModule.register({
       secret: process.env.JWT_SECRET || 'your-secret-key-change-in-production',
       signOptions: {
-        expiresIn: process.env.JWT_EXPIRES_IN || '7d',
+        expiresIn: 604800, // 7 days - override with JWT_EXPIRES_IN env (e.g. 3600 for 1h)
       },
     }),
   ],
