@@ -3,11 +3,11 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Evitar ERESOLVE en NestJS/TypeORM
+# Evitar ERESOLVE: legacy-peer-deps + npm install (más resiliente que npm ci)
 ENV npm_config_legacy_peer_deps=true
 
 COPY package*.json .npmrc* ./
-RUN npm ci
+RUN npm install
 
 COPY . .
 RUN npm run build
@@ -21,7 +21,7 @@ ENV NODE_ENV=production
 ENV npm_config_legacy_peer_deps=true
 
 COPY package*.json .npmrc* ./
-RUN npm ci --omit=dev --ignore-scripts
+RUN npm install --omit=dev --ignore-scripts
 
 COPY --from=builder /app/dist ./dist
 
