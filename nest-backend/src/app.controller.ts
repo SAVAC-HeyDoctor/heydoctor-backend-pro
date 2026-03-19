@@ -4,7 +4,9 @@ import { AuthService } from './modules/auth/auth.service';
 
 @Controller()
 export class AppController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(private readonly authService: AuthService) {
+    console.log('AppController loaded');
+  }
 
   @Public()
   @Get()
@@ -30,6 +32,7 @@ export class AppController {
   @Public()
   @Post('auth/login')
   async login(@Body() body: { email?: string; password?: string }) {
+    console.log('LOGIN HIT');
     return this.authService.login(
       body.email || '',
       body.password || '',
