@@ -5,6 +5,8 @@
   "private": true,
   "scripts": {
     "build": "nest build",
+    "migration:run": "npx typeorm-ts-node-commonjs migration:run -d src/database/data-source.ts",
+    "migration:revert": "npx typeorm-ts-node-commonjs migration:revert -d src/database/data-source.ts",
     "start": "node dist/main.js",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start:dev": "nest start --watch",
