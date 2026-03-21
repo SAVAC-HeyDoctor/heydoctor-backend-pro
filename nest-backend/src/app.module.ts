@@ -8,6 +8,7 @@ import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { ClinicResolverInterceptor } from './common/interceptors/clinic-resolver.interceptor';
 import { AppController } from './app.controller';
 import { CommonModule } from './common/common.module';
+import { AuditLogModule } from './modules/audit-log/audit-log.module';
 import { ClinicModule } from './modules/clinic/clinic.module';
 import { CopilotModule } from './modules/copilot/copilot.module';
 import { CdssModule } from './modules/cdss/cdss.module';
@@ -33,6 +34,7 @@ import { WebrtcModule } from './modules/webrtc/webrtc.module';
     ConfigModule,
     TypeOrmModule.forRoot(typeOrmConfig),
     CommonModule,
+    AuditLogModule,
     AuthModule,
     ClinicModule,
     PatientsModule,

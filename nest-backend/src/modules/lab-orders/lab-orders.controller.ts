@@ -15,6 +15,8 @@ import { LabOrderFiltersDto } from './dto/lab-order-filters.dto';
 import { ClinicId } from '../../common/decorators/clinic-id.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthActor } from '../../common/interfaces/auth-actor.interface';
+import { Audit } from '../audit-log/decorators/audit.decorator';
+import { AuditActions } from '../audit-log/audit-log.constants';
 
 @Controller('lab-orders')
 export class LabOrdersController {
@@ -75,6 +77,12 @@ export class LabOrdersController {
     );
   }
 
+  @Audit({
+    action: AuditActions.LAB_ORDER_CREATE,
+    resourceType: 'lab_order',
+    patientIdBodyKey: 'patientId',
+    resourceIdFromResponse: true,
+  })
   @Post()
   async create(
     @ClinicId() clinicId: string,
@@ -99,6 +107,12 @@ export class LabOrdersController {
     );
   }
 
+  @Audit({
+    action: AuditActions.LAB_ORDER_DELETE,
+    resourceType: 'lab_order',
+    resourceIdParam: 'id',
+    patientIdFromResponse: true,
+  })
   @Delete(':id')
   async remove(
     @Param('id') id: string,

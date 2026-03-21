@@ -15,3 +15,4 @@ export * from './treatment.entity';
 export * from './cie10-code.entity';
 export * from './medication.entity';
 export * from './ai-insight.entity';
+export * from './audit-log.entity';

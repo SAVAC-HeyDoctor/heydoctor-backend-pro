@@ -16,6 +16,8 @@ import { ClinicId } from '../../common/decorators/clinic-id.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { PatientFiltersDto } from '../clinic/dto/patient-filters.dto';
 import type { AuthActor } from '../../common/interfaces/auth-actor.interface';
+import { Audit } from '../audit-log/decorators/audit.decorator';
+import { AuditActions } from '../audit-log/audit-log.constants';
 
 @Controller('patients')
 export class PatientsController {
@@ -37,6 +39,12 @@ export class PatientsController {
     return this.patientsService.findAll(clinicId, filters, this.actor(userId, clinicId));
   }
 
+  @Audit({
+    action: AuditActions.PATIENT_READ,
+    resourceType: 'patient',
+    patientIdParam: 'id',
+    resourceIdParam: 'id',
+  })
   @Get(':id/medical-record')
   async getMedicalRecord(
     @Param('id') patientId: string,
@@ -47,6 +55,12 @@ export class PatientsController {
     return this.clinicService.getPatientMedicalRecord(patientId, clinicId);
   }
 
+  @Audit({
+    action: AuditActions.PATIENT_READ,
+    resourceType: 'patient',
+    patientIdParam: 'id',
+    resourceIdParam: 'id',
+  })
   @Get(':id')
   async findOne(
     @Param('id') id: string,

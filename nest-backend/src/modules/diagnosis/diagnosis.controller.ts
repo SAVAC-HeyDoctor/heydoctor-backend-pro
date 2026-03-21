@@ -15,6 +15,8 @@ import { DiagnosisFiltersDto } from './dto/diagnosis-filters.dto';
 import { ClinicId } from '../../common/decorators/clinic-id.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthActor } from '../../common/interfaces/auth-actor.interface';
+import { Audit } from '../audit-log/decorators/audit.decorator';
+import { AuditActions } from '../audit-log/audit-log.constants';
 
 @Controller('diagnosis')
 export class DiagnosisController {
@@ -51,6 +53,12 @@ export class DiagnosisController {
     return this.diagnosisService.create(dto, clinicId, this.actor(userId, clinicId));
   }
 
+  @Audit({
+    action: AuditActions.DIAGNOSIS_UPDATE,
+    resourceType: 'diagnosis',
+    resourceIdParam: 'id',
+    patientIdFromResponse: true,
+  })
   @Patch(':id')
   async update(
     @Param('id') id: string,

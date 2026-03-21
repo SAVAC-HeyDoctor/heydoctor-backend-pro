@@ -15,6 +15,8 @@ import { PrescriptionFiltersDto } from './dto/prescription-filters.dto';
 import { ClinicId } from '../../common/decorators/clinic-id.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthActor } from '../../common/interfaces/auth-actor.interface';
+import { Audit } from '../audit-log/decorators/audit.decorator';
+import { AuditActions } from '../audit-log/audit-log.constants';
 
 @Controller('prescriptions')
 export class PrescriptionsController {
@@ -75,6 +77,12 @@ export class PrescriptionsController {
     );
   }
 
+  @Audit({
+    action: AuditActions.PRESCRIPTION_CREATE,
+    resourceType: 'prescription',
+    patientIdBodyKey: 'patientId',
+    resourceIdFromResponse: true,
+  })
   @Post()
   async create(
     @ClinicId() clinicId: string,
