@@ -19,6 +19,7 @@ import { PatientReminder } from './patient-reminder.entity';
 import { LabOrder } from './lab-order.entity';
 import { Prescription } from './prescription.entity';
 import { Doctor } from './doctor.entity';
+import { AiInsight } from './ai-insight.entity';
 
 export type IdentificationType = 'passport' | 'id card' | 'rut';
 export type GenderType = 'M' | 'F' | 'Other';
@@ -95,6 +96,9 @@ export class Patient {
 
   @OneToMany(() => Prescription, (p) => p.patient)
   prescriptions: Prescription[];
+
+  @OneToMany(() => AiInsight, (a) => a.patient)
+  ai_insights: AiInsight[];
 
   @ManyToMany(() => Doctor, (d) => d.favoritePatients, { nullable: true })
   @JoinTable({

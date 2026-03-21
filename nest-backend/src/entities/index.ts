@@ -14,3 +14,4 @@ export * from './diagnosis.entity';
 export * from './treatment.entity';
 export * from './cie10-code.entity';
 export * from './medication.entity';
+export * from './ai-insight.entity';

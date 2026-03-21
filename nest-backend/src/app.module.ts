@@ -25,6 +25,7 @@ import { PatientsModule } from './modules/patients/patients.module';
 import { ConsultationsModule } from './modules/consultations/consultations.module';
 import { DiagnosisModule } from './modules/diagnosis/diagnosis.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
+import { AiInsightsModule } from './modules/ai-insights/ai-insights.module';
 
 @Module({
   imports: [
@@ -49,6 +50,7 @@ import { AnalyticsModule } from './modules/analytics/analytics.module';
     FavoriteOrdersModule,
     PatientRemindersModule,
     AnalyticsModule,
+    AiInsightsModule,
   ],
   controllers: [AppController],
   providers: [
