@@ -69,6 +69,7 @@ export class ConsultationsService {
         'diagnostic.cie_10_code',
         'lab_orders',
         'prescriptions',
+        'prescriptions.diagnosis',
       ],
     });
     if (!consultation) {

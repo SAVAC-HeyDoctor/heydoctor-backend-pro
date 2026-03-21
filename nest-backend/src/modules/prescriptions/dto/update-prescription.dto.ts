@@ -28,9 +28,10 @@ export class MedicationItemDto {
   instructions?: string;
 }
 
-export class CreatePrescriptionDto {
+export class UpdatePrescriptionDto {
+  @IsOptional()
   @IsUUID()
-  patientId: string;
+  patientId?: string;
 
   @IsOptional()
   @IsUUID()
@@ -48,10 +49,11 @@ export class CreatePrescriptionDto {
   @IsUUID()
   diagnosisId?: string;
 
+  @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => MedicationItemDto)
-  medications: MedicationItemDto[];
+  medications?: MedicationItemDto[];
 
   @IsOptional()
   @IsString()
@@ -60,6 +62,10 @@ export class CreatePrescriptionDto {
   @IsOptional()
   @IsString()
   instructions?: string;
+
+  @IsOptional()
+  @IsString()
+  status?: string;
 
   @IsOptional()
   @IsString()

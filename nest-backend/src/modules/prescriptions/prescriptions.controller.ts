@@ -1,6 +1,17 @@
-import { Controller, Get, Post, Param, Body, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Param,
+  Body,
+  Query,
+} from '@nestjs/common';
 import { PrescriptionsService } from './prescriptions.service';
 import { CreatePrescriptionDto } from './dto/create-prescription.dto';
+import { UpdatePrescriptionDto } from './dto/update-prescription.dto';
+import { PrescriptionFiltersDto } from './dto/prescription-filters.dto';
 import { ClinicId } from '../../common/decorators/clinic-id.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -14,6 +25,32 @@ export class PrescriptionsController {
     @InjectRepository(Doctor)
     private readonly doctorRepo: Repository<Doctor>,
   ) {}
+
+  @Get()
+  async findAll(@Query() filters: PrescriptionFiltersDto) {
+    return this.prescriptionsService.findAll(filters);
+  }
+
+  @Get('patient/:patientId')
+  async getByPatient(
+    @Param('patientId') patientId: string,
+    @ClinicId() clinicId: string,
+  ) {
+    if (!clinicId) {
+      return { data: [] };
+    }
+    return this.prescriptionsService.getByPatient(patientId, clinicId);
+  }
+
+  @Get('suggest-medications')
+  async suggestMedications(@Query('q') q: string) {
+    return this.prescriptionsService.suggestMedications(q || '');
+  }
+
+  @Get(':id')
+  async findOne(@Param('id') id: string) {
+    return this.prescriptionsService.findOne(id);
+  }
 
   @Post()
   async create(
@@ -30,19 +67,16 @@ export class PrescriptionsController {
     return this.prescriptionsService.create(clinicId, doctor.id, dto);
   }
 
-  @Get('patient/:id')
-  async getByPatient(
-    @Param('id') patientId: string,
-    @ClinicId() clinicId: string,
+  @Patch(':id')
+  async update(
+    @Param('id') id: string,
+    @Body() dto: UpdatePrescriptionDto,
   ) {
-    if (!clinicId) {
-      return { data: [] };
-    }
-    return this.prescriptionsService.getByPatient(patientId, clinicId);
+    return this.prescriptionsService.update(id, dto);
   }
 
-  @Get('suggest-medications')
-  async suggestMedications(@Query('q') q: string) {
-    return this.prescriptionsService.suggestMedications(q || '');
+  @Delete(':id')
+  async remove(@Param('id') id: string) {
+    return this.prescriptionsService.remove(id);
   }
 }

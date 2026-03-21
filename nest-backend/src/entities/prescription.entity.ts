@@ -11,6 +11,18 @@ import { Patient } from './patient.entity';
 import { Doctor } from './doctor.entity';
 import { Clinic } from './clinic.entity';
 import { Consultation } from './consultation.entity';
+import { Diagnosis } from './diagnosis.entity';
+
+/**
+ * Medication item within a prescription. Matches Strapi medications JSON structure.
+ */
+export interface MedicationItem {
+  name: string;
+  dosage?: string;
+  frequency?: string;
+  duration?: string;
+  instructions?: string;
+}
 
 @Entity('prescriptions')
 export class Prescription {
@@ -29,20 +41,23 @@ export class Prescription {
   @Column('uuid', { nullable: true })
   consultationId: string | null;
 
+  @Column('uuid', { nullable: true })
+  diagnosisId: string | null;
+
   @Column({ type: 'jsonb' })
-  medications: Array<{
-    name: string;
-    dosage?: string;
-    frequency?: string;
-    duration?: string;
-    instructions?: string;
-  }>;
+  medications: MedicationItem[];
+
+  @Column({ type: 'text', nullable: true })
+  dosage: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  instructions: string | null;
 
   @Column({ default: 'active' })
   status: string;
 
   @Column({ type: 'text', nullable: true })
-  notes: string;
+  notes: string | null;
 
   @CreateDateColumn()
   createdAt: Date;
@@ -68,4 +83,8 @@ export class Prescription {
   })
   @JoinColumn({ name: 'consultationId' })
   consultation: Consultation | null;
+
+  @ManyToOne(() => Diagnosis, { onDelete: 'SET NULL', nullable: true })
+  @JoinColumn({ name: 'diagnosisId' })
+  diagnosis: Diagnosis | null;
 }
