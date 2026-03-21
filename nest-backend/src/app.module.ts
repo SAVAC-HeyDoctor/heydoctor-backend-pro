@@ -22,6 +22,7 @@ import { TemplatesModule } from './modules/templates/templates.module';
 import { FavoriteOrdersModule } from './modules/favorite-orders/favorite-orders.module';
 import { PatientRemindersModule } from './modules/patient-reminders/patient-reminders.module';
 import { PatientsModule } from './modules/patients/patients.module';
+import { ConsultationsModule } from './modules/consultations/consultations.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 
 @Module({
@@ -32,6 +33,7 @@ import { AnalyticsModule } from './modules/analytics/analytics.module';
     AuthModule,
     ClinicModule,
     PatientsModule,
+    ConsultationsModule,
     CopilotModule,
     CdssModule,
     PredictiveMedicineModule,

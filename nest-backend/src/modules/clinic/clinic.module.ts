@@ -4,7 +4,7 @@ import {
   Clinic,
   ClinicUser,
   Patient,
-  Appointment,
+  Consultation,
   ClinicalRecord,
 } from '../../entities';
 import { ClinicService } from './clinic.service';
@@ -16,7 +16,7 @@ import { ClinicController, AppointmentsController } from './clinic.controller';
       Clinic,
       ClinicUser,
       Patient,
-      Appointment,
+      Consultation,
       ClinicalRecord,
     ]),
   ],

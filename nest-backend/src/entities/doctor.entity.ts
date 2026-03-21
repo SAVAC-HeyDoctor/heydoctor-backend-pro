@@ -12,7 +12,7 @@ import {
 import { User } from './user.entity';
 import { Clinic } from './clinic.entity';
 import { Patient } from './patient.entity';
-import { Appointment } from './appointment.entity';
+import { Consultation } from './consultation.entity';
 import { LabOrder } from './lab-order.entity';
 import { Prescription } from './prescription.entity';
 import { ClinicalRecord } from './clinical-record.entity';
@@ -48,8 +48,8 @@ export class Doctor {
   @JoinColumn({ name: 'clinicId' })
   clinic: Clinic;
 
-  @OneToMany(() => Appointment, (a) => a.doctor)
-  appointments: Appointment[];
+  @OneToMany(() => Consultation, (c) => c.doctor)
+  consultations: Consultation[];
 
   @OneToMany(() => LabOrder, (l) => l.doctor)
   labOrders: LabOrder[];

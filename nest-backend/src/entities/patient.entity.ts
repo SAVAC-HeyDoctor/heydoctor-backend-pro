@@ -13,7 +13,7 @@ import {
 } from 'typeorm';
 import { Clinic } from './clinic.entity';
 import { User } from './user.entity';
-import { Appointment } from './appointment.entity';
+import { Consultation } from './consultation.entity';
 import { ClinicalRecord } from './clinical-record.entity';
 import { PatientReminder } from './patient-reminder.entity';
 import { LabOrder } from './lab-order.entity';
@@ -81,8 +81,8 @@ export class Patient {
   @JoinColumn({ name: 'userId' })
   user: User | null;
 
-  @OneToMany(() => Appointment, (a) => a.patient)
-  appointments: Appointment[];
+  @OneToMany(() => Consultation, (c) => c.patient)
+  consultations: Consultation[];
 
   @OneToMany(() => ClinicalRecord, (c) => c.patient)
   clinical_record: ClinicalRecord[];

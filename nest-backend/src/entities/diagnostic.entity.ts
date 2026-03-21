@@ -4,9 +4,11 @@ import {
   Column,
   CreateDateColumn,
   ManyToOne,
+  OneToOne,
   JoinColumn,
 } from 'typeorm';
 import { ClinicalRecord } from './clinical-record.entity';
+import { Consultation } from './consultation.entity';
 
 @Entity('diagnostics')
 export class Diagnostic {
@@ -15,6 +17,9 @@ export class Diagnostic {
 
   @Column('uuid')
   clinicalRecordId: string;
+
+  @Column('uuid', { nullable: true })
+  consultationId: string | null;
 
   @Column()
   code: string;
@@ -31,4 +36,8 @@ export class Diagnostic {
   @ManyToOne(() => ClinicalRecord, (cr) => cr.diagnostics, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'clinicalRecordId' })
   clinicalRecord: ClinicalRecord;
+
+  @OneToOne(() => Consultation, (c) => c.diagnostic, { onDelete: 'SET NULL', nullable: true })
+  @JoinColumn({ name: 'consultationId' })
+  consultation: Consultation | null;
 }

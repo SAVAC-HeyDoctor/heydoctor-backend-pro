@@ -5,7 +5,7 @@ import {
   ClinicalRecord,
   LabOrder,
   Prescription,
-  Appointment,
+  Consultation,
 } from '../../entities';
 import { ClinicalInsightService } from './clinical-insight.service';
 import { ClinicalInsightController } from './clinical-insight.controller';
@@ -17,7 +17,7 @@ import { ClinicalInsightController } from './clinical-insight.controller';
       ClinicalRecord,
       LabOrder,
       Prescription,
-      Appointment,
+      Consultation,
     ]),
   ],
   controllers: [ClinicalInsightController],

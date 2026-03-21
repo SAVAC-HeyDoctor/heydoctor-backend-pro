@@ -4,7 +4,7 @@ import { Repository } from 'typeorm';
 import {
   Clinic,
   Patient,
-  Appointment,
+  Consultation,
   ClinicalRecord,
   ClinicUser,
 } from '../../entities';
@@ -20,8 +20,8 @@ export class ClinicService {
     private readonly clinicUserRepo: Repository<ClinicUser>,
     @InjectRepository(Patient)
     private readonly patientRepo: Repository<Patient>,
-    @InjectRepository(Appointment)
-    private readonly appointmentRepo: Repository<Appointment>,
+    @InjectRepository(Consultation)
+    private readonly consultationRepo: Repository<Consultation>,
     @InjectRepository(ClinicalRecord)
     private readonly clinicalRecordRepo: Repository<ClinicalRecord>,
   ) {}
@@ -60,7 +60,7 @@ export class ClinicService {
   }
 
   async getAppointments(clinicId: string, filters: AppointmentFiltersDto) {
-    const qb = this.appointmentRepo
+    const qb = this.consultationRepo
       .createQueryBuilder('a')
       .leftJoinAndSelect('a.patient', 'patient')
       .leftJoinAndSelect('a.doctor', 'doctor')
@@ -77,14 +77,14 @@ export class ClinicService {
       qb.andWhere('a.status = :status', { status: filters.status });
     }
     if (filters.from) {
-      qb.andWhere('a.scheduledAt >= :from', { from: filters.from });
+      qb.andWhere('a.date >= :from', { from: filters.from });
     }
     if (filters.to) {
-      qb.andWhere('a.scheduledAt <= :to', { to: filters.to });
+      qb.andWhere('a.date <= :to', { to: filters.to });
     }
 
     const [items, total] = await qb
-      .orderBy('a.scheduledAt', 'DESC')
+      .orderBy('a.date', 'DESC')
       .skip(filters.offset ?? 0)
       .take(filters.limit ?? 20)
       .getManyAndCount();

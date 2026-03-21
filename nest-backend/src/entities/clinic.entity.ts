@@ -9,7 +9,7 @@ import {
 import { ClinicUser } from './clinic-user.entity';
 import { Patient } from './patient.entity';
 import { Doctor } from './doctor.entity';
-import { Appointment } from './appointment.entity';
+import { Consultation } from './consultation.entity';
 import { Template } from './template.entity';
 import { FavoriteOrder } from './favorite-order.entity';
 import { LabOrder } from './lab-order.entity';
@@ -45,8 +45,8 @@ export class Clinic {
   @OneToMany(() => Doctor, (d) => d.clinic)
   doctors: Doctor[];
 
-  @OneToMany(() => Appointment, (a) => a.clinic)
-  appointments: Appointment[];
+  @OneToMany(() => Consultation, (c) => c.clinic)
+  consultations: Consultation[];
 
   @OneToMany(() => Template, (t) => t.clinic)
   templates: Template[];

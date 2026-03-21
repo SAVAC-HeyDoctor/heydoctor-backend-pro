@@ -6,7 +6,7 @@ import {
   ClinicalRecord,
   LabOrder,
   Prescription,
-  Appointment,
+  Consultation,
 } from '../../entities';
 
 @Injectable()
@@ -20,8 +20,8 @@ export class ClinicalInsightService {
     private readonly labOrderRepo: Repository<LabOrder>,
     @InjectRepository(Prescription)
     private readonly prescriptionRepo: Repository<Prescription>,
-    @InjectRepository(Appointment)
-    private readonly appointmentRepo: Repository<Appointment>,
+    @InjectRepository(Consultation)
+    private readonly consultationRepo: Repository<Consultation>,
   ) {}
 
   async getPatientInsight(patientId: string, clinicId: string) {
@@ -49,9 +49,9 @@ export class ClinicalInsightService {
         order: { createdAt: 'DESC' },
         take: 5,
       }),
-      this.appointmentRepo.find({
+      this.consultationRepo.find({
         where: { patientId, clinicId },
-        order: { scheduledAt: 'DESC' },
+        order: { date: 'DESC' },
         take: 5,
       }),
     ]);
@@ -62,7 +62,7 @@ export class ClinicalInsightService {
         recentRecords: records,
         recentLabOrders: labOrders,
         recentPrescriptions: prescriptions,
-        upcomingAppointments: appointments,
+        upcomingConsultations: appointments,
       },
     };
   }

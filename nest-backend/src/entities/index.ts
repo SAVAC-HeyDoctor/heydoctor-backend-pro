@@ -3,7 +3,7 @@ export * from './clinic.entity';
 export * from './clinic-user.entity';
 export * from './patient.entity';
 export * from './doctor.entity';
-export * from './appointment.entity';
+export * from './consultation.entity';
 export * from './template.entity';
 export * from './favorite-order.entity';
 export * from './patient-reminder.entity';

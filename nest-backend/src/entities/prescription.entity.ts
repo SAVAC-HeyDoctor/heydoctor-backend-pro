@@ -10,6 +10,7 @@ import {
 import { Patient } from './patient.entity';
 import { Doctor } from './doctor.entity';
 import { Clinic } from './clinic.entity';
+import { Consultation } from './consultation.entity';
 
 @Entity('prescriptions')
 export class Prescription {
@@ -24,6 +25,9 @@ export class Prescription {
 
   @Column('uuid')
   clinicId: string;
+
+  @Column('uuid', { nullable: true })
+  consultationId: string | null;
 
   @Column({ type: 'jsonb' })
   medications: Array<{
@@ -57,4 +61,11 @@ export class Prescription {
   @ManyToOne(() => Clinic, (c) => c.prescriptions, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'clinicId' })
   clinic: Clinic;
+
+  @ManyToOne(() => Consultation, (c) => c.prescriptions, {
+    onDelete: 'SET NULL',
+    nullable: true,
+  })
+  @JoinColumn({ name: 'consultationId' })
+  consultation: Consultation | null;
 }
