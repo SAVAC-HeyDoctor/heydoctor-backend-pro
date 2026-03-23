@@ -2,6 +2,7 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
@@ -12,6 +13,7 @@ import { Clinic } from '../clinic/clinic.entity';
 import { Patient } from '../patients/patient.entity';
 import { ConsultationStatus } from './consultation-status.enum';
 
+@Index(['clinic', 'createdAt'])
 @Entity('consultations')
 export class Consultation {
   @PrimaryGeneratedColumn('uuid')
