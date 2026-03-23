@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -10,7 +9,10 @@ import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import { AuthorizationService } from '../authorization/authorization.service';
 import { Consultation } from './consultation.entity';
 import { ConsultationStatus } from './consultation-status.enum';
-import { isValidTransition } from './consultation-status.transitions';
+import {
+  assertClinicalStatusTransition,
+  assertRoleForTransition,
+} from './consultation-status.transitions';
 import { CreateConsultationDto } from './dto/create-consultation.dto';
 import { UpdateConsultationDto } from './dto/update-consultation.dto';
 
@@ -98,11 +100,12 @@ export class ConsultationsService {
     }
 
     if (dto.status !== undefined) {
-      if (!isValidTransition(consultation.status, dto.status)) {
-        throw new BadRequestException(
-          `Invalid status transition: cannot change from "${consultation.status}" to "${dto.status}"`,
-        );
-      }
+      assertClinicalStatusTransition(consultation.status, dto.status);
+      assertRoleForTransition(
+        authUser.role,
+        consultation.status,
+        dto.status,
+      );
     }
 
     if (dto.diagnosis !== undefined) {
