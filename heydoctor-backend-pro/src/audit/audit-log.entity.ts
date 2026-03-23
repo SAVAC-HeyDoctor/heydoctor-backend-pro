@@ -9,6 +9,7 @@ import { AuditOutcome } from './audit-outcome.enum';
 
 @Index(['clinicId', 'createdAt'])
 @Index(['action', 'createdAt'])
+@Index(['clinicId', 'action', 'createdAt'])
 @Entity('audit_logs')
 export class AuditLog {
   @PrimaryGeneratedColumn('uuid')

@@ -11,6 +11,7 @@ import { AuditService } from '../audit/audit.service';
 import { AuthorizationService } from '../authorization/authorization.service';
 import { Consultation } from './consultation.entity';
 import { ConsultationStatus } from './consultation-status.enum';
+import { logConsultationStatusChange } from './consultation-status-audit.helper';
 import {
   assertClinicalStatusTransition,
   assertRoleForTransition,
@@ -136,22 +137,14 @@ export class ConsultationsService {
       previousStatus !== undefined &&
       dto.status !== previousStatus
     ) {
-      this.logger.log(
-        `Consultation ${saved.id} status changed from ${previousStatus} to ${dto.status} by user ${authUser.sub}`,
-      );
-
-      void this.auditService.logSuccess({
-        userId: authUser.sub,
-        action: 'CONSULTATION_STATUS_CHANGE',
-        resource: 'consultation',
-        resourceId: saved.id,
+      logConsultationStatusChange({
+        auditService: this.auditService,
+        logger: this.logger,
+        authUser,
+        previousStatus,
+        nextStatus: dto.status,
+        consultationId: saved.id,
         clinicId: saved.clinicId ?? consultation.clinicId,
-        httpStatus: 200,
-        metadata: {
-          from: previousStatus,
-          to: dto.status,
-          type: 'status_transition',
-        },
       });
     }
 
