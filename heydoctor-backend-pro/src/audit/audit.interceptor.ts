@@ -45,10 +45,7 @@ export class AuditInterceptor implements NestInterceptor {
       (req.params?.patientId as string | undefined) ??
       null;
 
-    const baseMetadata: Record<string, unknown> = {
-      method: req.method,
-      path: normalizedPath,
-    };
+    const baseMetadata = this.buildRequestMetadata(req, normalizedPath);
 
     return next.handle().pipe(
       tap(() => {
@@ -69,6 +66,29 @@ export class AuditInterceptor implements NestInterceptor {
         return throwError(() => err);
       }),
     );
+  }
+
+  /**
+   * Request context for audit rows; merge with extra fields (e.g. errorName) without overwriting keys.
+   */
+  private buildRequestMetadata(
+    req: Request,
+    normalizedPath: string,
+  ): Record<string, unknown> {
+    const rawUa = req.headers['user-agent'];
+    const userAgent =
+      rawUa === undefined
+        ? null
+        : Array.isArray(rawUa)
+          ? rawUa.join(', ')
+          : String(rawUa);
+
+    return {
+      method: req.method,
+      path: normalizedPath,
+      ip: req.ip ?? null,
+      userAgent,
+    };
   }
 
   private async resolveClinicId(
