@@ -12,6 +12,8 @@ export type LogConsultationStatusChangeParams = {
   nextStatus: ConsultationStatus;
   consultationId: string;
   clinicId: string | null;
+  /** HTTP correlation ID when invoked from a web request (see RequestIdMiddleware). */
+  requestId?: string;
 };
 
 /**
@@ -29,11 +31,22 @@ export function logConsultationStatusChange(
     nextStatus,
     consultationId,
     clinicId,
+    requestId,
   } = params;
 
   logger?.log(
     `Consultation ${consultationId} status changed from ${previousStatus} to ${nextStatus} by user ${authUser.sub}`,
   );
+
+  const metadata: Record<string, unknown> = {
+    from: previousStatus,
+    to: nextStatus,
+    type: 'status_transition',
+    doctorId: authUser.sub,
+  };
+  if (requestId !== undefined && requestId !== '') {
+    metadata.requestId = requestId;
+  }
 
   void auditService.logSuccess({
     userId: authUser.sub,
@@ -42,11 +55,6 @@ export function logConsultationStatusChange(
     resourceId: consultationId,
     clinicId,
     httpStatus: 200,
-    metadata: {
-      from: previousStatus,
-      to: nextStatus,
-      type: 'status_transition',
-      doctorId: authUser.sub,
-    },
+    metadata,
   });
 }

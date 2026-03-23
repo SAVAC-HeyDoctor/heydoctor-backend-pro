@@ -8,6 +8,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import { AuditService } from '../audit/audit.service';
+import { getCurrentRequestId } from '../common/request-context.storage';
 import { AuthorizationService } from '../authorization/authorization.service';
 import { Consultation } from './consultation.entity';
 import { ConsultationStatus } from './consultation-status.enum';
@@ -145,6 +146,7 @@ export class ConsultationsService {
         nextStatus: dto.status,
         consultationId: saved.id,
         clinicId: saved.clinicId ?? consultation.clinicId,
+        requestId: getCurrentRequestId(),
       });
     }
 
