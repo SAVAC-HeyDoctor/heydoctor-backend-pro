@@ -10,6 +10,7 @@ import { AuthModule } from './auth/auth.module';
 import { AuthorizationModule } from './authorization/authorization.module';
 import { ConsentModule } from './consents/consent.module';
 import { ConsultationsModule } from './consultations/consultations.module';
+import { LegalModule } from './legal/legal.module';
 import { PatientsModule } from './patients/patients.module';
 import { UsersModule } from './users/users.module';
 import { WebrtcModule } from './webrtc/webrtc.module';
@@ -51,6 +52,7 @@ import { WebrtcModule } from './webrtc/webrtc.module';
     PatientsModule,
     ConsentModule,
     ConsultationsModule,
+    LegalModule,
     AiModule,
     WebrtcModule,
   ],
