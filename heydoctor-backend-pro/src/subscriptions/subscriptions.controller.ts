@@ -7,9 +7,11 @@ import {
   Patch,
   UseGuards,
 } from '@nestjs/common';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import { UserRole } from '../users/user-role.enum';
 import { Subscription } from './subscription.entity';
 import { UpdateSubscriptionPlanDto } from './dto/update-subscription-plan.dto';
@@ -30,7 +32,8 @@ export class SubscriptionsController {
   updatePlan(
     @Param('userId', new ParseUUIDPipe({ version: '4' })) userId: string,
     @Body() dto: UpdateSubscriptionPlanDto,
+    @CurrentUser() authUser: AuthenticatedUser,
   ): Promise<Subscription> {
-    return this.subscriptionsService.updatePlan(userId, dto.plan);
+    return this.subscriptionsService.updatePlan(userId, dto.plan, authUser);
   }
 }

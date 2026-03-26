@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
+import { AuditService } from '../audit/audit.service';
 import { QueryFailedError, Repository } from 'typeorm';
 import {
   Subscription,
@@ -17,6 +19,7 @@ export class SubscriptionsService {
   constructor(
     @InjectRepository(Subscription)
     private readonly subscriptionsRepository: Repository<Subscription>,
+    private readonly auditService: AuditService,
   ) {}
 
   /**
@@ -70,9 +73,34 @@ export class SubscriptionsService {
   async updatePlan(
     userId: string,
     plan: SubscriptionPlan,
+    authUser: AuthenticatedUser,
   ): Promise<Subscription> {
-    const subscription = await this.getOrCreateForUser(userId);
-    subscription.plan = plan;
-    return this.subscriptionsRepository.save(subscription);
+    const existing = await this.getOrCreateForUser(userId);
+    const previousPlan = existing.plan;
+
+    if (previousPlan === plan) {
+      return existing;
+    }
+
+    existing.plan = plan;
+    const saved = await this.subscriptionsRepository.save(existing);
+
+    // Audit is best-effort: failure should never break admin operation.
+    void this.auditService.logSuccess({
+      action: 'SUBSCRIPTION_PLAN_CHANGED',
+      resource: 'subscription',
+      resourceId: saved.id,
+      userId,
+      clinicId: null,
+      httpStatus: 200,
+      metadata: {
+        from: previousPlan,
+        to: plan,
+        changedBy: authUser.sub,
+        type: 'plan_change',
+      },
+    });
+
+    return saved;
   }
 }
