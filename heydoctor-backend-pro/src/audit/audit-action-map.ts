@@ -31,6 +31,10 @@ const ROUTE_MAP: Record<string, AuditActionDescriptor> = {
     action: 'CONSULTATION_UPDATE',
     resource: 'consultation',
   },
+  'POST /api/consultations/:id/sign': {
+    action: 'CONSULTATION_SIGNED',
+    resource: 'consultation',
+  },
   'DELETE /api/consultations/:id': {
     action: 'CONSULTATION_DELETE',
     resource: 'consultation',

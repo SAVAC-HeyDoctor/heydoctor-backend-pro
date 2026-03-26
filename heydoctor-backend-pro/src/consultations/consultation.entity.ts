@@ -61,6 +61,15 @@ export class Consultation {
   @Column({ name: 'consent_user_agent', type: 'text', nullable: true })
   consentUserAgent: string | null;
 
+  @Column({ name: 'doctor_signature', type: 'text', nullable: true })
+  doctorSignature: string | null;
+
+  @Column({ name: 'patient_signature', type: 'text', nullable: true })
+  patientSignature: string | null;
+
+  @Column({ name: 'signed_at', type: 'timestamptz', nullable: true })
+  signedAt: Date | null;
+
   @Column({ name: 'doctor_id', type: 'uuid' })
   doctorId: string;
 

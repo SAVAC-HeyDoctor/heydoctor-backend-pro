@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -12,6 +13,7 @@ import { AppLoggerService } from '../common/logger/app-logger.service';
 import { getCurrentRequestId } from '../common/request-context.storage';
 import { AuthorizationService } from '../authorization/authorization.service';
 import { ConsentService } from '../consents/consent.service';
+import { UserRole } from '../users/user-role.enum';
 import { Consultation } from './consultation.entity';
 import { ConsultationStatus } from './consultation-status.enum';
 import { logConsultationStatusChange } from './consultation-status-audit.helper';
@@ -21,7 +23,19 @@ import {
 } from './consultation-status.transitions';
 import type { ConsultationAiSnapshot } from './consultation-ai-snapshot.type';
 import { CreateConsultationDto } from './dto/create-consultation.dto';
+import { SignConsultationDto } from './dto/sign-consultation.dto';
 import { UpdateConsultationDto } from './dto/update-consultation.dto';
+
+function normalizeSignature(signature: string): string {
+  const value = signature.trim();
+  const marker = 'base64,';
+  const idx = value.indexOf(marker);
+  const base64 = idx >= 0 ? value.slice(idx + marker.length).trim() : value;
+  if (!base64) {
+    throw new BadRequestException('signature is empty');
+  }
+  return base64;
+}
 
 @Injectable()
 export class ConsultationsService {
@@ -155,6 +169,60 @@ export class ConsultationsService {
       improvedNotes: row.aiImprovedNotes ?? null,
       generatedAt: row.aiGeneratedAt ?? null,
     };
+  }
+
+  async sign(
+    id: string,
+    dto: SignConsultationDto,
+    authUser: AuthenticatedUser,
+  ): Promise<Consultation> {
+    const { clinicId, user } =
+      await this.authorizationService.getUserWithClinic(authUser);
+    const consultation = await this.consultationsRepository.findOne({
+      where: { id, clinicId },
+    });
+    if (!consultation) {
+      throw new NotFoundException('Consultation not found');
+    }
+    await this.authorizationService.assertUserInClinic(
+      authUser,
+      consultation.clinicId,
+      user,
+    );
+
+    if (authUser.role !== UserRole.DOCTOR) {
+      throw new ForbiddenException('Only doctor can sign first');
+    }
+    if (consultation.doctorId !== authUser.sub) {
+      throw new ForbiddenException('Only assigned doctor can sign consultation');
+    }
+    if (consultation.doctorSignature) {
+      throw new ForbiddenException('Doctor signature already set');
+    }
+    if (consultation.signedAt) {
+      throw new ForbiddenException('Consultation is already signed');
+    }
+
+    consultation.doctorSignature = normalizeSignature(dto.signature);
+    consultation.signedAt = new Date();
+
+    const saved = await this.consultationsRepository.save(consultation);
+
+    void this.auditService.logSuccess({
+      userId: authUser.sub,
+      action: 'CONSULTATION_SIGNED',
+      resource: 'consultation',
+      resourceId: saved.id,
+      clinicId: saved.clinicId,
+      httpStatus: 201,
+      metadata: {
+        signerRole: authUser.role,
+        signerType: 'doctor',
+        signedAt: saved.signedAt?.toISOString() ?? null,
+      },
+    });
+
+    return saved;
   }
 
   async update(

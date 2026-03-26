@@ -14,6 +14,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import { ConsultationsService } from './consultations.service';
 import { CreateConsultationDto } from './dto/create-consultation.dto';
+import { SignConsultationDto } from './dto/sign-consultation.dto';
 import { UpdateConsultationDto } from './dto/update-consultation.dto';
 
 @Controller('consultations')
@@ -57,6 +58,15 @@ export class ConsultationsController {
     @Body() dto: UpdateConsultationDto,
   ) {
     return this.consultationsService.update(id, dto, user);
+  }
+
+  @Post(':id/sign')
+  sign(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @Body() dto: SignConsultationDto,
+  ) {
+    return this.consultationsService.sign(id, dto, user);
   }
 
   @Delete(':id')
