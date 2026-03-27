@@ -38,14 +38,13 @@ import { WebrtcModule } from './webrtc/webrtc.module';
       getTracker: (req) => String(req.ip ?? 'unknown'),
     }),
     TypeOrmModule.forRootAsync({
-      imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
         type: 'postgres' as const,
         url: config.getOrThrow<string>('DATABASE_URL'),
         autoLoadEntities: true,
         synchronize: true,
-        logging: config.get<string>('NODE_ENV') === 'development',
+        logging: true,
         ssl: { rejectUnauthorized: false },
       }),
     }),
