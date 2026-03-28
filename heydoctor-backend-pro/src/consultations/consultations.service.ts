@@ -171,6 +171,50 @@ export class ConsultationsService {
     };
   }
 
+  async startCall(
+    id: string,
+    authUser: AuthenticatedUser,
+  ): Promise<{ ok: true; consultationId: string }> {
+    const { clinicId, user } =
+      await this.authorizationService.getUserWithClinic(authUser);
+    const consultation = await this.consultationsRepository.findOne({
+      where: { id, clinicId },
+    });
+    if (!consultation) {
+      throw new NotFoundException('Consultation not found');
+    }
+    await this.authorizationService.assertUserInClinic(
+      authUser,
+      consultation.clinicId,
+      user,
+    );
+
+    if (
+      consultation.status !== ConsultationStatus.IN_PROGRESS &&
+      consultation.status !== ConsultationStatus.DRAFT
+    ) {
+      throw new BadRequestException(
+        'Consultation must be in progress or draft to start a call',
+      );
+    }
+
+    if (consultation.status === ConsultationStatus.DRAFT) {
+      consultation.status = ConsultationStatus.IN_PROGRESS;
+      await this.consultationsRepository.save(consultation);
+    }
+
+    void this.auditService.logSuccess({
+      userId: authUser.sub,
+      action: 'CONSULTATION_CALL_STARTED',
+      resource: 'consultation',
+      resourceId: id,
+      clinicId,
+      httpStatus: 200,
+    });
+
+    return { ok: true, consultationId: id };
+  }
+
   async sign(
     id: string,
     dto: SignConsultationDto,

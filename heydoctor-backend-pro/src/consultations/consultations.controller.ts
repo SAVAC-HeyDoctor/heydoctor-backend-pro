@@ -65,6 +65,16 @@ export class ConsultationsController {
     return this.consultationsService.update(id, dto, user);
   }
 
+  @Post(':id/start-call')
+  @UseGuards(FeatureGuard)
+  @RequirePlan(SubscriptionPlan.PRO)
+  startCall(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+  ) {
+    return this.consultationsService.startCall(id, user);
+  }
+
   @Post(':id/sign')
   sign(
     @CurrentUser() user: AuthenticatedUser,

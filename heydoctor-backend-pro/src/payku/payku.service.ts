@@ -1,9 +1,18 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import { AuditService } from '../audit/audit.service';
+import { AuthorizationService } from '../authorization/authorization.service';
+import { Consultation } from '../consultations/consultation.entity';
+import { ConsultationStatus } from '../consultations/consultation-status.enum';
 import {
   SubscriptionChangeSource,
   SubscriptionPlan,
@@ -43,8 +52,11 @@ export class PaykuService {
   constructor(
     @InjectRepository(PaykuPayment)
     private readonly paymentsRepository: Repository<PaykuPayment>,
+    @InjectRepository(Consultation)
+    private readonly consultationsRepository: Repository<Consultation>,
     private readonly dataSource: DataSource,
     private readonly config: ConfigService,
+    private readonly authorizationService: AuthorizationService,
     private readonly subscriptionsService: SubscriptionsService,
     private readonly auditService: AuditService,
   ) {
@@ -58,6 +70,130 @@ export class PaykuService {
     this.pendingExpireMinutes = Number(
       this.config.get<string>('PAYMENT_PENDING_EXPIRE_MINUTES') ?? '1440',
     );
+  }
+
+  // ── Create Payment Session ─────────────────────────────────────
+
+  async createPaymentSession(
+    consultationId: string,
+    authUser: AuthenticatedUser,
+  ): Promise<{ paymentId: string; paymentUrl: string }> {
+    const { clinicId } =
+      await this.authorizationService.getUserWithClinic(authUser);
+
+    const consultation = await this.consultationsRepository.findOne({
+      where: { id: consultationId, clinicId },
+    });
+    if (!consultation) {
+      throw new NotFoundException('Consultation not found');
+    }
+
+    const allowedForPayment: ConsultationStatus[] = [
+      ConsultationStatus.COMPLETED,
+      ConsultationStatus.SIGNED,
+    ];
+    if (!allowedForPayment.includes(consultation.status)) {
+      throw new BadRequestException(
+        'Consultation must be completed or signed before payment',
+      );
+    }
+
+    const existing = await this.paymentsRepository.findOne({
+      where: {
+        consultationId,
+        status: PaykuPaymentStatus.PENDING,
+      },
+    });
+    if (existing) {
+      throw new BadRequestException(
+        'A pending payment already exists for this consultation',
+      );
+    }
+
+    const paidExists = await this.paymentsRepository.findOne({
+      where: {
+        consultationId,
+        status: PaykuPaymentStatus.PAID,
+      },
+    });
+    if (paidExists) {
+      throw new BadRequestException('Consultation is already paid');
+    }
+
+    const amount = Number(
+      this.config.get<string>('CONSULTATION_PAYMENT_AMOUNT_CLP') ?? '15000',
+    );
+
+    const frontendUrl =
+      this.config.get<string>('FRONTEND_URL') ?? 'https://heydoctor.vercel.app';
+    const backendUrl =
+      this.config.get<string>('BACKEND_PUBLIC_URL') ??
+      'https://heydoctor-backend-pro-production.up.railway.app';
+
+    const payment = this.paymentsRepository.create({
+      userId: authUser.sub,
+      consultationId,
+      amount,
+      currency: 'CLP',
+      status: PaykuPaymentStatus.PENDING,
+    });
+    const saved = await this.paymentsRepository.save(payment);
+
+    let paymentUrl: string;
+    const paykuApiUrl = this.config.get<string>('PAYKU_API_URL');
+    const paykuApiKey = this.config.get<string>('PAYKU_API_KEY');
+
+    if (paykuApiUrl && paykuApiKey) {
+      try {
+        const res = await fetch(`${paykuApiUrl}/transaction`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${paykuApiKey}`,
+          },
+          body: JSON.stringify({
+            email: authUser.email,
+            order: saved.id,
+            subject: `Consulta médica HeyDoctor`,
+            amount,
+            currency: 'CLP',
+            payment_id: saved.id,
+            urlreturn: `${frontendUrl}/panel/consultas/${consultationId}?payment=success`,
+            urlnotify: `${backendUrl}/api/payku/webhook`,
+          }),
+        });
+        const data = (await res.json()) as { url?: string; redirect_url?: string };
+        paymentUrl = data.url ?? data.redirect_url ?? '';
+        if (!paymentUrl) {
+          throw new Error('Payku did not return a payment URL');
+        }
+      } catch (err) {
+        this.logger.error('Payku API call failed', err);
+        throw new BadRequestException(
+          'Could not create payment session with Payku',
+        );
+      }
+    } else {
+      paymentUrl = `${frontendUrl}/panel/consultas/${consultationId}?payment=mock&paymentId=${saved.id}`;
+      this.logger.warn(
+        'PAYKU_API_URL/PAYKU_API_KEY not configured; returning mock payment URL',
+      );
+    }
+
+    void this.auditService.logSuccess({
+      userId: authUser.sub,
+      action: 'PAYMENT_CREATED',
+      resource: 'payment',
+      resourceId: saved.id,
+      clinicId,
+      httpStatus: 201,
+      metadata: {
+        consultationId,
+        amount,
+      },
+    });
+
+    return { paymentId: saved.id, paymentUrl };
   }
 
   /**
@@ -277,6 +413,38 @@ export class PaykuService {
             `Failed to upgrade user ${payment.userId} after payment ${paymentId}`,
             err,
           );
+        }
+
+        if (payment.consultationId) {
+          try {
+            const consultation = await this.consultationsRepository.findOne({
+              where: { id: payment.consultationId },
+            });
+            if (
+              consultation &&
+              consultation.status === ConsultationStatus.SIGNED
+            ) {
+              consultation.status = ConsultationStatus.LOCKED;
+              await this.consultationsRepository.save(consultation);
+              void this.auditService.logSuccess({
+                action: 'CONSULTATION_LOCKED',
+                resource: 'consultation',
+                resourceId: consultation.id,
+                userId: payment.userId,
+                clinicId: consultation.clinicId,
+                httpStatus: 200,
+                metadata: {
+                  reason: 'payment_completed',
+                  paymentId: payment.id,
+                },
+              });
+            }
+          } catch (err) {
+            this.logger.error(
+              `Failed to lock consultation ${payment.consultationId} after payment`,
+              err,
+            );
+          }
         }
       }
 

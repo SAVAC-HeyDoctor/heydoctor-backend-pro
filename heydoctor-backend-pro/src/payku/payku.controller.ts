@@ -4,12 +4,26 @@ import {
   Headers,
   HttpCode,
   Post,
+  UseGuards,
 } from '@nestjs/common';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
+import { CreatePaymentSessionDto } from './dto/create-payment-session.dto';
 import { PaykuService } from './payku.service';
 
 @Controller('payku')
 export class PaykuController {
   constructor(private readonly paykuService: PaykuService) {}
+
+  @Post('create-payment-session')
+  @UseGuards(JwtAuthGuard)
+  async createPaymentSession(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: CreatePaymentSessionDto,
+  ) {
+    return this.paykuService.createPaymentSession(dto.consultationId, user);
+  }
 
   @Post('webhook')
   @HttpCode(200)

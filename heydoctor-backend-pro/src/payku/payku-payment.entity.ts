@@ -49,12 +49,16 @@ export function isTransitionAllowed(
 @Entity('payku_payments')
 @Index(['userId'])
 @Index(['status'])
+@Index(['consultationId'])
 export class PaykuPayment {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
   @Column({ name: 'user_id', type: 'uuid' })
   userId: string;
+
+  @Column({ name: 'consultation_id', type: 'uuid', nullable: true })
+  consultationId: string | null;
 
   @Column({
     type: 'enum',
