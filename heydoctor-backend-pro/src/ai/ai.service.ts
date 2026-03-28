@@ -9,8 +9,10 @@ export class AiService {
   private readonly client: OpenAI;
 
   constructor(private readonly config: ConfigService) {
+    const apiKey = this.config.get<string>('OPENAI_API_KEY');
+    console.log('[ENV] OPENAI_API_KEY:', apiKey ? 'SET' : 'MISSING');
     this.client = new OpenAI({
-      apiKey: this.config.getOrThrow<string>('OPENAI_API_KEY'),
+      apiKey: apiKey || 'sk-missing-placeholder',
     });
   }
 

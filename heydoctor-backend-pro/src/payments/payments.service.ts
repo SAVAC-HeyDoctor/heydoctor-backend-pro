@@ -33,13 +33,15 @@ export class PaymentsService {
     private readonly subscriptionsService: SubscriptionsService,
     private readonly auditService: AuditService,
   ) {
+    const stripeKey = this.config.get<string>('STRIPE_SECRET_KEY');
+    const webhookSec = this.config.get<string>('STRIPE_WEBHOOK_SECRET');
+    console.log('[ENV] STRIPE_SECRET_KEY:', stripeKey ? 'SET' : 'MISSING');
+    console.log('[ENV] STRIPE_WEBHOOK_SECRET:', webhookSec ? 'SET' : 'MISSING');
     this.stripe = new Stripe(
-      this.config.getOrThrow<string>('STRIPE_SECRET_KEY'),
+      stripeKey || 'sk_missing_placeholder',
       { apiVersion: '2026-03-25.dahlia' },
     );
-    this.webhookSecret = this.config.getOrThrow<string>(
-      'STRIPE_WEBHOOK_SECRET',
-    );
+    this.webhookSecret = webhookSec || '';
     const frontendUrl =
       this.config.get<string>('FRONTEND_URL') ?? 'http://localhost:3000';
     this.successUrl = `${frontendUrl}/panel/admin?payment=success`;
@@ -49,7 +51,10 @@ export class PaymentsService {
   async createCheckoutSession(
     authUser: AuthenticatedUser,
   ): Promise<{ sessionId: string; url: string }> {
-    const priceId = this.config.getOrThrow<string>('STRIPE_PRO_PRICE_ID');
+    const priceId = this.config.get<string>('STRIPE_PRO_PRICE_ID') || '';
+    if (!priceId) {
+      throw new Error('STRIPE_PRO_PRICE_ID not configured');
+    }
 
     const session = await this.stripe.checkout.sessions.create({
       mode: 'subscription',

@@ -41,11 +41,17 @@ import { WebrtcModule } from './webrtc/webrtc.module';
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
-        const dbUrl =
-          config.get<string>('DATABASE_PUBLIC_URL') ||
-          config.getOrThrow<string>('DATABASE_URL');
+        const publicUrl = config.get<string>('DATABASE_PUBLIC_URL');
+        const privateUrl = config.get<string>('DATABASE_URL');
+        console.log('[ENV] DATABASE_PUBLIC_URL:', publicUrl ? 'SET' : 'MISSING');
+        console.log('[ENV] DATABASE_URL:', privateUrl ? 'SET' : 'MISSING');
+        const dbUrl = publicUrl || privateUrl || '';
 
-        const masked = dbUrl.replace(/:([^@]+)@/, ':***@');
+        if (!dbUrl) {
+          console.error('[FATAL] No database URL configured!');
+        }
+
+        const masked = dbUrl ? dbUrl.replace(/:([^@]+)@/, ':***@') : 'NONE';
         console.log('[TypeORM] Connecting to:', masked);
 
         return {
