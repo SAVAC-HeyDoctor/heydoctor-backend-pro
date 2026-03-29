@@ -10,9 +10,9 @@ export const APP_LOGGER_CONTEXT = 'HeyDoctor';
  * registered with APP_INTERCEPTOR must resolve the logger reliably across the
  * module graph without depending on per-feature import order.
  *
- * - APP_LOGGER: canonical token (use @Inject(APP_LOGGER)).
- * - AppLoggerService: useExisting alias so Nest can also resolve by class token /
- *   reflect-metadata (avoids "AppLoggerService at index [2]" failures).
+ * Only APP_LOGGER is registered: injection sites must use @Inject(APP_LOGGER)
+ * and must not type the constructor param as AppLoggerService (reflect-metadata
+ * would otherwise ask Nest to resolve that class).
  */
 @Global()
 @Module({
@@ -21,11 +21,7 @@ export const APP_LOGGER_CONTEXT = 'HeyDoctor';
       provide: APP_LOGGER,
       useFactory: () => new AppLoggerService(APP_LOGGER_CONTEXT),
     },
-    {
-      provide: AppLoggerService,
-      useExisting: APP_LOGGER,
-    },
   ],
-  exports: [APP_LOGGER, AppLoggerService],
+  exports: [APP_LOGGER],
 })
 export class LoggerModule {}

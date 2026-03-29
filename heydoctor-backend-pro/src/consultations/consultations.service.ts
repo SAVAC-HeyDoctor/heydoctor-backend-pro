@@ -4,13 +4,13 @@ import {
   Inject,
   Injectable,
   NotFoundException,
+  type LoggerService,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import { AiService } from '../ai/ai.service';
 import { AuditService } from '../audit/audit.service';
-import { AppLoggerService } from '../common/logger/app-logger.service';
 import { APP_LOGGER } from '../common/logger/logger.tokens';
 import { getCurrentRequestId } from '../common/request-context.storage';
 import { AuthorizationService } from '../authorization/authorization.service';
@@ -49,7 +49,7 @@ export class ConsultationsService {
     private readonly auditService: AuditService,
     private readonly aiService: AiService,
     @Inject(APP_LOGGER)
-    private readonly logger: AppLoggerService,
+    private readonly logger: LoggerService,
   ) {}
 
   async create(

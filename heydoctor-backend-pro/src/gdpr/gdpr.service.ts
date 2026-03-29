@@ -3,6 +3,7 @@ import {
   Inject,
   Injectable,
   NotFoundException,
+  type LoggerService,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
@@ -14,7 +15,6 @@ import { Consultation } from '../consultations/consultation.entity';
 import { Patient } from '../patients/patient.entity';
 import { RefreshToken } from '../auth/entities/refresh-token.entity';
 import { User } from '../users/user.entity';
-import { AppLoggerService } from '../common/logger/app-logger.service';
 import { APP_LOGGER } from '../common/logger/logger.tokens';
 import {
   DeletionStatus,
@@ -42,7 +42,7 @@ export class GdprService {
     private readonly deletionRepo: Repository<GdprDeletionRequest>,
     private readonly auditService: AuditService,
     @Inject(APP_LOGGER)
-    private readonly logger: AppLoggerService,
+    private readonly logger: LoggerService,
   ) {}
 
   /**

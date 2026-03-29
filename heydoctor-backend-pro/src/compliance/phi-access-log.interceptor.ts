@@ -8,7 +8,6 @@ import {
 import { Observable, tap } from 'rxjs';
 import type { Request } from 'express';
 import { AuditService } from '../audit/audit.service';
-import { AppLoggerService } from '../common/logger/app-logger.service';
 import { APP_LOGGER } from '../common/logger/logger.tokens';
 import {
   ComplianceConfig,
@@ -35,16 +34,12 @@ const PHI_ACCESS_PATTERNS = [
 
 @Injectable()
 export class PhiAccessLogInterceptor implements NestInterceptor {
-  /**
-   * Nest may still print "AppLoggerService" in UnknownDependenciesException for
-   * index [2] because of emitDecoratorMetadata — the runtime token is APP_LOGGER.
-   */
   constructor(
     @Inject(COMPLIANCE_CONFIG_TOKEN)
     private readonly config: ComplianceConfig,
     private readonly auditService: AuditService,
     @Inject(APP_LOGGER)
-    private readonly logger: AppLoggerService,
+    private readonly logger: any,
   ) {}
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
