@@ -1,5 +1,6 @@
 import { Global, Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { APP_INTERCEPTOR } from '@nestjs/core';
 import { AuditModule } from '../audit/audit.module';
 import { LoggerModule } from '../common/logger/logger.module';
 import {
@@ -8,6 +9,11 @@ import {
 } from './compliance.config';
 import { PhiAccessLogInterceptor } from './phi-access-log.interceptor';
 
+/**
+ * Compliance is @Global so COMPLIANCE_CONFIG_TOKEN is app-wide.
+ * PHI interceptor MUST be registered with APP_INTERCEPTOR (not useGlobalInterceptors +
+ * app.get) so Nest builds it in-module with full DI (Logger + Audit).
+ */
 @Global()
 @Module({
   imports: [LoggerModule, AuditModule],
@@ -17,8 +23,11 @@ import { PhiAccessLogInterceptor } from './phi-access-log.interceptor';
       useFactory: (config: ConfigService) => new ComplianceConfig(config),
       inject: [ConfigService],
     },
-    PhiAccessLogInterceptor,
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: PhiAccessLogInterceptor,
+    },
   ],
-  exports: [COMPLIANCE_CONFIG_TOKEN, PhiAccessLogInterceptor],
+  exports: [COMPLIANCE_CONFIG_TOKEN],
 })
 export class ComplianceModule {}

@@ -7,7 +7,6 @@ import cookieParser from 'cookie-parser';
 import { AuditInterceptor } from './audit/audit.interceptor';
 import { AuditService } from './audit/audit.service';
 import { AuthorizationService } from './authorization/authorization.service';
-import { PhiAccessLogInterceptor } from './compliance/phi-access-log.interceptor';
 import { validateAndLogEnv } from './config/env-startup-check';
 import { EnvConfig, ENV_CONFIG_TOKEN } from './config/env.config';
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
@@ -35,10 +34,8 @@ async function bootstrap() {
 
   const auditService = app.get(AuditService);
   const authorizationService = app.get(AuthorizationService);
-  const phiInterceptor = app.get(PhiAccessLogInterceptor);
   app.useGlobalInterceptors(
     new AuditInterceptor(auditService, authorizationService),
-    phiInterceptor,
   );
   app.enableCors({
     origin: envConfig.corsOrigin.length > 0 ? envConfig.corsOrigin : true,
