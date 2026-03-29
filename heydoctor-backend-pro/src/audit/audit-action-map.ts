@@ -99,6 +99,22 @@ const ROUTE_MAP: Record<string, AuditActionDescriptor> = {
     action: 'AI_CONSULTATION_SUMMARY',
     resource: 'ai',
   },
+  'GET /api/consents/telemedicine/status': {
+    action: 'CONSENT_STATUS_CHECK',
+    resource: 'consent',
+  },
+  'POST /api/consents/telemedicine': {
+    action: 'CONSENT_TELEMEDICINE_ACCEPTED',
+    resource: 'consent',
+  },
+  'GET /api/gdpr/export': {
+    action: 'GDPR_DATA_EXPORT',
+    resource: 'user',
+  },
+  'DELETE /api/gdpr/delete-my-data': {
+    action: 'GDPR_DELETION_REQUEST',
+    resource: 'user',
+  },
 };
 
 const FALLBACK_RESOURCE = 'unknown';

@@ -177,6 +177,12 @@ export class ConsultationsService {
   ): Promise<{ ok: true; consultationId: string }> {
     const { clinicId, user } =
       await this.authorizationService.getUserWithClinic(authUser);
+
+    const consent = await this.consentService.getLatestConsent(authUser.sub);
+    if (!consent) {
+      throw new ForbiddenException('CONSENT_REQUIRED');
+    }
+
     const consultation = await this.consultationsRepository.findOne({
       where: { id, clinicId },
     });
