@@ -4,9 +4,6 @@ import { NestFactory } from '@nestjs/core';
 import { IoAdapter } from '@nestjs/platform-socket.io';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import cookieParser from 'cookie-parser';
-import { AuditInterceptor } from './audit/audit.interceptor';
-import { AuditService } from './audit/audit.service';
-import { AuthorizationService } from './authorization/authorization.service';
 import { validateAndLogEnv } from './config/env-startup-check';
 import { EnvConfig, ENV_CONFIG_TOKEN } from './config/env.config';
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
@@ -32,11 +29,6 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api');
 
-  const auditService = app.get(AuditService);
-  const authorizationService = app.get(AuthorizationService);
-  app.useGlobalInterceptors(
-    new AuditInterceptor(auditService, authorizationService),
-  );
   app.enableCors({
     origin: envConfig.corsOrigin.length > 0 ? envConfig.corsOrigin : true,
     credentials: true,
