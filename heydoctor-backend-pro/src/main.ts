@@ -56,12 +56,15 @@ async function bootstrap() {
     }),
   );
 
-  const port = Number(process.env.PORT) || 3001;
+  const port = process.env.PORT;
+
+  if (!port) {
+    throw new Error('PORT is not defined. Railway requires PORT env variable.');
+  }
 
   await app.listen(port, '0.0.0.0');
 
-  console.log('[HeyDoctor] ENV PORT:', process.env.PORT);
-  console.log('[HeyDoctor] Final PORT:', port);
+  console.log('[HeyDoctor] PORT from ENV:', port);
 }
 
 bootstrap();
