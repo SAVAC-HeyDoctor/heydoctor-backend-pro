@@ -24,6 +24,9 @@
     "migration:show": "typeorm-ts-node-commonjs migration:show -d src/data-source.ts"
   },
   "dependencies": {
+    "@keyv/redis": "^5.1.6",
+    "@nest-lab/throttler-storage-redis": "^1.2.0",
+    "@nestjs/cache-manager": "^3.1.0",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.3",
     "@nestjs/core": "^11.0.1",
@@ -36,10 +39,12 @@
     "@nestjs/typeorm": "^11.0.0",
     "@nestjs/websockets": "^11.1.17",
     "bcrypt": "^6.0.0",
+    "cache-manager": "^7.2.8",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
     "cookie-parser": "^1.4.7",
     "dotenv": "^17.3.1",
+    "ioredis": "^5.10.1",
     "nanoid": "^5.1.7",
     "openai": "^6.32.0",
     "passport": "^0.7.0",

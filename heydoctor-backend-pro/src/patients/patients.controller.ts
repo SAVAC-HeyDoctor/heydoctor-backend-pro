@@ -1,7 +1,8 @@
-import { Body, Controller, Get, Logger, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Logger, Post, Query, UseGuards } from '@nestjs/common';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
+import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { CreatePatientDto } from './dto/create-patient.dto';
 import { PatientsService } from './patients.service';
 
@@ -22,9 +23,12 @@ export class PatientsController {
   }
 
   @Get()
-  findAll(@CurrentUser() user: AuthenticatedUser) {
+  findAll(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() pagination: PaginationQueryDto,
+  ) {
     this.logRequest(`findAll requested by user ${user.sub} (${user.email})`);
-    return this.patientsService.findAll(user);
+    return this.patientsService.findAll(user, pagination);
   }
 
   @Post()

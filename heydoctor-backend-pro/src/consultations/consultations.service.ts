@@ -14,6 +14,8 @@ import { AuditService } from '../audit/audit.service';
 import { APP_LOGGER } from '../common/logger/logger.tokens';
 import { getCurrentRequestId } from '../common/request-context.storage';
 import { AuthorizationService } from '../authorization/authorization.service';
+import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
+import type { PaginatedResult } from '../common/types/paginated-result.type';
 import { ConsentService } from '../consents/consent.service';
 import { UserRole } from '../users/user-role.enum';
 import { Consultation } from './consultation.entity';
@@ -99,14 +101,37 @@ export class ConsultationsService {
     return saved;
   }
 
-  async findAll(authUser: AuthenticatedUser): Promise<Consultation[]> {
+  async findAll(
+    authUser: AuthenticatedUser,
+    pagination?: PaginationQueryDto,
+  ): Promise<Consultation[] | PaginatedResult<Consultation>> {
     const { clinicId } =
       await this.authorizationService.getUserWithClinic(authUser);
-    return this.consultationsRepository.find({
+    const paginate =
+      pagination !== undefined &&
+      (pagination.page !== undefined || pagination.limit !== undefined);
+
+    if (!paginate) {
+      return this.consultationsRepository.find({
+        where: { clinicId },
+        relations: { patient: true },
+        order: { createdAt: 'DESC' },
+      });
+    }
+
+    const page = pagination.page ?? 1;
+    const limit = Math.min(pagination.limit ?? 20, 100);
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await this.consultationsRepository.findAndCount({
       where: { clinicId },
       relations: { patient: true },
       order: { createdAt: 'DESC' },
+      skip,
+      take: limit,
     });
+
+    return { data, total, page, limit };
   }
 
   async findOne(

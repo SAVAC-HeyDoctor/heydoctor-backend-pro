@@ -7,11 +7,13 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
+import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { RequirePlan } from '../subscriptions/decorators/require-plan.decorator';
 import { FeatureGuard } from '../subscriptions/guards/feature.guard';
 import { SubscriptionPlan } from '../subscriptions/subscription.entity';
@@ -34,8 +36,11 @@ export class ConsultationsController {
   }
 
   @Get()
-  findAll(@CurrentUser() user: AuthenticatedUser) {
-    return this.consultationsService.findAll(user);
+  findAll(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() pagination: PaginationQueryDto,
+  ) {
+    return this.consultationsService.findAll(user, pagination);
   }
 
   @Get(':id/ai')

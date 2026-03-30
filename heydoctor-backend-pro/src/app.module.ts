@@ -4,11 +4,14 @@ import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
 import { AppController } from './app.controller';
+import { AppCacheModule } from './cache/cache.module';
 import { AiModule } from './ai/ai.module';
 import { AuditModule } from './audit/audit.module';
 import { LoggerModule } from './common/logger/logger.module';
 import { AuthModule } from './auth/auth.module';
+import { JwtUserCacheModule } from './auth/jwt-user-cache.module';
 import { AuthorizationModule } from './authorization/authorization.module';
 import { ComplianceModule } from './compliance/compliance.module';
 import { EnvConfigModule } from './config/env-config.module';
@@ -36,6 +39,8 @@ const dbUrl = process.env.DATABASE_PUBLIC_URL || process.env.DATABASE_URL;
       envFilePath: ['.env.local', '.env'],
     }),
     LoggerModule,
+    AppCacheModule,
+    JwtUserCacheModule,
     TypeOrmModule.forRoot({
       type: 'postgres',
       url: dbUrl,
@@ -47,14 +52,23 @@ const dbUrl = process.env.DATABASE_PUBLIC_URL || process.env.DATABASE_URL;
       migrationsRun: true,
     }),
     ScheduleModule.forRoot(),
-    ThrottlerModule.forRoot({
-      throttlers: [
-        {
-          ttl: 60_000,
-          limit: 100,
-        },
-      ],
-      getTracker: (req) => String(req.ip ?? 'unknown'),
+    ThrottlerModule.forRootAsync({
+      useFactory: () => {
+        const redisUrl = process.env.REDIS_URL?.trim();
+        return {
+          throttlers: [
+            {
+              name: 'default',
+              ttl: 60_000,
+              limit: 120,
+            },
+          ],
+          ...(redisUrl
+            ? { storage: new ThrottlerStorageRedisService(redisUrl) }
+            : {}),
+          getTracker: (req) => String(req.ip ?? 'unknown'),
+        };
+      },
     }),
     UsersModule,
     AuthorizationModule,

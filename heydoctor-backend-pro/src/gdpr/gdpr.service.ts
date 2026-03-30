@@ -14,6 +14,7 @@ import { TelemedicineConsent } from '../consents/consent.entity';
 import { Consultation } from '../consultations/consultation.entity';
 import { Patient } from '../patients/patient.entity';
 import { RefreshToken } from '../auth/entities/refresh-token.entity';
+import { JwtUserCacheInvalidationService } from '../auth/jwt-user-cache-invalidation.service';
 import { User } from '../users/user.entity';
 import { APP_LOGGER } from '../common/logger/logger.tokens';
 import {
@@ -41,6 +42,7 @@ export class GdprService {
     @InjectRepository(GdprDeletionRequest)
     private readonly deletionRepo: Repository<GdprDeletionRequest>,
     private readonly auditService: AuditService,
+    private readonly jwtUserCacheInvalidation: JwtUserCacheInvalidationService,
     @Inject(APP_LOGGER)
     private readonly logger: LoggerService,
   ) {}
@@ -277,6 +279,7 @@ export class GdprService {
       email: `${ANONYMIZED_EMAIL}.${anonSuffix}`,
       passwordHash: 'ANONYMIZED',
     });
+    await this.jwtUserCacheInvalidation.invalidateUserCache(userId);
     fields['users'] = ['email', 'password_hash'];
 
     // 2. Anonymize patients belonging to user's clinic

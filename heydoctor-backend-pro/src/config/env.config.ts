@@ -25,6 +25,9 @@ export class EnvConfig {
   // ── CORS ──
   readonly corsOrigin: string[];
 
+  // ── CACHE / REDIS (optional) ──
+  readonly redisUrl: string | null;
+
   // ── PAYKU ──
   readonly paykuApiUrl: string | null;
   readonly paykuApiKey: string | null;
@@ -60,6 +63,9 @@ export class EnvConfig {
       .split(',')
       .map((s) => s.trim())
       .filter(Boolean);
+
+    const redisUrlRaw = config.get<string>('REDIS_URL')?.trim();
+    this.redisUrl = redisUrlRaw && redisUrlRaw.length > 0 ? redisUrlRaw : null;
 
     this.paykuApiUrl = config.get<string>('PAYKU_API_URL') ?? null;
     this.paykuApiKey = config.get<string>('PAYKU_API_KEY') ?? null;

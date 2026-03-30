@@ -41,8 +41,12 @@ async function bootstrap() {
     ],
   });
 
+  const defaultCorsOrigins = ['http://localhost:3000'];
+  const corsOrigins =
+    envConfig.corsOrigin.length > 0 ? envConfig.corsOrigin : defaultCorsOrigins;
+
   app.enableCors({
-    origin: envConfig.corsOrigin.length > 0 ? envConfig.corsOrigin : true,
+    origin: corsOrigins,
     credentials: true,
   });
 

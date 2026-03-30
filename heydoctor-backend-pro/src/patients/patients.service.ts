@@ -4,6 +4,8 @@ import { Repository } from 'typeorm';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import { AuditService } from '../audit/audit.service';
 import { AuthorizationService } from '../authorization/authorization.service';
+import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
+import type { PaginatedResult } from '../common/types/paginated-result.type';
 import { CreatePatientDto } from './dto/create-patient.dto';
 import { Patient } from './patient.entity';
 
@@ -16,13 +18,35 @@ export class PatientsService {
     private readonly auditService: AuditService,
   ) {}
 
-  async findAll(authUser: AuthenticatedUser): Promise<Patient[]> {
+  async findAll(
+    authUser: AuthenticatedUser,
+    pagination?: PaginationQueryDto,
+  ): Promise<Patient[] | PaginatedResult<Patient>> {
     const { clinicId } =
       await this.authorizationService.getUserWithClinic(authUser);
-    return this.patientsRepository.find({
+    const paginate =
+      pagination !== undefined &&
+      (pagination.page !== undefined || pagination.limit !== undefined);
+
+    if (!paginate) {
+      return this.patientsRepository.find({
+        where: { clinicId },
+        order: { createdAt: 'DESC' },
+      });
+    }
+
+    const page = pagination.page ?? 1;
+    const limit = Math.min(pagination.limit ?? 20, 100);
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await this.patientsRepository.findAndCount({
       where: { clinicId },
       order: { createdAt: 'DESC' },
+      skip,
+      take: limit,
     });
+
+    return { data, total, page, limit };
   }
 
   async create(

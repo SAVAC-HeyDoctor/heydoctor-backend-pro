@@ -2,6 +2,7 @@ import { ConflictException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
+import { JwtUserCacheInvalidationService } from '../auth/jwt-user-cache-invalidation.service';
 import { ClinicService } from '../clinic/clinic.service';
 import { User } from './user.entity';
 import { UserRole } from './user-role.enum';
@@ -20,7 +21,15 @@ export class UsersService {
     @InjectRepository(User)
     private readonly usersRepository: Repository<User>,
     private readonly clinicService: ClinicService,
+    private readonly jwtUserCacheInvalidation: JwtUserCacheInvalidationService,
   ) {}
+
+  /**
+   * Call after persisting JWT-claim fields (email, role, account active state) so guards see DB truth immediately.
+   */
+  async invalidateJwtUserCache(userId: string): Promise<void> {
+    await this.jwtUserCacheInvalidation.invalidateUserCache(userId);
+  }
 
   async findByEmail(email: string): Promise<User | null> {
     return this.usersRepository.findOne({

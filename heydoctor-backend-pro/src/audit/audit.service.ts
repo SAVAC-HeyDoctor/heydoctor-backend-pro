@@ -35,6 +35,13 @@ export type AuditExportFilters = {
 
 @Injectable()
 export class AuditService {
+  /*
+   * TODO (pro): audit write buffering — enqueue logSuccess/logError payloads in memory or Redis,
+   * flush every N seconds via @nestjs/schedule + batch insert (TypeORM save(Array)), to reduce DB
+   * write amplification under traffic spikes. On shutdown, flush remaining queue; size-cap the
+   * buffer to avoid OOM. Trade-off: short window where logs are not yet queryable after a crash.
+   */
+
   // TODO: Replace in-memory counters with Redis (or similar) for multi-instance environments
   // so thresholds are shared across pods and survive process restarts.
   private readonly user403Timestamps = new Map<string, number[]>();
