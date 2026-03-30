@@ -55,10 +55,7 @@ async function bootstrap() {
     }),
   );
 
-  // Puerto dinámico compatible con Railway
-  const port = Number.parseInt(process.env.PORT || '3001', 10);
-
-  // Escuchar en todas las interfaces (clave para Railway)
+  const port = process.env.PORT || 3001;
   await app.listen(port, '0.0.0.0');
 
   console.log(`[HeyDoctor] Running on port ${port}`);
