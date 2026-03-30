@@ -24,7 +24,10 @@ describe('AppController (e2e)', () => {
 
     app = moduleFixture.createNestApplication();
     app.setGlobalPrefix('api', {
-      exclude: [{ path: '_health', method: RequestMethod.GET }],
+      exclude: [
+        { path: 'healthz', method: RequestMethod.GET },
+        { path: '_health', method: RequestMethod.GET },
+      ],
     });
     app.useGlobalPipes(
       new ValidationPipe({
@@ -57,5 +60,9 @@ describe('AppController (e2e)', () => {
       .get('/_health')
       .expect(200)
       .expect({ status: 'ok' });
+  });
+
+  it('/healthz (GET)', () => {
+    return request(app.getHttpServer()).get('/healthz').expect(200);
   });
 });

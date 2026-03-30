@@ -11,11 +11,4 @@ export class AppController {
   getHealth() {
     return this.appService.getHealth();
   }
-
-  /** Railway / probes: sin prefijo `/api` (ver exclude en main.ts). */
-  @SkipThrottle()
-  @Get('_health')
-  getRailwayHealth(): { status: string } {
-    return { status: 'ok' };
-  }
 }

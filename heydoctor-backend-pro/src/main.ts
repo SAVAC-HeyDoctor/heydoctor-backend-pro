@@ -11,10 +11,6 @@ import { AppModule } from './app.module';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  app.getHttpAdapter().get('/healthz', (req, res) => {
-    res.status(200).send('ok');
-  });
-
   app.use(cookieParser());
   app.getHttpAdapter().getInstance().set('trust proxy', 1);
   app.useWebSocketAdapter(new IoAdapter(app));
@@ -30,7 +26,10 @@ async function bootstrap() {
   }
 
   app.setGlobalPrefix('api', {
-    exclude: [{ path: '_health', method: RequestMethod.GET }],
+    exclude: [
+      { path: 'healthz', method: RequestMethod.GET },
+      { path: '_health', method: RequestMethod.GET },
+    ],
   });
 
   app.enableCors({

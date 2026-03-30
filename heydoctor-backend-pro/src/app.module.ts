@@ -24,6 +24,7 @@ import { UsersModule } from './users/users.module';
 import { DoctorApplicationsModule } from './doctor-applications/doctor-applications.module';
 import { DoctorProfilesModule } from './doctor-profiles/doctor-profiles.module';
 import { GdprModule } from './gdpr/gdpr.module';
+import { HealthController } from './health/health.controller';
 import { WebrtcModule } from './webrtc/webrtc.module';
 
 const dbUrl = process.env.DATABASE_PUBLIC_URL || process.env.DATABASE_URL;
@@ -73,7 +74,7 @@ const dbUrl = process.env.DATABASE_PUBLIC_URL || process.env.DATABASE_URL;
     GdprModule,
     WebrtcModule,
   ],
-  controllers: [AppController],
+  controllers: [AppController, HealthController],
   providers: [AppService, ThrottlerGuard],
 })
 export class AppModule {}
