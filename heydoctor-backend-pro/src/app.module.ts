@@ -1,3 +1,4 @@
+import { join } from 'path';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
@@ -40,8 +41,10 @@ const dbUrl = process.env.DATABASE_PUBLIC_URL || process.env.DATABASE_URL;
       url: dbUrl,
       ssl: { rejectUnauthorized: false },
       autoLoadEntities: true,
-      synchronize: true,
-      logging: true,
+      synchronize: false,
+      logging: process.env.NODE_ENV === 'production' ? false : true,
+      migrations: [join(__dirname, 'migrations', '*.{js,ts}')],
+      migrationsRun: true,
     }),
     ScheduleModule.forRoot(),
     ThrottlerModule.forRoot({

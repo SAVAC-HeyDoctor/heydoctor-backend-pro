@@ -74,4 +74,7 @@ async function bootstrap() {
   console.log('[HeyDoctor] PORT from ENV:', port);
 }
 
-bootstrap();
+bootstrap().catch((err: unknown) => {
+  console.error('[HeyDoctor] Fatal startup error', err);
+  process.exit(1);
+});

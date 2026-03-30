@@ -12,6 +12,15 @@ type EnvVarStatus = {
  * Returns list of missing required vars for early failure.
  */
 export function validateAndLogEnv(env: EnvConfig): string[] {
+  if (process.env.NODE_ENV === 'production') {
+    if (!process.env.JWT_SECRET?.trim()) {
+      throw new Error('Missing JWT_SECRET');
+    }
+    if (!process.env.DATABASE_URL?.trim()) {
+      throw new Error('Missing DATABASE_URL');
+    }
+  }
+
   const vars: EnvVarStatus[] = [
     { name: 'NODE_ENV', status: env.nodeEnv ? 'SET' : 'DEFAULT', required: false, value: env.nodeEnv },
     { name: 'PORT', status: 'SET', required: false, value: String(env.port) },
@@ -32,18 +41,22 @@ export function validateAndLogEnv(env: EnvConfig): string[] {
     { name: 'BACKEND_PUBLIC_URL', status: 'SET', required: false, value: env.backendPublicUrl },
   ];
 
-  console.log('\n╔══════════════════════════════════════════════════════════╗');
-  console.log('║           HeyDoctor — Environment Configuration         ║');
-  console.log('╠══════════════════════════════════════════════════════════╣');
+  if (process.env.NODE_ENV === 'production') {
+    console.log('[HeyDoctor] Environment configuration validated (production).');
+  } else {
+    console.log('\n╔══════════════════════════════════════════════════════════╗');
+    console.log('║           HeyDoctor — Environment Configuration         ║');
+    console.log('╠══════════════════════════════════════════════════════════╣');
 
-  for (const v of vars) {
-    const icon = v.status === 'SET' ? '✓' : v.status === 'DEFAULT' ? '~' : '✗';
-    const display = v.value ?? v.status;
-    const req = v.required ? ' [REQUIRED]' : '';
-    console.log(`║  ${icon} ${v.name.padEnd(38)} ${display}${req}`);
+    for (const v of vars) {
+      const icon = v.status === 'SET' ? '✓' : v.status === 'DEFAULT' ? '~' : '✗';
+      const display = v.value ?? v.status;
+      const req = v.required ? ' [REQUIRED]' : '';
+      console.log(`║  ${icon} ${v.name.padEnd(38)} ${display}${req}`);
+    }
+
+    console.log('╚══════════════════════════════════════════════════════════╝\n');
   }
-
-  console.log('╚══════════════════════════════════════════════════════════╝\n');
 
   const missing = vars.filter((v) => v.required && v.status === 'MISSING');
 
