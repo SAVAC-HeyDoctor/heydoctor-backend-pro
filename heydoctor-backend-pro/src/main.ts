@@ -41,6 +41,7 @@ async function bootstrap() {
     ],
   });
 
+  // List every frontend origin that calls this API with credentials (cookies + Bearer).
   const defaultCorsOrigins = ['http://localhost:3000'];
   const corsOrigins =
     envConfig.corsOrigin.length > 0 ? envConfig.corsOrigin : defaultCorsOrigins;
