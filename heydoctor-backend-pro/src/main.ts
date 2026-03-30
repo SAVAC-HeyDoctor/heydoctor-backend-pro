@@ -1,5 +1,4 @@
 import { RequestMethod, ValidationPipe } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { IoAdapter } from '@nestjs/platform-socket.io';
 import { ThrottlerGuard } from '@nestjs/throttler';
@@ -10,14 +9,7 @@ import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  // Temporal: verificar en logs de Railway que el despliegue es el commit esperado (p. ej. 60abc4a).
-  const deploySha = process.env.RAILWAY_GIT_COMMIT_SHA;
-  console.log(
-    'BOOT CLEAN V2',
-    deploySha ? deploySha.slice(0, 7) : 'local/no-RAILWAY_GIT_COMMIT_SHA',
-  );
-
-  const app = await NestFactory.create(AppModule, { rawBody: true });
+  const app = await NestFactory.create(AppModule);
 
   app.getHttpAdapter().get('/healthz', (req, res) => {
     res.status(200).send('ok');
@@ -29,7 +21,6 @@ async function bootstrap() {
   app.useGlobalGuards(app.get(ThrottlerGuard));
   app.use(new RequestIdMiddleware().use);
 
-  const config = app.get(ConfigService);
   const envConfig = app.get<EnvConfig>(ENV_CONFIG_TOKEN);
   const missingVars = validateAndLogEnv(envConfig);
   if (missingVars.length > 0 && envConfig.isProduction) {
@@ -64,8 +55,13 @@ async function bootstrap() {
     }),
   );
 
+  // Puerto dinámico compatible con Railway
   const port = Number.parseInt(process.env.PORT || '3001', 10);
+
+  // Escuchar en todas las interfaces (clave para Railway)
   await app.listen(port, '0.0.0.0');
+
   console.log(`[HeyDoctor] Running on port ${port}`);
 }
-void bootstrap();
+
+bootstrap();
