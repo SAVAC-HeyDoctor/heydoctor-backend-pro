@@ -4,7 +4,6 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
-import { AppService } from './app.service';
 import { AiModule } from './ai/ai.module';
 import { AuditModule } from './audit/audit.module';
 import { LoggerModule } from './common/logger/logger.module';
@@ -75,6 +74,6 @@ const dbUrl = process.env.DATABASE_PUBLIC_URL || process.env.DATABASE_URL;
     WebrtcModule,
   ],
   controllers: [AppController, HealthController],
-  providers: [AppService, ThrottlerGuard],
+  providers: [ThrottlerGuard],
 })
 export class AppModule {}

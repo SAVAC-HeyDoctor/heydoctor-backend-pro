@@ -25,6 +25,8 @@ describe('AppController (e2e)', () => {
     app = moduleFixture.createNestApplication();
     app.setGlobalPrefix('api', {
       exclude: [
+        { path: '/', method: RequestMethod.GET },
+        { path: 'health', method: RequestMethod.GET },
         { path: 'healthz', method: RequestMethod.GET },
         { path: '_health', method: RequestMethod.GET },
       ],
@@ -43,26 +45,35 @@ describe('AppController (e2e)', () => {
     await app.close();
   });
 
-  it('/api/health (GET)', () => {
+  it('/ (GET)', () => {
     return request(app.getHttpServer())
-      .get('/api/health')
+      .get('/')
       .expect(200)
-      .expect((res) => {
-        expect(res.body).toMatchObject({
-          status: 'ok',
-          service: 'heydoctor-backend-pro',
-        });
-      });
+      .expect('Content-Type', /text\/plain/)
+      .expect('ok');
+  });
+
+  it('/health (GET)', () => {
+    return request(app.getHttpServer())
+      .get('/health')
+      .expect(200)
+      .expect('Content-Type', /text\/plain/)
+      .expect('ok');
   });
 
   it('/_health (GET)', () => {
     return request(app.getHttpServer())
       .get('/_health')
       .expect(200)
-      .expect({ status: 'ok' });
+      .expect('Content-Type', /text\/plain/)
+      .expect('ok');
   });
 
   it('/healthz (GET)', () => {
-    return request(app.getHttpServer()).get('/healthz').expect(200);
+    return request(app.getHttpServer())
+      .get('/healthz')
+      .expect(200)
+      .expect('Content-Type', /text\/plain/)
+      .expect('ok');
   });
 });

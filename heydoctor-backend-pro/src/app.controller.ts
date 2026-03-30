@@ -1,14 +1,19 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Header } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
-import { AppService } from './app.service';
 
 @Controller()
 export class AppController {
-  constructor(private readonly appService: AppService) {}
+  @SkipThrottle()
+  @Header('Content-Type', 'text/plain; charset=utf-8')
+  @Get('/')
+  root() {
+    return 'ok';
+  }
 
   @SkipThrottle()
-  @Get('health')
-  getHealth() {
-    return this.appService.getHealth();
+  @Header('Content-Type', 'text/plain; charset=utf-8')
+  @Get('/health')
+  health() {
+    return 'ok';
   }
 }
