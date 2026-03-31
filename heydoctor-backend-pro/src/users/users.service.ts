@@ -1,9 +1,15 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { JwtUserCacheInvalidationService } from '../auth/jwt-user-cache-invalidation.service';
 import { ClinicService } from '../clinic/clinic.service';
+import { UpdateUserDto } from './dto/update-user.dto';
 import { User } from './user.entity';
 import { UserRole } from './user-role.enum';
 
@@ -41,6 +47,15 @@ export class UsersService {
     return this.usersRepository.findOne({ where: { id } });
   }
 
+  /** Fast check for JWT validation when serving from cache. */
+  async isUserActive(id: string): Promise<boolean> {
+    const row = await this.usersRepository.findOne({
+      where: { id },
+      select: { id: true, isActive: true },
+    });
+    return row?.isActive !== false;
+  }
+
   /**
    * Loads user including password hash (for credential checks only).
    */
@@ -60,6 +75,9 @@ export class UsersService {
   ): Promise<User | null> {
     const user = await this.findByEmailWithPasswordHash(email);
     if (!user?.passwordHash) {
+      return null;
+    }
+    if (user.isActive === false) {
       return null;
     }
     const match = await bcrypt.compare(plainPassword, user.passwordHash);
@@ -96,6 +114,59 @@ export class UsersService {
     if (!user) {
       throw new Error('Failed to load user after create');
     }
+    return user;
+  }
+
+  async updateUser(userId: string, dto: UpdateUserDto): Promise<User> {
+    const user = await this.usersRepository.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException();
+    }
+
+    if (dto.email === undefined && dto.name === undefined) {
+      throw new BadRequestException('Provide at least one field to update');
+    }
+
+    if (dto.email !== undefined) {
+      const normalized = dto.email.trim().toLowerCase();
+      const existing = await this.findByEmail(normalized);
+      if (existing && existing.id !== userId) {
+        throw new ConflictException('Email is already in use');
+      }
+      user.email = normalized;
+    }
+
+    if (dto.name !== undefined) {
+      const trimmed = dto.name.trim();
+      user.name = trimmed.length > 0 ? trimmed : null;
+    }
+
+    await this.usersRepository.save(user);
+    await this.invalidateJwtUserCache(user.id);
+    return user;
+  }
+
+  async updateUserRole(userId: string, role: UserRole): Promise<User> {
+    const user = await this.usersRepository.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException();
+    }
+
+    user.role = role;
+    await this.usersRepository.save(user);
+    await this.invalidateJwtUserCache(user.id);
+    return user;
+  }
+
+  async updateUserStatus(userId: string, isActive: boolean): Promise<User> {
+    const user = await this.usersRepository.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException();
+    }
+
+    user.isActive = isActive;
+    await this.usersRepository.save(user);
+    await this.invalidateJwtUserCache(user.id);
     return user;
   }
 }

@@ -166,7 +166,7 @@ export class AuthService {
     await this.refreshTokenRepository.save(stored);
 
     const user = await this.usersService.findById(stored.userId);
-    if (!user) {
+    if (!user || user.isActive === false) {
       throw new UnauthorizedException('User not found');
     }
 
@@ -268,7 +268,7 @@ export class AuthService {
 
   async getMe(userId: string): Promise<MeResponse> {
     const user = await this.usersService.findById(userId);
-    if (!user) {
+    if (!user || user.isActive === false) {
       throw new UnauthorizedException();
     }
 

@@ -19,6 +19,9 @@ export class User {
   @Column({ unique: true })
   email: string;
 
+  @Column({ type: 'varchar', length: 200, nullable: true })
+  name: string | null;
+
   /** Never expose in API responses; omitted from default SELECT (see UsersService). */
   @Exclude()
   @Column({ name: 'password_hash', select: false })
@@ -38,6 +41,9 @@ export class User {
   /** FK column `clinic_id` (read-only mirror for queries / future JWT). */
   @RelationId((user: User) => user.clinic)
   clinicId: string;
+
+  @Column({ name: 'is_active', default: true })
+  isActive: boolean;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;

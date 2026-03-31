@@ -38,11 +38,18 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       if (cached.email !== payload.email || cached.role !== payload.role) {
         throw new UnauthorizedException();
       }
+      const active = await this.usersService.isUserActive(payload.sub);
+      if (!active) {
+        throw new UnauthorizedException();
+      }
       return cached;
     }
 
     const user = await this.usersService.findById(payload.sub);
     if (!user) {
+      throw new UnauthorizedException();
+    }
+    if (user.isActive === false) {
       throw new UnauthorizedException();
     }
     if (user.email !== payload.email || user.role !== payload.role) {
