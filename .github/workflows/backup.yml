@@ -22,14 +22,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install PostgreSQL client
+      # En Ubuntu 24.04, `pip install awscli` falla (PEP 668 / entorno gestionado).
+      - name: Install PostgreSQL client and AWS CLI
         run: |
           sudo apt-get update
-          sudo apt-get install -y postgresql-client
+          sudo apt-get install -y postgresql-client awscli
 
-      - name: Install AWS CLI
+      - name: Verify tools
         run: |
-          pip install awscli
+          pg_dump --version
+          aws --version
 
       - name: Run backup
         run: |
