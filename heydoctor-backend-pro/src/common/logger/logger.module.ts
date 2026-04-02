@@ -16,7 +16,8 @@ export const APP_LOGGER_CONTEXT = 'HeyDoctor';
  *
  * Scale note: for very high QPS, consider a pino/winston transport with async
  * destinations or a bounded queue + worker; keep `enterRequestContext`/`getCurrentRequestId`
- * semantics when enqueuing so structured logs retain trace id.
+ * semantics when enqueuing so structured logs retain trace id. For optional sampling of
+ * very chatty lines, see `log-sampling.util.ts` (off by default).
  */
 @Global()
 @Module({

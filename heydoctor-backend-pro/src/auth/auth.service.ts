@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Inject, Injectable, UnauthorizedException, type LoggerService } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { createHash, randomBytes } from 'crypto';
@@ -11,6 +11,7 @@ import {
 } from '../subscriptions/subscription.entity';
 import { User } from '../users/user.entity';
 import { UserRole } from '../users/user-role.enum';
+import { APP_LOGGER } from '../common/logger/logger.tokens';
 import { UsersService } from '../users/users.service';
 import { RefreshToken } from './entities/refresh-token.entity';
 import { LoginDto } from './dto/login.dto';
@@ -51,6 +52,8 @@ export type MeResponse = {
 @Injectable()
 export class AuthService {
   constructor(
+    @Inject(APP_LOGGER)
+    private readonly logger: LoggerService,
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
     @InjectRepository(Subscription)
@@ -82,10 +85,18 @@ export class AuthService {
         email: dto.email,
         reason: 'invalid_credentials',
       });
+      // App log: sin PII (email ya puede ir a audit DB vía logSecurityEvent si aplica)
+      this.logger.warn('User login failed', {
+        reason: 'invalid_credentials',
+      });
       throw new UnauthorizedException('Invalid credentials');
     }
 
     await this.logSecurityEvent('AUTH_LOGIN_SUCCESS', user.id, ctx);
+    this.logger.log('User login success', {
+      userId: user.id,
+      clinicId: user.clinicId,
+    });
     return this.buildAuthResponse(user);
   }
 
@@ -259,8 +270,14 @@ export class AuthService {
         },
       });
       await this.auditLogRepository.save(row);
-    } catch {
-      // Audit must never block auth flow
+    } catch (err) {
+      const error =
+        err instanceof Error ? err : new Error(String(err));
+      this.logger.error(
+        'Unexpected error in AuthService.logSecurityEvent',
+        error,
+        { action, userId },
+      );
     }
   }
 

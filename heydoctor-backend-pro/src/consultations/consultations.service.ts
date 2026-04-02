@@ -98,6 +98,13 @@ export class ConsultationsService {
       },
     });
 
+    this.logger.log('Consultation created', {
+      consultationId: saved.id,
+      patientId: dto.patientId,
+      doctorId: authUser.sub,
+      clinicId,
+    });
+
     return saved;
   }
 
@@ -305,6 +312,8 @@ export class ConsultationsService {
       nextStatus: ConsultationStatus.SIGNED,
       consultationId: saved.id,
       clinicId: saved.clinicId ?? consultation.clinicId,
+      doctorId: saved.doctorId,
+      patientId: saved.patientId,
       requestId: getCurrentRequestId(),
     });
 
@@ -417,6 +426,8 @@ export class ConsultationsService {
         nextStatus: dto.status,
         consultationId: saved.id,
         clinicId: saved.clinicId ?? consultation.clinicId,
+        doctorId: saved.doctorId,
+        patientId: saved.patientId,
         requestId: getCurrentRequestId(),
       });
     }
@@ -445,12 +456,20 @@ export class ConsultationsService {
             aiGeneratedAt: new Date(),
           },
         );
-        this.logger.log(
-          `AI summary generated for consultation ${consultation.id}`,
-        );
-      } catch {
-        this.logger.warn(
-          `AI summary skipped or failed for consultation ${consultation.id}`,
+        this.logger.log('AI summary generated', {
+          consultationId: consultation.id,
+          patientId: consultation.patientId,
+          clinicId: consultation.clinicId,
+        });
+      } catch (err) {
+        this.logger.error(
+          'AI summary skipped or failed',
+          err instanceof Error ? err : new Error(String(err)),
+          {
+            consultationId: consultation.id,
+            patientId: consultation.patientId,
+            clinicId: consultation.clinicId,
+          },
         );
       }
     })();

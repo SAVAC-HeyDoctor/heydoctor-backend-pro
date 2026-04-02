@@ -1,4 +1,4 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import { ConflictException, Inject, Injectable, type LoggerService } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
@@ -6,6 +6,7 @@ import { AuditService } from '../audit/audit.service';
 import { AuthorizationService } from '../authorization/authorization.service';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import type { PaginatedResult } from '../common/types/paginated-result.type';
+import { APP_LOGGER } from '../common/logger/logger.tokens';
 import { CreatePatientDto } from './dto/create-patient.dto';
 import { Patient } from './patient.entity';
 
@@ -16,6 +17,8 @@ export class PatientsService {
     private readonly patientsRepository: Repository<Patient>,
     private readonly authorizationService: AuthorizationService,
     private readonly auditService: AuditService,
+    @Inject(APP_LOGGER)
+    private readonly logger: LoggerService,
   ) {}
 
   async findAll(
@@ -61,6 +64,11 @@ export class PatientsService {
       where: { clinicId, email },
     });
     if (existing) {
+      this.logger.warn('Business rule violation', {
+        reason: 'patient email already exists in clinic',
+        clinicId,
+        patientId: existing.id,
+      });
       throw new ConflictException('A patient with this email already exists');
     }
 
@@ -79,6 +87,12 @@ export class PatientsService {
       clinicId,
       httpStatus: 201,
       metadata: { email: saved.email },
+    });
+
+    this.logger.log('Patient created', {
+      patientId: saved.id,
+      clinicId,
+      actorUserId: authUser.sub,
     });
 
     return saved;

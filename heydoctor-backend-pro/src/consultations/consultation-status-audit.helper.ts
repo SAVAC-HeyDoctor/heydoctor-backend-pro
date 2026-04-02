@@ -12,12 +12,16 @@ export type LogConsultationStatusChangeParams = {
   nextStatus: ConsultationStatus;
   consultationId: string;
   clinicId: string | null;
+  /** Assigned doctor (consultation.doctorId), for completion logs. */
+  doctorId?: string | null;
+  /** Patient FK on the consultation row (correlation only; never clinical text). */
+  patientId?: string | null;
   /** HTTP correlation ID when invoked from a web request (see RequestIdMiddleware). */
   requestId?: string;
 };
 
 /**
- * Centralized consultation status transition logging (console + audit_logs).
+ * Centralized consultation status transition logging (app logs + audit_logs).
  * Reuse from update(), future bulk updates, or automations.
  */
 export function logConsultationStatusChange(
@@ -31,12 +35,31 @@ export function logConsultationStatusChange(
     nextStatus,
     consultationId,
     clinicId,
+    doctorId,
+    patientId,
     requestId,
   } = params;
 
-  logger?.log(
-    `Consultation ${consultationId} status changed from ${previousStatus} to ${nextStatus} by user ${authUser.sub}`,
-  );
+  const clinicKey = clinicId ?? undefined;
+  const patientKey = patientId ?? undefined;
+
+  logger?.log('Consultation status changed', {
+    consultationId,
+    patientId: patientKey,
+    from: previousStatus,
+    to: nextStatus,
+    userId: authUser.sub,
+    clinicId: clinicKey,
+  });
+
+  if (nextStatus === ConsultationStatus.COMPLETED && logger) {
+    logger.log('Consultation completed', {
+      consultationId,
+      patientId: patientKey,
+      doctorId: doctorId ?? authUser.sub,
+      clinicId: clinicKey,
+    });
+  }
 
   const metadata: Record<string, unknown> = {
     from: previousStatus,

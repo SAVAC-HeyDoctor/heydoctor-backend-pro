@@ -1,15 +1,17 @@
 import {
   BadRequestException,
   ConflictException,
+  Inject,
   Injectable,
-  Logger,
   NotFoundException,
+  type LoggerService,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { JwtUserCacheInvalidationService } from '../auth/jwt-user-cache-invalidation.service';
 import { ClinicService } from '../clinic/clinic.service';
+import { APP_LOGGER } from '../common/logger/logger.tokens';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { User } from './user.entity';
 import { UserRole } from './user-role.enum';
@@ -26,13 +28,13 @@ function clinicNameForNewUser(email: string): string {
 
 @Injectable()
 export class UsersService {
-  private readonly logger = new Logger(UsersService.name);
-
   constructor(
     @InjectRepository(User)
     private readonly usersRepository: Repository<User>,
     private readonly clinicService: ClinicService,
     private readonly jwtUserCacheInvalidation: JwtUserCacheInvalidationService,
+    @Inject(APP_LOGGER)
+    private readonly logger: LoggerService,
   ) {}
 
   /**
@@ -114,6 +116,11 @@ export class UsersService {
     const normalized = email.toLowerCase();
     const existing = await this.findByEmail(normalized);
     if (existing) {
+      this.logger.warn('Business rule violation', {
+        reason: 'email already registered',
+        clinicId: existing.clinicId,
+        existingUserId: existing.id,
+      });
       throw new ConflictException('Email is already registered');
     }
 
@@ -150,6 +157,11 @@ export class UsersService {
     const normalized = params.email.trim().toLowerCase();
     const existing = await this.findByEmailAndClinic(normalized, clinicId);
     if (existing) {
+      this.logger.warn('Business rule violation', {
+        reason: 'email already exists in clinic',
+        clinicId,
+        existingUserId: existing.id,
+      });
       throw new ConflictException('Email is already registered in this clinic');
     }
 
@@ -171,9 +183,11 @@ export class UsersService {
       throw new Error('Failed to load user after create');
     }
 
-    this.logger.log(
-      `User created in clinic ${clinicId}: ${user.id} (${user.email}, ${user.role})`,
-    );
+    this.logger.log('User created', {
+      userId: user.id,
+      clinicId,
+      role: user.role,
+    });
     return user;
   }
 
@@ -191,6 +205,11 @@ export class UsersService {
       const normalized = dto.email.trim().toLowerCase();
       const existing = await this.findByEmailAndClinic(normalized, user.clinicId);
       if (existing && existing.id !== userId) {
+        this.logger.warn('Business rule violation', {
+          reason: 'email already in use in clinic',
+          clinicId: user.clinicId,
+          conflictingUserId: existing.id,
+        });
         throw new ConflictException('Email is already in use');
       }
       user.email = normalized;
@@ -201,8 +220,18 @@ export class UsersService {
       user.name = trimmed.length > 0 ? trimmed : null;
     }
 
+    const fields: string[] = [];
+    if (dto.email !== undefined) fields.push('email');
+    if (dto.name !== undefined) fields.push('name');
+
     await this.usersRepository.save(user);
     await this.invalidateJwtUserCache(user.id);
+
+    this.logger.log('User updated', {
+      userId: user.id,
+      clinicId: user.clinicId,
+      fields,
+    });
     return user;
   }
 
@@ -227,6 +256,12 @@ export class UsersService {
     user.isActive = isActive;
     await this.usersRepository.save(user);
     await this.invalidateJwtUserCache(user.id);
+
+    this.logger.log('User updated', {
+      userId: user.id,
+      clinicId: user.clinicId,
+      isActive,
+    });
     return user;
   }
 }
