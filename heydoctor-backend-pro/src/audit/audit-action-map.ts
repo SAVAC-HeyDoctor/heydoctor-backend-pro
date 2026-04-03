@@ -18,6 +18,7 @@ const ROUTE_MAP: Record<string, AuditActionDescriptor> = {
   'GET /': { action: 'HEALTH_CHECK', resource: 'health' },
   'GET /health': { action: 'HEALTH_CHECK', resource: 'health' },
   'GET /healthz': { action: 'HEALTH_CHECK', resource: 'health' },
+  'GET /api/health': { action: 'HEALTH_CHECK', resource: 'health' },
   'POST /api/auth/register': { action: 'AUTH_REGISTER', resource: 'auth' },
   'POST /api/auth/login': { action: 'AUTH_LOGIN', resource: 'auth' },
   'POST /api/auth/refresh': { action: 'AUTH_REFRESH', resource: 'auth' },
