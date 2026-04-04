@@ -68,9 +68,22 @@ function extractContext(req: Request): RequestContext {
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  /**
+   * Diagnóstico deploy/routing: si este log NO aparece en Railway ante GET /api/auth/me,
+   * la request no está llegando al controller (proxy, otra instancia o ruta distinta).
+   */
   @Get('me')
   @UseGuards(JwtAuthGuard)
-  getMe(@CurrentUser() user: AuthenticatedUser): Promise<MeResponse> {
+  getMe(
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() req: Request,
+  ): Promise<MeResponse> {
+    // eslint-disable-next-line no-console -- visibilidad explícita en logs Railway
+    console.log('🔥 LLEGUÉ A /me', {
+      user: req.user,
+      path: req.path,
+      authHeaderPresent: Boolean(req.headers.authorization),
+    });
     return this.authService.getMe(user.sub);
   }
 
