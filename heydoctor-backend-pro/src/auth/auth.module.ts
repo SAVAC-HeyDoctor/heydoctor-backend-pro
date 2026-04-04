@@ -11,6 +11,7 @@ import { AuthService } from './auth.service';
 import { RefreshToken } from './entities/refresh-token.entity';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
+import { resolveJwtSecret } from './jwt-secret.util';
 import { JwtStrategy } from './strategies/jwt.strategy';
 
 @Module({
@@ -21,16 +22,10 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (config: ConfigService) => {
-        const secret = config.get<string>('JWT_SECRET')?.trim();
-        if (!secret) {
-          throw new Error('JWT_SECRET is required');
-        }
-        return {
-          secret,
-          signOptions: { expiresIn: '15m' },
-        };
-      },
+      useFactory: (config: ConfigService) => ({
+        secret: resolveJwtSecret(config),
+        signOptions: { expiresIn: '15m' },
+      }),
     }),
   ],
   controllers: [AuthController],

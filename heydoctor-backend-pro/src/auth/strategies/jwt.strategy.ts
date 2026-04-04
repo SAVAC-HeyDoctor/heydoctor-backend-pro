@@ -4,8 +4,10 @@ import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
 import type { Cache } from 'cache-manager';
 import { ExtractJwt, Strategy } from 'passport-jwt';
+import { UserRole } from '../../users/user-role.enum';
 import { UsersService } from '../../users/users.service';
 import { getJwtUserCacheKey } from '../jwt-user-cache.constants';
+import { resolveJwtSecret } from '../jwt-secret.util';
 import { JwtPayload } from '../types/jwt-payload.interface';
 
 /** Shape attached to `req.user` after JWT validation. */
@@ -20,22 +22,33 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     private readonly usersService: UsersService,
     @Inject(CACHE_MANAGER) private readonly cache: Cache,
   ) {
-    const secret = config.get<string>('JWT_SECRET')?.trim();
-    if (!secret) {
-      throw new Error('JWT_SECRET is required');
-    }
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: secret,
+      secretOrKey: resolveJwtSecret(config),
     });
+  }
+
+  /** Claims en JWT son JSON; la DB puede devolver enum — normalizar antes de comparar. */
+  private claimsMatchDb(
+    email: string,
+    role: UserRole,
+    payload: JwtPayload,
+  ): boolean {
+    const pEmail = String(payload.email ?? '')
+      .toLowerCase()
+      .trim();
+    const pRole = String(payload.role ?? '').trim();
+    return (
+      email.toLowerCase().trim() === pEmail && String(role) === pRole
+    );
   }
 
   async validate(payload: JwtPayload): Promise<AuthenticatedUser> {
     const key = getJwtUserCacheKey(payload.sub);
     const cached = await this.cache.get<AuthenticatedUser>(key);
     if (cached) {
-      if (cached.email !== payload.email || cached.role !== payload.role) {
+      if (!this.claimsMatchDb(cached.email, cached.role as UserRole, payload)) {
         throw new UnauthorizedException();
       }
       const active = await this.usersService.isUserActive(payload.sub);
@@ -52,7 +65,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     if (user.isActive === false) {
       throw new UnauthorizedException();
     }
-    if (user.email !== payload.email || user.role !== payload.role) {
+    if (!this.claimsMatchDb(user.email, user.role, payload)) {
       throw new UnauthorizedException();
     }
     const validated: AuthenticatedUser = {
