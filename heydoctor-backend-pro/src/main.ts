@@ -12,6 +12,20 @@ import type { Request, Response } from 'express';
 
 const bootstrapLogger = new Logger('Bootstrap');
 
+/** Orígenes permitidos cuando CORS_ORIGIN no está definido (p. ej. Railway sin variable). */
+function resolveCorsOrigins(envConfig: EnvConfig): string[] {
+  if (envConfig.corsOrigin.length > 0) {
+    return envConfig.corsOrigin;
+  }
+  const fallbacks = [
+    'http://localhost:3000',
+    'https://heydoctor-frontend.vercel.app',
+    'https://heydoctor.vercel.app',
+    envConfig.frontendUrl,
+  ];
+  return [...new Set(fallbacks.filter(Boolean))];
+}
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
@@ -53,14 +67,16 @@ async function bootstrap() {
     );
   }
 
-  // List every frontend origin that calls this API with credentials (cookies + Bearer).
-  const defaultCorsOrigins = ['http://localhost:3000'];
-  const corsOrigins =
-    envConfig.corsOrigin.length > 0 ? envConfig.corsOrigin : defaultCorsOrigins;
+  // Orígenes con credenciales: si CORS_ORIGIN está vacío, incluir Vercel + FRONTEND_URL.
+  const corsOrigins = resolveCorsOrigins(envConfig);
+  bootstrapLogger.log(`CORS allowed origins (${corsOrigins.length}): ${corsOrigins.join(', ')}`);
 
   app.enableCors({
     origin: corsOrigins,
     credentials: true,
+    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Cookie', 'X-Requested-With'],
+    exposedHeaders: ['Set-Cookie'],
   });
 
   app.use((_req: unknown, res: { setHeader: (k: string, v: string) => void }, next: () => void) => {
