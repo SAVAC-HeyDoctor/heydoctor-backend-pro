@@ -2,6 +2,8 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
+  HttpStatus,
   Post,
   Req,
   Res,
@@ -88,6 +90,7 @@ export class AuthController {
   }
 
   @Post('register')
+  @HttpCode(HttpStatus.CREATED)
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   async register(
     @Body() dto: RegisterDto,
