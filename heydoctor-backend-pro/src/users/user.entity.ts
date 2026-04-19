@@ -7,7 +7,6 @@ import {
   JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
-  RelationId,
 } from 'typeorm';
 import { Clinic } from '../clinic/clinic.entity';
 import { UserRole } from './user-role.enum';
@@ -36,12 +35,14 @@ export class User {
   })
   role: UserRole;
 
-  @ManyToOne(() => Clinic, { nullable: false, onDelete: 'RESTRICT' })
+  @ManyToOne(() => Clinic, (clinic) => clinic.users, {
+    nullable: false,
+    onDelete: 'RESTRICT',
+  })
   @JoinColumn({ name: 'clinic_id' })
   clinic: Clinic;
 
-  /** FK column `clinic_id` (read-only mirror for queries / future JWT). */
-  @RelationId((user: User) => user.clinic)
+  @Column({ name: 'clinic_id', type: 'uuid', nullable: false })
   clinicId: string;
 
   @Column({ name: 'is_active', default: true })
