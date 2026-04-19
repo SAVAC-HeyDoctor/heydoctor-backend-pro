@@ -75,6 +75,7 @@ export class PatientsService {
     const entity = this.patientsRepository.create({
       name: dto.name.trim(),
       email,
+      clinicId,
       clinic: { id: clinicId },
     });
     const saved = await this.patientsRepository.save(entity);

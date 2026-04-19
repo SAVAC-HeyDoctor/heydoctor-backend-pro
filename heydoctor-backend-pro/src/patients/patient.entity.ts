@@ -6,22 +6,23 @@ import {
   JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
-  RelationId,
 } from 'typeorm';
 import { Clinic } from '../clinic/clinic.entity';
 
 @Entity('patients')
-@Index('UQ_patients_clinic_email', ['clinic', 'email'], { unique: true })
+@Index('UQ_patients_clinic_email', ['clinicId', 'email'], { unique: true })
 export class Patient {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @ManyToOne(() => Clinic, { nullable: false, onDelete: 'CASCADE' })
+  @ManyToOne(() => Clinic, (clinic) => clinic.patients, {
+    nullable: false,
+    onDelete: 'RESTRICT',
+  })
   @JoinColumn({ name: 'clinic_id' })
   clinic: Clinic;
 
-  /** FK `clinic_id` — read-only mirror for queries and tenant filters. */
-  @RelationId((patient: Patient) => patient.clinic)
+  @Column({ name: 'clinic_id', type: 'uuid', nullable: false })
   clinicId: string;
 
   @Column({ type: 'varchar', length: 200 })
