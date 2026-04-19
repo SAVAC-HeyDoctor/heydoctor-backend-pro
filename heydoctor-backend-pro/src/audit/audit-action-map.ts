@@ -24,6 +24,10 @@ const ROUTE_MAP: Record<string, AuditActionDescriptor> = {
   'POST /api/auth/refresh': { action: 'AUTH_REFRESH', resource: 'auth' },
   'POST /api/auth/logout': { action: 'AUTH_LOGOUT', resource: 'auth' },
   'GET /api/auth/me': { action: 'AUTH_ME', resource: 'auth' },
+  'PATCH /api/auth/change-password': {
+    action: 'AUTH_CHANGE_PASSWORD',
+    resource: 'auth',
+  },
   'GET /api/patients': { action: 'PATIENT_LIST', resource: 'patient' },
   'POST /api/patients': { action: 'PATIENT_CREATE', resource: 'patient' },
   'POST /api/appointments': {

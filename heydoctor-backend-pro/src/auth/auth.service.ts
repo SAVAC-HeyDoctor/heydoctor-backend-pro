@@ -22,6 +22,7 @@ import { ClinicService } from '../clinic/clinic.service';
 import { UsersService } from '../users/users.service';
 import { RefreshToken } from './entities/refresh-token.entity';
 import { LoginDto } from './dto/login.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { RegisterDto } from './dto/register.dto';
 import { JwtPayload } from './types/jwt-payload.interface';
 
@@ -91,6 +92,14 @@ export class AuthService {
       role,
     });
     return this.buildAuthResponse(user);
+  }
+
+  async changePassword(userId: string, dto: ChangePasswordDto): Promise<void> {
+    await this.usersService.changePassword(
+      userId,
+      dto.currentPassword,
+      dto.newPassword,
+    );
   }
 
   async login(dto: LoginDto, ctx: RequestContext) {

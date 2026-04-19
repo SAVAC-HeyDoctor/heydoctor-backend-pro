@@ -4,6 +4,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Patch,
   Post,
   Req,
   Res,
@@ -20,6 +21,7 @@ import {
   type RequestContext,
 } from './auth.service';
 import type { AuthenticatedUser } from './strategies/jwt.strategy';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 
@@ -87,6 +89,17 @@ export class AuthController {
       authHeaderPresent: Boolean(req.headers.authorization),
     });
     return this.authService.getMe(user.sub);
+  }
+
+  @Patch('change-password')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async changePassword(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: ChangePasswordDto,
+  ): Promise<{ ok: true }> {
+    await this.authService.changePassword(user.sub, dto);
+    return { ok: true };
   }
 
   @Post('register')

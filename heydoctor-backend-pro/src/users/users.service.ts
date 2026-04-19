@@ -4,6 +4,7 @@ import {
   Inject,
   Injectable,
   NotFoundException,
+  UnauthorizedException,
   type LoggerService,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -103,6 +104,37 @@ export class UsersService {
     }
     const match = await bcrypt.compare(plainPassword, user.passwordHash);
     return match ? user : null;
+  }
+
+  /**
+   * Cambio de contraseña autenticado: verifica la actual con bcrypt y persiste `password_hash`.
+   */
+  async changePassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<void> {
+    const user = await this.usersRepository
+      .createQueryBuilder('user')
+      .addSelect('user.passwordHash')
+      .where('user.id = :id', { id: userId })
+      .getOne();
+
+    if (!user) {
+      throw new NotFoundException();
+    }
+    if (!user.passwordHash || user.isActive === false) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    const match = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!match) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    user.passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+    await this.usersRepository.save(user);
+    await this.invalidateJwtUserCache(userId);
   }
 
   /**
