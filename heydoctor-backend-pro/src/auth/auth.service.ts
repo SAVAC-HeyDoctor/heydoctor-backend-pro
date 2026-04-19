@@ -1,4 +1,10 @@
-import { Inject, Injectable, UnauthorizedException, type LoggerService } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+  type LoggerService,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { createHash, randomBytes } from 'crypto';
@@ -12,6 +18,7 @@ import {
 import { User } from '../users/user.entity';
 import { UserRole } from '../users/user-role.enum';
 import { APP_LOGGER } from '../common/logger/logger.tokens';
+import { ClinicService } from '../clinic/clinic.service';
 import { UsersService } from '../users/users.service';
 import { RefreshToken } from './entities/refresh-token.entity';
 import { LoginDto } from './dto/login.dto';
@@ -55,6 +62,7 @@ export class AuthService {
     @Inject(APP_LOGGER)
     private readonly logger: LoggerService,
     private readonly usersService: UsersService,
+    private readonly clinicService: ClinicService,
     private readonly jwtService: JwtService,
     @InjectRepository(Subscription)
     private readonly subscriptionRepository: Repository<Subscription>,
@@ -66,12 +74,22 @@ export class AuthService {
 
   // ── Public Auth flows ─────────────────────────────────────────
 
+  /**
+   * Alta en una clínica ya existente: email único por `clinic_id`, password con bcrypt
+   * (vía {@link UsersService.createUserForClinic}). Rol por defecto: admin.
+   */
   async register(dto: RegisterDto) {
-    const user = await this.usersService.create(
-      dto.email,
-      dto.password,
-      UserRole.DOCTOR,
-    );
+    const clinic = await this.clinicService.findById(dto.clinicId);
+    if (!clinic) {
+      throw new NotFoundException('Clinic not found');
+    }
+
+    const role = dto.role ?? UserRole.ADMIN;
+    const user = await this.usersService.createUserForClinic(dto.clinicId, {
+      email: dto.email,
+      password: dto.password,
+      role,
+    });
     return this.buildAuthResponse(user);
   }
 
