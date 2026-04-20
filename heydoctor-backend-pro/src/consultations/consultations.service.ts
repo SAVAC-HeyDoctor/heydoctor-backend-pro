@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { QueryFailedError, Repository } from 'typeorm';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import { AiService } from '../ai/ai.service';
 import { AuditService } from '../audit/audit.service';
@@ -84,14 +84,50 @@ export class ConsultationsService {
     dto: CreateConsultationDto,
     authUser: AuthenticatedUser,
   ): Promise<Consultation> {
+    // eslint-disable-next-line no-console -- visibilidad en logs Railway (diagnóstico 500)
+    console.log('create consultation', {
+      userId: authUser.sub,
+      clinicId: null,
+      patientId: dto.patientId,
+      step: 'start',
+    });
+
     const { clinicId } =
       await this.authorizationService.getUserWithClinic(authUser);
-    await this.authorizationService.assertPatientInClinic(
+
+    // eslint-disable-next-line no-console -- visibilidad en logs Railway (diagnóstico 500)
+    console.log('create consultation', {
+      userId: authUser.sub,
+      clinicId,
+      patientId: dto.patientId,
+      step: 'after_user_clinic',
+    });
+
+    await this.authorizationService.assertPatientInClinicWithContext(
       authUser,
       dto.patientId,
+      clinicId,
     );
 
+    // eslint-disable-next-line no-console -- visibilidad en logs Railway (diagnóstico 500)
+    console.log('create consultation', {
+      userId: authUser.sub,
+      clinicId,
+      patientId: dto.patientId,
+      step: 'after_patient_validated',
+    });
+
     const consent = await this.consentService.getLatestConsent(authUser.sub);
+
+    // eslint-disable-next-line no-console -- visibilidad en logs Railway (diagnóstico 500)
+    console.log('create consultation', {
+      userId: authUser.sub,
+      clinicId,
+      patientId: dto.patientId,
+      step: 'after_consent_load',
+      consentId: consent?.id ?? null,
+    });
+
     if (!consent) {
       throw new ForbiddenException(
         'Consent required before consultation',
@@ -100,6 +136,7 @@ export class ConsultationsService {
 
     const entity = this.consultationsRepository.create({
       patient: { id: dto.patientId },
+      clinicId,
       clinic: { id: clinicId },
       consent: { id: consent.id },
       consentVersion: consent.version,
@@ -110,7 +147,41 @@ export class ConsultationsService {
       reason: dto.reason.trim(),
       status: ConsultationStatus.DRAFT,
     });
-    const saved = await this.consultationsRepository.save(entity);
+
+    // eslint-disable-next-line no-console -- visibilidad en logs Railway (diagnóstico 500)
+    console.log('create consultation', {
+      userId: authUser.sub,
+      clinicId,
+      patientId: dto.patientId,
+      step: 'before_save',
+    });
+
+    let saved: Consultation;
+    try {
+      saved = await this.consultationsRepository.save(entity);
+    } catch (err) {
+      const detail =
+        err instanceof QueryFailedError
+          ? String(err.driverError ?? err.message)
+          : err instanceof Error
+            ? err.message
+            : String(err);
+      // eslint-disable-next-line no-console -- visibilidad en logs Railway (diagnóstico 500)
+      console.log('create consultation:save_failed', {
+        userId: authUser.sub,
+        clinicId,
+        patientId: dto.patientId,
+        detail,
+      });
+      this.logger.error(
+        'Consultation save failed',
+        err instanceof Error ? err : new Error(String(err)),
+        { userId: authUser.sub, clinicId, patientId: dto.patientId },
+      );
+      throw new BadRequestException(
+        `Could not create consultation: ${detail}`,
+      );
+    }
 
     void this.auditService.logSuccess({
       userId: authUser.sub,

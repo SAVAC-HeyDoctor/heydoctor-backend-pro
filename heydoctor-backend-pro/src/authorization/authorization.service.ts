@@ -80,7 +80,18 @@ export class AuthorizationService {
     patientId: string,
   ): Promise<Patient> {
     const { clinicId } = await this.getUserWithClinic(authUser);
+    return this.assertPatientInClinicWithContext(authUser, patientId, clinicId);
+  }
 
+  /**
+   * Misma regla que {@link assertPatientInClinic} sin volver a cargar el usuario
+   * (usar cuando ya tienes `clinicId` de {@link getUserWithClinic}).
+   */
+  async assertPatientInClinicWithContext(
+    authUser: AuthenticatedUser,
+    patientId: string,
+    clinicId: string,
+  ): Promise<Patient> {
     const patient = await this.patientsRepository.findOne({
       where: { id: patientId },
     });
@@ -88,7 +99,9 @@ export class AuthorizationService {
       throw new NotFoundException('Patient not found');
     }
     if (patient.clinicId !== clinicId) {
-      throw new ForbiddenException('Access denied for this patient');
+      throw new ForbiddenException(
+        'Patient does not belong to your clinic',
+      );
     }
 
     await this.assertPatientOwnership(authUser, patient);

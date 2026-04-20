@@ -14,7 +14,7 @@ import { TelemedicineConsent } from '../consents/consent.entity';
 import { Patient } from '../patients/patient.entity';
 import { ConsultationStatus } from './consultation-status.enum';
 
-@Index(['clinic', 'createdAt'])
+@Index(['clinicId', 'createdAt'])
 @Entity('consultations')
 export class Consultation {
   @PrimaryGeneratedColumn('uuid')
@@ -27,11 +27,14 @@ export class Consultation {
   @RelationId((c: Consultation) => c.patient)
   patientId: string;
 
-  @ManyToOne(() => Clinic, { nullable: false, onDelete: 'CASCADE' })
+  @ManyToOne(() => Clinic, (clinic) => clinic.consultations, {
+    nullable: false,
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'clinic_id' })
   clinic: Clinic;
 
-  @RelationId((c: Consultation) => c.clinic)
+  @Column({ name: 'clinic_id', type: 'uuid', nullable: false })
   clinicId: string;
 
   /** Consentimiento de telemedicina vigente al crear la consulta (trazabilidad legal). */
