@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AiModule } from '../ai/ai.module';
 import { AuditModule } from '../audit/audit.module';
@@ -13,6 +14,7 @@ import { ConsultationsService } from './consultations.service';
 
 @Module({
   imports: [
+    ConfigModule,
     TypeOrmModule.forFeature([Consultation]),
     AuthModule,
     AuthorizationModule,

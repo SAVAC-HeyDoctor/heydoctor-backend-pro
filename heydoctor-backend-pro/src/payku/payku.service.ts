@@ -139,11 +139,23 @@ export class PaykuService {
     });
     const saved = await this.paymentsRepository.save(payment);
 
-    let paymentUrl: string;
+    /**
+     * Payku live: desactivar con PAYKU_CONSULTATION_PAYMENTS_DISABLED=true (revertir quitando o false).
+     * Si la API falla o falta URL, se usa URL mock y se registra el error — sin 502 ni excepción al cliente.
+     */
+    let paymentUrl: string | undefined;
     const paykuApiUrl = this.config.get<string>('PAYKU_API_URL');
     const paykuApiKey = this.config.get<string>('PAYKU_API_KEY');
+    const paykuLiveDisabled =
+      this.config.get<string>('PAYKU_CONSULTATION_PAYMENTS_DISABLED') === 'true';
 
-    if (paykuApiUrl && paykuApiKey) {
+    const mockPaymentUrl = `${frontendUrl}/panel/consultas/${consultationId}?payment=mock&paymentId=${saved.id}`;
+
+    if (paykuLiveDisabled) {
+      this.logger.warn(
+        'PAYKU_CONSULTATION_PAYMENTS_DISABLED=true: skipping live Payku API (mock checkout URL)',
+      );
+    } else if (paykuApiUrl && paykuApiKey) {
       try {
         const res = await fetch(`${paykuApiUrl}/transaction`, {
           method: 'POST',
@@ -162,22 +174,36 @@ export class PaykuService {
             urlnotify: `${backendUrl}/api/payku/webhook`,
           }),
         });
-        const data = (await res.json()) as { url?: string; redirect_url?: string };
-        paymentUrl = data.url ?? data.redirect_url ?? '';
-        if (!paymentUrl) {
-          throw new Error('Payku did not return a payment URL');
+        if (!res.ok) {
+          this.logger.warn(
+            `Payku HTTP ${res.status}: falling back to mock checkout URL`,
+          );
+        } else {
+          const data = (await res.json()) as {
+            url?: string;
+            redirect_url?: string;
+          };
+          paymentUrl = data.url ?? data.redirect_url ?? '';
+          if (!paymentUrl) {
+            this.logger.warn(
+              'Payku response missing payment URL; using mock checkout URL',
+            );
+          }
         }
       } catch (err) {
-        this.logger.error('Payku API call failed', err);
-        throw new BadRequestException(
-          'Could not create payment session with Payku',
+        this.logger.error(
+          'Payku API call failed; using mock checkout URL',
+          err instanceof Error ? err.stack : err,
         );
       }
     } else {
-      paymentUrl = `${frontendUrl}/panel/consultas/${consultationId}?payment=mock&paymentId=${saved.id}`;
       this.logger.warn(
         'PAYKU_API_URL/PAYKU_API_KEY not configured; returning mock payment URL',
       );
+    }
+
+    if (!paymentUrl) {
+      paymentUrl = mockPaymentUrl;
     }
 
     void this.auditService.logSuccess({

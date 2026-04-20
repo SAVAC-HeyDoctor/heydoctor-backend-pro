@@ -6,6 +6,7 @@ import {
   NotFoundException,
   type LoggerService,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
@@ -26,6 +27,10 @@ import {
   assertRoleForTransition,
 } from './consultation-status.transitions';
 import type { ConsultationAiSnapshot } from './consultation-ai-snapshot.type';
+import {
+  DEFAULT_CONSULTATION_PRICE_CLP,
+  type ConsultationPriceResponse,
+} from './consultation-price.dto';
 import { CreateConsultationDto } from './dto/create-consultation.dto';
 import { SignConsultationDto } from './dto/sign-consultation.dto';
 import { UpdateConsultationDto } from './dto/update-consultation.dto';
@@ -50,9 +55,30 @@ export class ConsultationsService {
     private readonly consentService: ConsentService,
     private readonly auditService: AuditService,
     private readonly aiService: AiService,
+    private readonly configService: ConfigService,
     @Inject(APP_LOGGER)
     private readonly logger: LoggerService,
   ) {}
+
+  /**
+   * Precio fijo desde env (o 15000). No usa Payku; nunca lanza por fallos externos.
+   */
+  getConsultationPrice(): ConsultationPriceResponse {
+    const raw = this.configService.get<string>('CONSULTATION_PAYMENT_AMOUNT_CLP');
+    const parsed = raw !== undefined && raw !== '' ? Number(raw) : NaN;
+    if (Number.isFinite(parsed) && parsed > 0) {
+      return {
+        amountClp: parsed,
+        currency: 'CLP',
+        source: 'config',
+      };
+    }
+    return {
+      amountClp: DEFAULT_CONSULTATION_PRICE_CLP,
+      currency: 'CLP',
+      source: 'default',
+    };
+  }
 
   async create(
     dto: CreateConsultationDto,

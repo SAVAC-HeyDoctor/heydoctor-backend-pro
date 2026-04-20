@@ -43,6 +43,14 @@ export class ConsultationsController {
     return this.consultationsService.findAll(user, pagination);
   }
 
+  /**
+   * Precio para el flujo de consultas (solo env local). No contacta Payku.
+   */
+  @Get('consultation-price')
+  getConsultationPrice() {
+    return this.consultationsService.getConsultationPrice();
+  }
+
   @Get(':id/ai')
   @UseGuards(FeatureGuard)
   @RequirePlan(SubscriptionPlan.PRO)

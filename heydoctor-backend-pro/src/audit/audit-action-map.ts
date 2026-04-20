@@ -60,6 +60,10 @@ const ROUTE_MAP: Record<string, AuditActionDescriptor> = {
   },
   'GET /api/consultations': { action: 'CONSULTATION_LIST', resource: 'consultation' },
   'POST /api/consultations': { action: 'CONSULTATION_CREATE', resource: 'consultation' },
+  'GET /api/consultations/consultation-price': {
+    action: 'CONSULTATION_PRICE_READ',
+    resource: 'consultation',
+  },
   'GET /api/consultations/:id': { action: 'CONSULTATION_READ', resource: 'consultation' },
   'GET /api/consultations/:id/ai': {
     action: 'CONSULTATION_AI_READ',
