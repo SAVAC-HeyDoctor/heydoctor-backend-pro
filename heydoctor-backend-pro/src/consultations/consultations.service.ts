@@ -8,7 +8,15 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { QueryFailedError, Repository } from 'typeorm';
+import {
+  Between,
+  FindOperator,
+  FindOptionsWhere,
+  LessThanOrEqual,
+  MoreThanOrEqual,
+  QueryFailedError,
+  Repository,
+} from 'typeorm';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import { AiService } from '../ai/ai.service';
 import { AuditService } from '../audit/audit.service';
@@ -211,13 +219,15 @@ export class ConsultationsService {
   ): Promise<Consultation[] | PaginatedResult<Consultation>> {
     const { clinicId } =
       await this.authorizationService.getUserWithClinic(authUser);
+    const where = this.buildConsultationListWhere(clinicId, pagination);
+
     const paginate =
       pagination !== undefined &&
       (pagination.page !== undefined || pagination.limit !== undefined);
 
     if (!paginate) {
       return this.consultationsRepository.find({
-        where: { clinicId },
+        where,
         relations: { patient: true },
         order: { createdAt: 'DESC' },
       });
@@ -228,7 +238,7 @@ export class ConsultationsService {
     const skip = (page - 1) * limit;
 
     const [data, total] = await this.consultationsRepository.findAndCount({
-      where: { clinicId },
+      where,
       relations: { patient: true },
       order: { createdAt: 'DESC' },
       skip,
@@ -236,6 +246,68 @@ export class ConsultationsService {
     });
 
     return { data, total, page, limit };
+  }
+
+  private buildConsultationListWhere(
+    clinicId: string,
+    pagination?: PaginationQueryDto,
+  ): FindOptionsWhere<Consultation> {
+    const where: FindOptionsWhere<Consultation> = { clinicId };
+
+    if (pagination?.status !== undefined) {
+      where.status = pagination.status;
+    }
+
+    if (pagination?.patientId !== undefined) {
+      where.patient = { id: pagination.patientId };
+    }
+
+    const createdAt = this.consultationCreatedAtFilter(
+      pagination?.from,
+      pagination?.to,
+    );
+    if (createdAt !== undefined) {
+      where.createdAt = createdAt;
+    }
+
+    return where;
+  }
+
+  private consultationCreatedAtFilter(
+    from?: string,
+    to?: string,
+  ): FindOperator<Date> | undefined {
+    if (!from?.trim() && !to?.trim()) {
+      return undefined;
+    }
+
+    const start = from?.trim()
+      ? this.parseConsultationListDate(from.trim(), 'start')
+      : undefined;
+    const end = to?.trim()
+      ? this.parseConsultationListDate(to.trim(), 'end')
+      : undefined;
+
+    if (start && end) {
+      return Between(start, end);
+    }
+    if (start) {
+      return MoreThanOrEqual(start);
+    }
+    if (end) {
+      return LessThanOrEqual(end);
+    }
+    return undefined;
+  }
+
+  /** Fecha calendario `YYYY-MM-DD` → día UTC completo; ISO con hora → tal cual. */
+  private parseConsultationListDate(iso: string, bound: 'start' | 'end'): Date {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) {
+      return new Date(
+        bound === 'start' ? `${iso}T00:00:00.000Z` : `${iso}T23:59:59.999Z`,
+      );
+    }
+    return new Date(iso);
   }
 
   async findOne(
