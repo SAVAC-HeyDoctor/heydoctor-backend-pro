@@ -6,6 +6,7 @@ import { AuditService } from '../audit/audit.service';
 import { AuthorizationService } from '../authorization/authorization.service';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import type { PaginatedResult } from '../common/types/paginated-result.type';
+import { assignClinic } from '../common/entity-clinic.util';
 import { APP_LOGGER } from '../common/logger/logger.tokens';
 import { CreatePatientDto } from './dto/create-patient.dto';
 import { Patient } from './patient.entity';
@@ -75,9 +76,8 @@ export class PatientsService {
     const entity = this.patientsRepository.create({
       name: dto.name.trim(),
       email,
-      clinicId,
-      clinic: { id: clinicId },
     });
+    assignClinic(entity, clinicId);
     const saved = await this.patientsRepository.save(entity);
 
     void this.auditService.logSuccess({

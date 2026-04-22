@@ -17,6 +17,7 @@ import {
 } from '../subscriptions/subscription.entity';
 import { User } from '../users/user.entity';
 import { UserRole } from '../users/user-role.enum';
+import { assignClinic, assertClinicIdForSave } from '../common/entity-clinic.util';
 import { APP_LOGGER } from '../common/logger/logger.tokens';
 import { ClinicService } from '../clinic/clinic.service';
 import { UsersService } from '../users/users.service';
@@ -164,11 +165,11 @@ export class AuthService {
     const entity = this.refreshTokenRepository.create({
       tokenHash,
       userId,
-      clinicId: user.clinicId,
       expiresAt,
       ipAddress: ctx.ip,
       userAgent: ctx.userAgent ? ctx.userAgent.slice(0, 512) : null,
     });
+    assignClinic(entity, user.clinicId);
     await this.refreshTokenRepository.save(entity);
 
     return raw;
@@ -286,6 +287,19 @@ export class AuthService {
 
   // ── Security audit logging ────────────────────────────────────
 
+  private async resolveClinicIdForSecurityAudit(
+    userId: string | null,
+  ): Promise<string> {
+    if (userId) {
+      const user = await this.usersService.findById(userId);
+      if (user?.clinicId) {
+        return assertClinicIdForSave(user.clinicId);
+      }
+    }
+    const fallback = await this.clinicService.getOldestClinicId();
+    return assertClinicIdForSave(fallback);
+  }
+
   private async logSecurityEvent(
     action: string,
     userId: string | null,
@@ -293,20 +307,24 @@ export class AuthService {
     extra?: Record<string, unknown>,
   ): Promise<void> {
     try {
+      const clinicId = await this.resolveClinicIdForSecurityAudit(userId);
       const row = this.auditLogRepository.create({
         userId,
         action,
         resource: 'auth',
+        resourceId: null,
         status: action.includes('FAIL') || action.includes('REUSE')
           ? AuditOutcome.ERROR
           : AuditOutcome.SUCCESS,
         httpStatus: action.includes('FAIL') ? 401 : 200,
+        errorMessage: null,
         metadata: {
           ip: ctx.ip,
           userAgent: ctx.userAgent,
           ...extra,
         },
       });
+      assignClinic(row, clinicId);
       await this.auditLogRepository.save(row);
     } catch (err) {
       const error =

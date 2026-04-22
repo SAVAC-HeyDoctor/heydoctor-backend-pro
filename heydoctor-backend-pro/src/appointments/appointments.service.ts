@@ -9,6 +9,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
 import { Repository } from 'typeorm';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
+import { assignClinic } from '../common/entity-clinic.util';
 import { APP_LOGGER } from '../common/logger/logger.tokens';
 import { AuthorizationService } from '../authorization/authorization.service';
 import { UsersService } from '../users/users.service';
@@ -83,13 +84,13 @@ export class AppointmentsService {
 
     const entity = this.appointmentsRepository.create({
       patient: { id: dto.patientId },
-      clinic: { id: clinicId },
       doctor: { id: doctorId },
       startsAt,
       status: AppointmentStatus.PENDING,
       confirmationToken,
       confirmationTokenExpiresAt,
     });
+    assignClinic(entity, clinicId);
 
     return this.appointmentsRepository.save(entity);
   }

@@ -15,6 +15,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
+import { AuthorizationService } from '../authorization/authorization.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UpdateUserRoleDto } from './dto/update-user-role.dto';
@@ -56,7 +57,10 @@ function toUserResponse(user: User): UserResponse {
 @Controller('users')
 @UseGuards(JwtAuthGuard)
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly authorizationService: AuthorizationService,
+  ) {}
 
   @Post()
   @UseGuards(RolesGuard)
@@ -65,12 +69,10 @@ export class UsersController {
     @Body() dto: CreateUserDto,
     @CurrentUser() authUser: AuthenticatedUser,
   ): Promise<CreateUserResponse> {
-    const actor = await this.usersService.findById(authUser.sub);
-    if (!actor?.clinicId) {
-      throw new ForbiddenException('User has no clinic assigned');
-    }
+    const { clinicId } =
+      await this.authorizationService.getUserWithClinic(authUser);
 
-    const user = await this.usersService.createUserForClinic(actor.clinicId, {
+    const user = await this.usersService.createUserForClinic(clinicId, {
       email: dto.email,
       password: dto.password,
       role: dto.role ?? UserRole.DOCTOR,

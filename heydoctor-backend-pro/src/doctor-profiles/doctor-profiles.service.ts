@@ -1,6 +1,14 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  forwardRef,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
+import { AuthorizationService } from '../authorization/authorization.service';
+import { assignClinic } from '../common/entity-clinic.util';
 import { DoctorProfile } from './doctor-profile.entity';
 import { DoctorRating } from './doctor-rating.entity';
 import { CreateRatingDto } from './dto/create-rating.dto';
@@ -12,6 +20,8 @@ export class DoctorProfilesService {
     private readonly profileRepo: Repository<DoctorProfile>,
     @InjectRepository(DoctorRating)
     private readonly ratingRepo: Repository<DoctorRating>,
+    @Inject(forwardRef(() => AuthorizationService))
+    private readonly authorizationService: AuthorizationService,
   ) {}
 
   async findAllPublic(): Promise<DoctorProfile[]> {
@@ -59,12 +69,12 @@ export class DoctorProfilesService {
 
     const entity = this.ratingRepo.create({
       doctorProfileId: profile.id,
-      clinicId: profile.clinicId,
       patientName: dto.patientName,
       rating: dto.rating,
       comment: dto.comment ?? '',
       consultationId: dto.consultationId ?? null,
     });
+    assignClinic(entity, profile.clinicId);
     const saved = await this.ratingRepo.save(entity);
 
     const { avg } = await this.ratingRepo
@@ -84,8 +94,14 @@ export class DoctorProfilesService {
     return saved;
   }
 
-  async createProfile(data: Partial<DoctorProfile>): Promise<DoctorProfile> {
+  async createProfile(
+    authUser: AuthenticatedUser,
+    data: Omit<Partial<DoctorProfile>, 'clinic' | 'clinicId'>,
+  ): Promise<DoctorProfile> {
+    const { clinicId } =
+      await this.authorizationService.getUserWithClinic(authUser);
     const entity = this.profileRepo.create(data);
+    assignClinic(entity, clinicId);
     return this.profileRepo.save(entity);
   }
 }

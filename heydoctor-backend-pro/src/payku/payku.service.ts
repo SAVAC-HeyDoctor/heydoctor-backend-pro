@@ -9,6 +9,7 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
+import { assignClinic } from '../common/entity-clinic.util';
 import { AuditService } from '../audit/audit.service';
 import { AuthorizationService } from '../authorization/authorization.service';
 import { Consultation } from '../consultations/consultation.entity';
@@ -133,12 +134,12 @@ export class PaykuService {
 
     const payment = this.paymentsRepository.create({
       userId: authUser.sub,
-      clinicId: consultation.clinicId,
       consultationId,
       amount,
       currency: 'CLP',
       status: PaykuPaymentStatus.PENDING,
     });
+    assignClinic(payment, consultation.clinicId);
     const saved = await this.paymentsRepository.save(payment);
 
     /**

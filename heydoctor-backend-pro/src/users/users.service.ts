@@ -12,6 +12,7 @@ import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { JwtUserCacheInvalidationService } from '../auth/jwt-user-cache-invalidation.service';
 import { ClinicService } from '../clinic/clinic.service';
+import { assignClinic } from '../common/entity-clinic.util';
 import { APP_LOGGER } from '../common/logger/logger.tokens';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { User } from './user.entity';
@@ -165,8 +166,8 @@ export class UsersService {
       email: normalized,
       passwordHash,
       role,
-      clinic,
     });
+    assignClinic(entity, clinic.id);
     const saved = await this.usersRepository.save(entity);
     const user = await this.findById(saved.id);
     if (!user) {
@@ -207,8 +208,8 @@ export class UsersService {
       passwordHash,
       role: params.role,
       isActive: true,
-      clinic: { id: clinicId },
     });
+    assignClinic(entity, clinicId);
     const saved = await this.usersRepository.save(entity);
     const user = await this.findById(saved.id);
     if (!user) {

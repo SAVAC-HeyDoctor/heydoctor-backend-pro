@@ -1,6 +1,7 @@
 import { Inject, Injectable, type LoggerService } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { assignClinic } from '../common/entity-clinic.util';
 import { APP_LOGGER } from '../common/logger/logger.tokens';
 import { Clinic } from '../clinic/clinic.entity';
 import { AuditLog } from './audit-log.entity';
@@ -130,12 +131,12 @@ export class AuditService {
         action: data.action,
         resource: data.resource,
         resourceId: data.resourceId ?? null,
-        clinicId,
         status: AuditOutcome.SUCCESS,
         httpStatus: data.httpStatus,
         errorMessage: null,
         metadata: data.metadata ?? null,
       });
+      assignClinic(row, clinicId);
       await this.auditLogsRepository.save(row);
       if (shouldEmitAuditPersistSuccessLog(data.action)) {
         this.logger.log('Audit log created', {
@@ -169,12 +170,12 @@ export class AuditService {
         action: data.action,
         resource: data.resource,
         resourceId: data.resourceId ?? null,
-        clinicId,
         status: AuditOutcome.ERROR,
         httpStatus: data.httpStatus,
         errorMessage: data.errorMessage,
         metadata: data.metadata ?? null,
       });
+      assignClinic(row, clinicId);
       await this.auditLogsRepository.save(row);
       if (shouldEmitAuditPersistErrorLog()) {
         this.logger.log('Audit log created', {

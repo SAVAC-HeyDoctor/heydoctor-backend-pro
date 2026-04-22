@@ -10,6 +10,7 @@ import {
   SubscriptionPlan,
   SubscriptionStatus,
 } from './subscription.entity';
+import { assignClinic } from '../common/entity-clinic.util';
 import { UsersService } from '../users/users.service';
 import { normalizeReasonCode } from './reason-normalizer';
 
@@ -52,10 +53,10 @@ export class SubscriptionsService {
 
     const created = this.subscriptionsRepository.create({
       userId,
-      clinicId: user.clinicId,
       plan: SubscriptionPlan.FREE,
       status: SubscriptionStatus.ACTIVE,
     });
+    assignClinic(created, user.clinicId);
     try {
       return await this.subscriptionsRepository.save(created);
     } catch (e) {

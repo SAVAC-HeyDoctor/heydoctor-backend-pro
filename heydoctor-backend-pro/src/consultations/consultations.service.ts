@@ -12,6 +12,7 @@ import { QueryFailedError, Repository } from 'typeorm';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import { AiService } from '../ai/ai.service';
 import { AuditService } from '../audit/audit.service';
+import { assignClinic } from '../common/entity-clinic.util';
 import { APP_LOGGER } from '../common/logger/logger.tokens';
 import { getCurrentRequestId } from '../common/request-context.storage';
 import { AuthorizationService } from '../authorization/authorization.service';
@@ -95,7 +96,7 @@ export class ConsultationsService {
     // eslint-disable-next-line no-console -- visibilidad en logs Railway (diagnóstico 500)
     console.log('create consultation', {
       userId: authUser.sub,
-      clinicId: null,
+      clinicId: 'pending_authz',
       patientId: dto.patientId,
       step: 'start',
     });
@@ -144,8 +145,6 @@ export class ConsultationsService {
 
     const entity = this.consultationsRepository.create({
       patient: { id: dto.patientId },
-      clinicId,
-      clinic: { id: clinicId },
       consent: { id: consent.id },
       consentVersion: consent.version,
       consentGivenAt: consent.consentGivenAt,
@@ -155,6 +154,7 @@ export class ConsultationsService {
       reason: dto.reason.trim(),
       status: ConsultationStatus.DRAFT,
     });
+    assignClinic(entity, clinicId);
 
     // eslint-disable-next-line no-console -- visibilidad en logs Railway (diagnóstico 500)
     console.log('create consultation', {

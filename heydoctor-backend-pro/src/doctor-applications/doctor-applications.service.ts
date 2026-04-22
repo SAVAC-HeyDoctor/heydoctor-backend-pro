@@ -7,6 +7,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AuditService } from '../audit/audit.service';
+import { assignClinic, assertClinicIdForSave } from '../common/entity-clinic.util';
 import { ClinicService } from '../clinic/clinic.service';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import {
@@ -33,19 +34,20 @@ export class DoctorApplicationsService {
       throw new ConflictException('An application for this email already exists');
     }
 
-    const clinicId = await this.clinicService.getOldestClinicId();
-    if (!clinicId) {
+    const rawClinicId = await this.clinicService.getOldestClinicId();
+    if (!rawClinicId) {
       throw new ServiceUnavailableException(
         'No clinic configured; cannot accept applications',
       );
     }
+    const clinicId = assertClinicIdForSave(rawClinicId);
 
     const entity = this.repo.create({
       ...dto,
       email: dto.email.toLowerCase(),
       licenseUrl: dto.licenseUrl ?? null,
-      clinicId,
     });
+    assignClinic(entity, clinicId);
     const saved = await this.repo.save(entity);
 
     void this.auditService.logSuccess({

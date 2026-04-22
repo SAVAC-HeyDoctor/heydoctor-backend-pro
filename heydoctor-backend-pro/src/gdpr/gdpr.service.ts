@@ -10,6 +10,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { IsNull, Not, Repository } from 'typeorm';
 import type { Request } from 'express';
 import { AuditService } from '../audit/audit.service';
+import { assignClinic } from '../common/entity-clinic.util';
 import { TelemedicineConsent } from '../consents/consent.entity';
 import { Consultation } from '../consultations/consultation.entity';
 import { Patient } from '../patients/patient.entity';
@@ -143,11 +144,11 @@ export class GdprService {
 
     const request = this.deletionRepo.create({
       userId,
-      clinicId: user.clinicId,
       status: DeletionStatus.PENDING,
       ipAddress: this.extractIp(req),
       userAgent: req.headers['user-agent'] ?? null,
     });
+    assignClinic(request, user.clinicId);
     const saved = await this.deletionRepo.save(request);
 
     void this.auditService.logSuccess({

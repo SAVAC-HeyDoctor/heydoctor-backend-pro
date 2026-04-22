@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import type { Request } from 'express';
 import { QueryFailedError, Repository } from 'typeorm';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
+import { assignClinic } from '../common/entity-clinic.util';
 import { AuthorizationService } from '../authorization/authorization.service';
 import {
   TELEMEDICINE_CONSENT_VERSION,
@@ -130,12 +131,12 @@ export class ConsentService {
     const now = new Date();
     const row = this.consentsRepository.create({
       userId: user.id,
-      clinicId,
       consentGivenAt: now,
       ip: extractClientIp(req),
       userAgent: extractUserAgent(req),
       version,
     });
+    assignClinic(row, clinicId);
 
     try {
       const saved = await this.consentsRepository.save(row);
