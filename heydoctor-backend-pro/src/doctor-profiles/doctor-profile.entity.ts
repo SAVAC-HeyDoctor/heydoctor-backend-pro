@@ -4,10 +4,12 @@ import {
   Entity,
   Index,
   JoinColumn,
+  ManyToOne,
   OneToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { Clinic } from '../clinic/clinic.entity';
 import { User } from '../users/user.entity';
 
 @Entity('doctor_profiles')
@@ -16,6 +18,16 @@ import { User } from '../users/user.entity';
 export class DoctorProfile {
   @PrimaryGeneratedColumn('uuid')
   id: string;
+
+  @ManyToOne(() => Clinic, (clinic) => clinic.doctorProfiles, {
+    nullable: false,
+    onDelete: 'RESTRICT',
+  })
+  @JoinColumn({ name: 'clinic_id' })
+  clinic: Clinic;
+
+  @Column({ name: 'clinic_id', type: 'uuid', nullable: false })
+  clinicId: string;
 
   @OneToOne(() => User, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'user_id' })

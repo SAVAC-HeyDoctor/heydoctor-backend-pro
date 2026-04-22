@@ -154,9 +154,17 @@ export class AuthService {
       Date.now() + REFRESH_TOKEN_DAYS * 24 * 60 * 60 * 1000,
     );
 
+    const user = await this.usersService.findById(userId);
+    if (!user?.clinicId) {
+      throw new UnauthorizedException(
+        'User has no clinic assigned; cannot create session',
+      );
+    }
+
     const entity = this.refreshTokenRepository.create({
       tokenHash,
       userId,
+      clinicId: user.clinicId,
       expiresAt,
       ipAddress: ctx.ip,
       userAgent: ctx.userAgent ? ctx.userAgent.slice(0, 512) : null,

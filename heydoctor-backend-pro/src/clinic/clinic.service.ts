@@ -21,4 +21,14 @@ export class ClinicService {
   async findById(id: string): Promise<Clinic | null> {
     return this.clinicsRepository.findOne({ where: { id } });
   }
+
+  /** Clínica más antigua (misma semántica que migraciones de backfill). */
+  async getOldestClinicId(): Promise<string | null> {
+    const row = await this.clinicsRepository.find({
+      order: { createdAt: 'ASC' },
+      take: 1,
+      select: { id: true },
+    });
+    return row[0]?.id ?? null;
+  }
 }

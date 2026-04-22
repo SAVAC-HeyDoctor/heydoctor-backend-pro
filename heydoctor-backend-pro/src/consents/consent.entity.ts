@@ -3,8 +3,11 @@ import {
   CreateDateColumn,
   Entity,
   Index,
+  JoinColumn,
+  ManyToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
+import { Clinic } from '../clinic/clinic.entity';
 
 /**
  * Versión vigente del consentimiento de telemedicina que exige el backend.
@@ -22,7 +25,14 @@ export class TelemedicineConsent {
   @Column({ name: 'user_id', type: 'uuid' })
   userId: string;
 
-  @Column({ name: 'clinic_id', type: 'uuid' })
+  @ManyToOne(() => Clinic, (clinic) => clinic.telemedicineConsents, {
+    nullable: false,
+    onDelete: 'RESTRICT',
+  })
+  @JoinColumn({ name: 'clinic_id' })
+  clinic: Clinic;
+
+  @Column({ name: 'clinic_id', type: 'uuid', nullable: false })
   clinicId: string;
 
   /** Momento en que el usuario aceptó; fijado en servidor (no enviado por el cliente). */

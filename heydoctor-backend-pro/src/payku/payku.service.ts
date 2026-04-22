@@ -133,6 +133,7 @@ export class PaykuService {
 
     const payment = this.paymentsRepository.create({
       userId: authUser.sub,
+      clinicId: consultation.clinicId,
       consultationId,
       amount,
       currency: 'CLP',
@@ -310,7 +311,7 @@ export class PaykuService {
           resource: 'payment',
           resourceId: paymentId,
           userId: payment.userId,
-          clinicId: null,
+          clinicId: payment.clinicId,
           httpStatus: 200,
           metadata: {
             statusBefore,
@@ -333,7 +334,7 @@ export class PaykuService {
           resource: 'payment',
           resourceId: paymentId,
           userId: payment.userId,
-          clinicId: null,
+          clinicId: payment.clinicId,
           httpStatus: 200,
           metadata: {
             statusBefore,
@@ -354,7 +355,7 @@ export class PaykuService {
           resource: 'payment',
           resourceId: paymentId,
           userId: payment.userId,
-          clinicId: null,
+          clinicId: payment.clinicId,
           httpStatus: 200,
           errorMessage: `Invalid transition: ${payment.status} → ${incomingStatus}`,
         });
@@ -369,7 +370,7 @@ export class PaykuService {
             resource: 'payment',
             resourceId: paymentId,
             userId: payment.userId,
-            clinicId: null,
+            clinicId: payment.clinicId,
             httpStatus: 200,
             errorMessage: 'Missing amount in webhook payload',
           });
@@ -385,7 +386,7 @@ export class PaykuService {
             resource: 'payment',
             resourceId: paymentId,
             userId: payment.userId,
-            clinicId: null,
+            clinicId: payment.clinicId,
             httpStatus: 200,
             errorMessage: `Amount mismatch: expected ${payment.amount}, got ${incomingAmount}`,
             metadata: {
@@ -414,7 +415,7 @@ export class PaykuService {
         resource: 'payment',
         resourceId: paymentId,
         userId: payment.userId,
-        clinicId: null,
+        clinicId: payment.clinicId,
         httpStatus: 200,
         metadata: {
           amount: payment.amount,
@@ -428,10 +429,14 @@ export class PaykuService {
 
       if (incomingStatus === PaykuPaymentStatus.PAID) {
         try {
+          const webhookActor: AuthenticatedUser = {
+            ...SYSTEM_USER,
+            clinicId: payment.clinicId,
+          };
           await this.subscriptionsService.updatePlan(
             payment.userId,
             SubscriptionPlan.PRO,
-            SYSTEM_USER,
+            webhookActor,
             SubscriptionChangeSource.WEBHOOK,
             'payku payment',
           );

@@ -3,9 +3,12 @@ import {
   CreateDateColumn,
   Entity,
   Index,
+  JoinColumn,
+  ManyToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { Clinic } from '../clinic/clinic.entity';
 
 export enum ApplicationStatus {
   PENDING = 'pending',
@@ -19,6 +22,16 @@ export enum ApplicationStatus {
 export class DoctorApplication {
   @PrimaryGeneratedColumn('uuid')
   id: string;
+
+  @ManyToOne(() => Clinic, (clinic) => clinic.doctorApplications, {
+    nullable: false,
+    onDelete: 'RESTRICT',
+  })
+  @JoinColumn({ name: 'clinic_id' })
+  clinic: Clinic;
+
+  @Column({ name: 'clinic_id', type: 'uuid', nullable: false })
+  clinicId: string;
 
   @Column({ type: 'varchar', length: 200 })
   name: string;

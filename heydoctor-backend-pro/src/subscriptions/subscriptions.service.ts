@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import { AuditService } from '../audit/audit.service';
@@ -10,6 +10,7 @@ import {
   SubscriptionPlan,
   SubscriptionStatus,
 } from './subscription.entity';
+import { UsersService } from '../users/users.service';
 import { normalizeReasonCode } from './reason-normalizer';
 
 const PLAN_RANK: Record<SubscriptionPlan, number> = {
@@ -29,6 +30,7 @@ export class SubscriptionsService {
     @InjectRepository(Subscription)
     private readonly subscriptionsRepository: Repository<Subscription>,
     private readonly auditService: AuditService,
+    private readonly usersService: UsersService,
   ) {}
 
   /**
@@ -41,8 +43,16 @@ export class SubscriptionsService {
     });
     if (existing) return existing;
 
+    const user = await this.usersService.findById(userId);
+    if (!user?.clinicId) {
+      throw new BadRequestException(
+        'User has no clinic assigned; cannot create subscription',
+      );
+    }
+
     const created = this.subscriptionsRepository.create({
       userId,
+      clinicId: user.clinicId,
       plan: SubscriptionPlan.FREE,
       status: SubscriptionStatus.ACTIVE,
     });
@@ -108,7 +118,7 @@ export class SubscriptionsService {
       resource: 'subscription',
       resourceId: saved.id,
       userId,
-      clinicId: null,
+      clinicId: saved.clinicId,
       httpStatus: 200,
       metadata: {
         from: previousPlan,

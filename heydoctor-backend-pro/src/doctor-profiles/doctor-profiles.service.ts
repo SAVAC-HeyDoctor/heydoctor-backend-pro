@@ -59,6 +59,7 @@ export class DoctorProfilesService {
 
     const entity = this.ratingRepo.create({
       doctorProfileId: profile.id,
+      clinicId: profile.clinicId,
       patientName: dto.patientName,
       rating: dto.rating,
       comment: dto.comment ?? '',

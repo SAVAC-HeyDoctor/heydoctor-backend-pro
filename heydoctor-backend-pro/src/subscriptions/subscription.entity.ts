@@ -3,8 +3,11 @@ import {
   CreateDateColumn,
   Entity,
   Index,
+  JoinColumn,
+  ManyToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
+import { Clinic } from '../clinic/clinic.entity';
 
 export enum SubscriptionPlan {
   FREE = 'free',
@@ -37,6 +40,16 @@ export enum SubscriptionChangeReasonCode {
 export class Subscription {
   @PrimaryGeneratedColumn('uuid')
   id: string;
+
+  @ManyToOne(() => Clinic, (clinic) => clinic.subscriptions, {
+    nullable: false,
+    onDelete: 'RESTRICT',
+  })
+  @JoinColumn({ name: 'clinic_id' })
+  clinic: Clinic;
+
+  @Column({ name: 'clinic_id', type: 'uuid', nullable: false })
+  clinicId: string;
 
   @Column({ name: 'user_id', type: 'uuid' })
   userId: string;

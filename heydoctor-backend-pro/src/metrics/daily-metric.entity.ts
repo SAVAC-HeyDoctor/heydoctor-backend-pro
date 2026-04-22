@@ -1,10 +1,29 @@
-import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  Index,
+  JoinColumn,
+  ManyToOne,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
+import { Clinic } from '../clinic/clinic.entity';
 
 @Entity('daily_metrics')
-@Index(['date'], { unique: true })
+@Index(['clinicId', 'date'], { unique: true })
 export class DailyMetric {
   @PrimaryGeneratedColumn('uuid')
   id: string;
+
+  @ManyToOne(() => Clinic, (clinic) => clinic.dailyMetrics, {
+    nullable: false,
+    onDelete: 'RESTRICT',
+  })
+  @JoinColumn({ name: 'clinic_id' })
+  clinic: Clinic;
+
+  @Column({ name: 'clinic_id', type: 'uuid', nullable: false })
+  clinicId: string;
 
   @Column({ type: 'date' })
   date: string;

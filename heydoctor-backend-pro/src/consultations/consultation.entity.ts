@@ -29,7 +29,7 @@ export class Consultation {
 
   @ManyToOne(() => Clinic, (clinic) => clinic.consultations, {
     nullable: false,
-    onDelete: 'CASCADE',
+    onDelete: 'RESTRICT',
   })
   @JoinColumn({ name: 'clinic_id' })
   clinic: Clinic;

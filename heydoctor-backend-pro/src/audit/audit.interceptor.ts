@@ -95,6 +95,9 @@ export class AuditInterceptor implements NestInterceptor {
   private async resolveClinicId(
     authUser?: AuthenticatedUser,
   ): Promise<string | null> {
+    if (authUser?.clinicId) {
+      return authUser.clinicId;
+    }
     if (!authUser?.sub) {
       return null;
     }

@@ -2,6 +2,7 @@ import { Inject, Injectable, type LoggerService } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { APP_LOGGER } from '../common/logger/logger.tokens';
+import { Clinic } from '../clinic/clinic.entity';
 import { AuditLog } from './audit-log.entity';
 import { AuditOutcome } from './audit-outcome.enum';
 import type { AuditLogErrorPayload, AuditLogSuccessPayload } from './audit.types';
@@ -57,9 +58,30 @@ export class AuditService {
   constructor(
     @InjectRepository(AuditLog)
     private readonly auditLogsRepository: Repository<AuditLog>,
+    @InjectRepository(Clinic)
+    private readonly clinicsRepository: Repository<Clinic>,
     @Inject(APP_LOGGER)
     private readonly logger: LoggerService,
   ) {}
+
+  /** Si no viene clínica (p. ej. webhook sin contexto), usa la clínica más antigua. */
+  private async resolveClinicIdForAudit(
+    explicit: string | null | undefined,
+  ): Promise<string> {
+    if (explicit != null && String(explicit).trim() !== '') {
+      return explicit;
+    }
+    const row = await this.clinicsRepository.find({
+      order: { createdAt: 'ASC' },
+      take: 1,
+      select: { id: true },
+    });
+    const id = row[0]?.id;
+    if (!id) {
+      throw new Error('Audit: no hay clínicas en BD para asignar clinic_id');
+    }
+    return id;
+  }
 
   /**
    * Returns audit rows for reporting (ordered by time ascending).
@@ -102,12 +124,13 @@ export class AuditService {
 
   async logSuccess(data: AuditLogSuccessPayload): Promise<void> {
     try {
+      const clinicId = await this.resolveClinicIdForAudit(data.clinicId);
       const row = this.auditLogsRepository.create({
         userId: data.userId ?? null,
         action: data.action,
         resource: data.resource,
         resourceId: data.resourceId ?? null,
-        clinicId: data.clinicId ?? null,
+        clinicId,
         status: AuditOutcome.SUCCESS,
         httpStatus: data.httpStatus,
         errorMessage: null,
@@ -118,7 +141,7 @@ export class AuditService {
         this.logger.log('Audit log created', {
           action: data.action,
           userId: data.userId ?? undefined,
-          clinicId: data.clinicId ?? undefined,
+          clinicId,
         });
       }
       const log: AuditAlertLogContext = {
@@ -140,12 +163,13 @@ export class AuditService {
 
   async logError(data: AuditLogErrorPayload): Promise<void> {
     try {
+      const clinicId = await this.resolveClinicIdForAudit(data.clinicId);
       const row = this.auditLogsRepository.create({
         userId: data.userId ?? null,
         action: data.action,
         resource: data.resource,
         resourceId: data.resourceId ?? null,
-        clinicId: data.clinicId ?? null,
+        clinicId,
         status: AuditOutcome.ERROR,
         httpStatus: data.httpStatus,
         errorMessage: data.errorMessage,
@@ -156,7 +180,7 @@ export class AuditService {
         this.logger.log('Audit log created', {
           action: data.action,
           userId: data.userId ?? undefined,
-          clinicId: data.clinicId ?? undefined,
+          clinicId,
         });
       }
       const log: AuditAlertLogContext = {

@@ -7,6 +7,7 @@ import {
   ManyToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
+import { Clinic } from '../clinic/clinic.entity';
 import { DoctorProfile } from './doctor-profile.entity';
 
 @Entity('doctor_ratings')
@@ -14,6 +15,16 @@ import { DoctorProfile } from './doctor-profile.entity';
 export class DoctorRating {
   @PrimaryGeneratedColumn('uuid')
   id: string;
+
+  @ManyToOne(() => Clinic, (clinic) => clinic.doctorRatings, {
+    nullable: false,
+    onDelete: 'RESTRICT',
+  })
+  @JoinColumn({ name: 'clinic_id' })
+  clinic: Clinic;
+
+  @Column({ name: 'clinic_id', type: 'uuid', nullable: false })
+  clinicId: string;
 
   @ManyToOne(() => DoctorProfile, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'doctor_profile_id' })

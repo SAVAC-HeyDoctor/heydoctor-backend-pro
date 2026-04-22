@@ -18,11 +18,14 @@ export class Appointment {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @ManyToOne(() => Clinic, { nullable: false, onDelete: 'CASCADE' })
+  @ManyToOne(() => Clinic, (c) => c.appointments, {
+    nullable: false,
+    onDelete: 'RESTRICT',
+  })
   @JoinColumn({ name: 'clinic_id' })
   clinic: Clinic;
 
-  @RelationId((a: Appointment) => a.clinic)
+  @Column({ name: 'clinic_id', type: 'uuid', nullable: false })
   clinicId: string;
 
   @ManyToOne(() => Patient, { nullable: false, onDelete: 'CASCADE' })

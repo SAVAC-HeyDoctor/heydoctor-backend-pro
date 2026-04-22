@@ -3,8 +3,11 @@ import {
   CreateDateColumn,
   Entity,
   Index,
+  JoinColumn,
+  ManyToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
+import { Clinic } from '../clinic/clinic.entity';
 import { AuditOutcome } from './audit-outcome.enum';
 
 @Index(['clinicId', 'createdAt'])
@@ -27,8 +30,15 @@ export class AuditLog {
   @Column({ name: 'resource_id', type: 'varchar', length: 64, nullable: true })
   resourceId: string | null;
 
-  @Column({ name: 'clinic_id', type: 'uuid', nullable: true })
-  clinicId: string | null;
+  @ManyToOne(() => Clinic, (clinic) => clinic.auditLogs, {
+    nullable: false,
+    onDelete: 'RESTRICT',
+  })
+  @JoinColumn({ name: 'clinic_id' })
+  clinic: Clinic;
+
+  @Column({ name: 'clinic_id', type: 'uuid', nullable: false })
+  clinicId: string;
 
   @Column({
     type: 'enum',

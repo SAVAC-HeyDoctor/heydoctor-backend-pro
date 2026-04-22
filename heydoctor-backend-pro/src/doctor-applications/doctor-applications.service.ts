@@ -2,10 +2,12 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AuditService } from '../audit/audit.service';
+import { ClinicService } from '../clinic/clinic.service';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import {
   ApplicationStatus,
@@ -20,6 +22,7 @@ export class DoctorApplicationsService {
     @InjectRepository(DoctorApplication)
     private readonly repo: Repository<DoctorApplication>,
     private readonly auditService: AuditService,
+    private readonly clinicService: ClinicService,
   ) {}
 
   async create(dto: CreateDoctorApplicationDto): Promise<DoctorApplication> {
@@ -30,10 +33,18 @@ export class DoctorApplicationsService {
       throw new ConflictException('An application for this email already exists');
     }
 
+    const clinicId = await this.clinicService.getOldestClinicId();
+    if (!clinicId) {
+      throw new ServiceUnavailableException(
+        'No clinic configured; cannot accept applications',
+      );
+    }
+
     const entity = this.repo.create({
       ...dto,
       email: dto.email.toLowerCase(),
       licenseUrl: dto.licenseUrl ?? null,
+      clinicId,
     });
     const saved = await this.repo.save(entity);
 
@@ -42,7 +53,7 @@ export class DoctorApplicationsService {
       action: 'DOCTOR_APPLICATION_CREATED',
       resource: 'doctor_application',
       resourceId: saved.id,
-      clinicId: null,
+      clinicId: saved.clinicId,
       httpStatus: 201,
       metadata: { email: saved.email, specialty: saved.specialty },
     });
@@ -84,7 +95,7 @@ export class DoctorApplicationsService {
       action: `DOCTOR_APPLICATION_${dto.status.toUpperCase()}`,
       resource: 'doctor_application',
       resourceId: saved.id,
-      clinicId: null,
+      clinicId: authUser.clinicId ?? saved.clinicId,
       httpStatus: 200,
       metadata: {
         email: saved.email,

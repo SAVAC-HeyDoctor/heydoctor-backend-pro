@@ -83,6 +83,7 @@ export class GdprService {
       action: 'GDPR_DATA_EXPORT',
       resource: 'user',
       resourceId: userId,
+      clinicId: user.clinicId,
       httpStatus: 200,
     });
 
@@ -142,6 +143,7 @@ export class GdprService {
 
     const request = this.deletionRepo.create({
       userId,
+      clinicId: user.clinicId,
       status: DeletionStatus.PENDING,
       ipAddress: this.extractIp(req),
       userAgent: req.headers['user-agent'] ?? null,
@@ -153,6 +155,7 @@ export class GdprService {
       action: 'GDPR_DELETION_REQUEST',
       resource: 'user',
       resourceId: saved.id,
+      clinicId: user.clinicId,
       httpStatus: 201,
     });
 
@@ -195,6 +198,7 @@ export class GdprService {
       action: 'GDPR_DELETION_CONFIRMED',
       resource: 'user',
       resourceId: request.id,
+      clinicId: request.clinicId,
       httpStatus: 200,
     });
 
@@ -229,6 +233,7 @@ export class GdprService {
           action: 'GDPR_DATA_DELETED',
           resource: 'user',
           resourceId: request.id,
+          clinicId: request.clinicId,
           httpStatus: 200,
           metadata: { anonymizedFields: result.anonymizedFields },
         });
@@ -248,6 +253,7 @@ export class GdprService {
           action: 'GDPR_DELETION_FAILED',
           resource: 'user',
           resourceId: request.id,
+          clinicId: request.clinicId,
           httpStatus: 500,
           metadata: { error: request.errorDetail },
         });
