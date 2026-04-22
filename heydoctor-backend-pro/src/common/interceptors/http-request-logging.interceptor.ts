@@ -10,7 +10,10 @@ import type { Request, Response } from 'express';
 import { Observable } from 'rxjs';
 import { finalize } from 'rxjs/operators';
 import { APP_LOGGER } from '../logger/logger.tokens';
-import { getCurrentRequestId } from '../request-context.storage';
+import {
+  getCurrentRequestId,
+  mergeHttpLogContextFromUser,
+} from '../request-context.storage';
 
 @Injectable()
 export class HttpRequestLoggingInterceptor implements NestInterceptor {
@@ -25,6 +28,10 @@ export class HttpRequestLoggingInterceptor implements NestInterceptor {
     const res = context.switchToHttp().getResponse<Response>();
     const start = Date.now();
     const requestId = req.requestId ?? getCurrentRequestId();
+
+    if (req.user?.sub) {
+      mergeHttpLogContextFromUser(req.user);
+    }
 
     return next.handle().pipe(
       finalize(() => {

@@ -22,7 +22,7 @@ export class PaykuController {
 
   @Public()
   @Post('webhook')
-  @Throttle({ default: { limit: 120, ttl: 60_000 } })
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
   async handleWebhook(
     @Headers() headers: Record<string, string | string[] | undefined>,
     @Body() body: Record<string, unknown>,

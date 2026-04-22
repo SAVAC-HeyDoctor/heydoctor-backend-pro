@@ -12,6 +12,7 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
+import { notifyAlert } from '../common/alerts/alert.hooks';
 import { assignClinic } from '../common/entity-clinic.util';
 import { APP_LOGGER } from '../common/logger/logger.tokens';
 import { AuditService } from '../audit/audit.service';
@@ -585,12 +586,18 @@ export class PaykuService {
       }
 
       if (incomingStatus === PaykuPaymentStatus.FAILED) {
-        this.logger.warn('payku_payment_failed', {
+        const meta = {
           event: 'payku_payment_failed',
           paymentId,
           consultationId: payment.consultationId,
           clinicId: payment.clinicId,
-        });
+        };
+        this.logger.error(
+          'payku_payment_failed',
+          new Error('Payku payment failed'),
+          meta,
+        );
+        notifyAlert(meta);
       }
 
       return { action: 'processed', paymentId };

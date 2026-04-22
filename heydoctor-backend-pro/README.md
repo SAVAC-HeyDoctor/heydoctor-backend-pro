@@ -47,6 +47,25 @@ npm run start:dev
 | `PORT`         | Puerto HTTP (default 3001)           |
 | `NODE_ENV`     | `production` desactiva `synchronize`   |
 | `CORS_ORIGIN`  | Opcional: lista separada por comas   |
+| `COOKIE_DOMAIN` | Opcional: dominio compartido para cookies de sesión (ej. `.heydoctor.health`). Mismo valor en front si comparten dominio padre. |
+
+## Cookies de sesión (JWT)
+
+- `access_token` y `refresh_token`: **HttpOnly**, **Secure** solo en producción, **SameSite** `none` en producción (cross-domain) y `lax` en desarrollo.
+- Opcional: `COOKIE_DOMAIN` para compartir cookies entre subdominios del mismo sitio.
+
+## CI/CD y protección de `main`
+
+El workflow **CI** (`.github/workflows/ci.yml` en la raíz del repo) ejecuta instalación, lint, build y tests del directorio `heydoctor-backend-pro`.
+
+Para exigir que pase antes de fusionar:
+
+1. En GitHub: **Settings** → **Branches** → **Add branch protection rule** (o editar la regla de `main`).
+2. Activar **Require a pull request before merging** (recomendado).
+3. En **Require status checks to pass before merging**: activar el check y seleccionar el job del workflow (p. ej. **backend** o el nombre que muestre GitHub Actions en la pestaña *Actions* del repositorio).
+4. Guardar la regla.
+
+> Los checks obligatorios no se pueden fijar desde el código; deben configurarse en la UI (o API) de GitHub con permisos de administrador del repo.
 
 ## Estructura
 

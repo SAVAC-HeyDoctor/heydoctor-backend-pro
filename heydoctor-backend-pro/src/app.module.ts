@@ -1,6 +1,11 @@
 import { join } from 'path';
-import { Module } from '@nestjs/common';
-import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { Module, type LoggerService } from '@nestjs/common';
+import {
+  APP_FILTER,
+  APP_GUARD,
+  APP_INTERCEPTOR,
+  HttpAdapterHost,
+} from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
@@ -12,6 +17,8 @@ import { AiModule } from './ai/ai.module';
 import { AppointmentsModule } from './appointments/appointments.module';
 import { AuditModule } from './audit/audit.module';
 import { LoggerModule } from './common/logger/logger.module';
+import { APP_LOGGER } from './common/logger/logger.tokens';
+import { AlertingExceptionFilter } from './common/filters/alerting-exception.filter';
 import { ClinicGuard } from './common/guards/clinic.guard';
 import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
@@ -105,6 +112,12 @@ const dbUrl = process.env.DATABASE_PUBLIC_URL || process.env.DATABASE_URL;
     { provide: APP_GUARD, useExisting: JwtAuthGuard },
     { provide: APP_GUARD, useClass: ClinicGuard },
     { provide: APP_INTERCEPTOR, useClass: HttpRequestLoggingInterceptor },
+    {
+      provide: APP_FILTER,
+      useFactory: (httpAdapterHost: HttpAdapterHost, logger: LoggerService) =>
+        new AlertingExceptionFilter(httpAdapterHost, logger),
+      inject: [HttpAdapterHost, APP_LOGGER],
+    },
   ],
 })
 export class AppModule {}

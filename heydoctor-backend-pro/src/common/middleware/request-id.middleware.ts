@@ -24,8 +24,8 @@ function pickRequestId(req: Request): string {
 }
 
 /**
- * Binds `req.requestId` and AsyncLocalStorage for the request (UUID or trusted `X-Request-Id`).
- * Use as Express middleware: `app.use(new RequestIdMiddleware().use)`.
+ * Binds `req.requestId`, header `X-Request-Id` y AsyncLocalStorage (`requestId`).
+ * `userId` / `clinicId` en el mismo store los añade el interceptor HTTP global tras el JWT.
  */
 export class RequestIdMiddleware {
   use = (req: Request, res: Response, next: NextFunction): void => {

@@ -1,5 +1,9 @@
 import { Injectable, Logger, type LoggerService } from '@nestjs/common';
-import { getCurrentRequestId } from '../request-context.storage';
+import {
+  getCurrentClinicIdForLog,
+  getCurrentRequestId,
+  getCurrentUserIdForLog,
+} from '../request-context.storage';
 
 function isStructuredContext(value: unknown): value is Record<string, unknown> {
   return (
@@ -39,8 +43,16 @@ export class AppLoggerService implements LoggerService {
   private formatMessage(message: unknown): string {
     const text = typeof message === 'string' ? message : String(message ?? '');
     const requestId = getCurrentRequestId();
-    if (requestId) {
-      return `[requestId=${requestId}] ${text}`;
+    const userId = getCurrentUserIdForLog();
+    const clinicId = getCurrentClinicIdForLog();
+    const bits: string[] = [];
+    if (requestId) bits.push(`requestId=${requestId}`);
+    if (userId) {
+      bits.push(`userId=${userId}`);
+      bits.push(`clinicId=${clinicId ?? 'null'}`);
+    }
+    if (bits.length > 0) {
+      return `[${bits.join(' ')}] ${text}`;
     }
     return text;
   }
@@ -56,14 +68,31 @@ export class AppLoggerService implements LoggerService {
     meta?: Record<string, unknown>,
   ): Record<string, unknown> | undefined {
     const requestId = getCurrentRequestId();
+    const userId = getCurrentUserIdForLog();
+    const clinicId = getCurrentClinicIdForLog();
     const hasInput = meta !== undefined && Object.keys(meta).length > 0;
-    if (!requestId && !hasInput) {
+    if (
+      !requestId &&
+      userId === undefined &&
+      clinicId === undefined &&
+      !hasInput
+    ) {
       return undefined;
     }
     const out: Record<string, unknown> =
       hasInput && meta !== undefined ? { ...meta } : {};
     if (requestId !== undefined && out.requestId === undefined) {
       out.requestId = requestId;
+    }
+    if (userId !== undefined && out.userId === undefined) {
+      out.userId = userId;
+    }
+    if (
+      userId !== undefined &&
+      out.clinicId === undefined &&
+      clinicId !== undefined
+    ) {
+      out.clinicId = clinicId;
     }
     return Object.keys(out).length > 0 ? out : undefined;
   }

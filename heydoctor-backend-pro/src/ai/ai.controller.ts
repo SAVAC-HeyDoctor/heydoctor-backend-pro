@@ -1,4 +1,5 @@
 import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
@@ -9,6 +10,7 @@ import type { ClinicalSummaryResult } from './ai.types';
 import { AiService } from './ai.service';
 import { ConsultationSummaryQueryDto } from './dto/consultation-summary-query.dto';
 
+@Throttle({ default: { limit: 10, ttl: 60_000 } })
 @Controller('ai')
 @UseGuards(JwtAuthGuard, FeatureGuard)
 @RequirePlan(SubscriptionPlan.PRO)
