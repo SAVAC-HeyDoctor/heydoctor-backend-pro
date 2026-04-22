@@ -18,11 +18,25 @@ export function getApiBase(): string {
   return process.env.NEXT_PUBLIC_API_URL ?? '';
 }
 
+const NON_MUTATING = new Set(['GET', 'HEAD', 'OPTIONS', 'TRACE']);
+
+/**
+ * fetch con cookies en todas las peticiones.
+ * Mutaciones (POST, PUT, PATCH, DELETE): cabecera no simple para endurecer frente a CSRF cross-site.
+ */
 export function apiFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const method = (init?.method ?? 'GET').toUpperCase();
+  const isMutation = !NON_MUTATING.has(method);
+  const headers = init?.headers
+    ? new Headers(init.headers)
+    : new Headers();
+  if (isMutation) {
+    headers.set('X-Requested-With', 'XMLHttpRequest');
+  }
   return fetch(input, {
     ...init,
     credentials: 'include',
-    headers: init?.headers,
+    headers,
   });
 }
 

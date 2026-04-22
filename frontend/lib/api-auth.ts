@@ -18,13 +18,25 @@ export interface AuthUser {
   clinicId?: string | null;
 }
 
-/** Respuesta alineada con Nest: usuario en JSON; tokens solo en cookies HttpOnly. */
+/** Respuesta alineada con Nest: solo `user` en JSON; nunca depender de tokens en el cuerpo. */
 export interface LoginResponse {
   user: AuthUser;
 }
 
+function parseLoginResponseBody(raw: unknown): LoginResponse {
+  if (!raw || typeof raw !== 'object') {
+    throw new Error('Invalid login response');
+  }
+  const o = raw as Record<string, unknown>;
+  const user = o.user;
+  if (!user || typeof user !== 'object') {
+    throw new Error('Invalid login response: missing user');
+  }
+  return { user: user as AuthUser };
+}
+
 /**
- * POST /api/auth/login — Set-Cookie: access_token, refresh_token
+ * POST /api/auth/login — Set-Cookie HttpOnly; no usar `access_token` del JSON aunque exista.
  */
 export async function login(credentials: LoginCredentials): Promise<LoginResponse> {
   const base = getApiBase();
@@ -38,7 +50,8 @@ export async function login(credentials: LoginCredentials): Promise<LoginRespons
     throw await parseApiErrorResponse(res);
   }
 
-  return res.json() as Promise<LoginResponse>;
+  const raw: unknown = await res.json();
+  return parseLoginResponseBody(raw);
 }
 
 export async function logout(): Promise<void> {

@@ -33,8 +33,11 @@ function buildContentSecurityPolicy() {
     `connect-src ${connect}`,
     "img-src 'self' data: blob:",
     "font-src 'self'",
+    /**
+     * style/script unsafe-inline: exigido hoy por el runtime de Next sin pipeline de nonces.
+     * Endurecimiento progresivo: nonces (middleware + `next/script`) y retirar unsafe-inline.
+     */
     "style-src 'self' 'unsafe-inline'",
-    /** Next.js requiere eval en desarrollo; en prod el bundle suele no necesitarlo. */
     isProd
       ? "script-src 'self' 'unsafe-inline'"
       : "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
