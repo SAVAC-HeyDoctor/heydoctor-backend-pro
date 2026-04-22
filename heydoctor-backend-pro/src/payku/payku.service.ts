@@ -1,9 +1,10 @@
 import {
   BadRequestException,
-  ForbiddenException,
+  ConflictException,
   Injectable,
   Logger,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -226,18 +227,29 @@ export class PaykuService {
   }
 
   /**
-   * Full webhook handler. Always returns a result (never throws to the caller).
-   * The controller is responsible for returning 200 { ok: true } regardless.
+   * Webhook Payku: 401 si falla autenticación; 4xx si el cuerpo o la transición no aplican;
+   * 200 solo con procesamiento idempotente o actualización aplicada ({ ok: true }).
    */
   async handleWebhook(
     headers: Record<string, string | string[] | undefined>,
     body: Record<string, unknown>,
-  ): Promise<WebhookResult> {
+  ): Promise<{
+    ok: true;
+    action: string;
+    paymentId?: string;
+    duplicate?: boolean;
+  }> {
     try {
       assertPaykuWebhookAuthenticated(headers, body, this.authConfig);
     } catch (err) {
-      const msg = (err as Error).message;
-      this.logger.warn(`Webhook auth failed: ${msg}`);
+      const msg =
+        err instanceof UnauthorizedException
+          ? err.message
+          : (err as Error).message;
+      this.logger.warn('Payku webhook authentication failed', {
+        event: 'payku_webhook_auth_failed',
+        error: msg,
+      });
       void this.auditService.logError({
         action: 'PAYKU_WEBHOOK_AUTH_FAILED',
         resource: 'payment',
@@ -248,31 +260,85 @@ export class PaykuService {
         errorMessage: msg,
         metadata: { ip: body._ip as string | undefined },
       });
-      return { action: 'auth_failed', error: msg };
+      if (err instanceof UnauthorizedException) {
+        throw err;
+      }
+      throw new UnauthorizedException(msg);
     }
+
+    this.logger.log('Payku webhook authenticated', {
+      event: 'payku_webhook_authenticated',
+      paymentIdHint: String(
+        body.payment_id ?? body.paymentId ?? body.id ?? '',
+      ),
+    });
 
     const paymentId = String(
       body.payment_id ?? body.paymentId ?? body.id ?? '',
     );
     if (!paymentId) {
-      this.logger.warn('Webhook missing payment_id');
-      return { action: 'missing_payment_id' };
+      this.logger.warn('Payku webhook missing payment_id', {
+        event: 'payku_webhook_missing_payment_id',
+      });
+      throw new BadRequestException('missing payment_id');
     }
 
     const incomingStatus = this.resolveStatus(body);
     if (!incomingStatus) {
-      this.logger.warn(`Webhook unknown status for payment ${paymentId}`);
-      return { action: 'unknown_status', paymentId };
+      this.logger.warn('Payku webhook unknown status', {
+        event: 'payku_webhook_unknown_status',
+        paymentId,
+      });
+      throw new BadRequestException('unknown payment status');
     }
 
     const incomingAmount = this.extractAmount(body);
 
-    return this.processWebhookInTransaction(
+    const result = await this.processWebhookInTransaction(
       paymentId,
       incomingStatus,
       incomingAmount,
       body,
     );
+
+    this.logger.log('Payku webhook transaction completed', {
+      event: 'payku_webhook_tx_result',
+      action: result.action,
+      paymentId: result.paymentId,
+      duplicate: result.duplicate,
+    });
+
+    switch (result.action) {
+      case 'processed':
+        return {
+          ok: true,
+          action: result.action,
+          paymentId: result.paymentId,
+        };
+      case 'already_final':
+        return {
+          ok: true,
+          action: result.action,
+          paymentId: result.paymentId,
+          duplicate: result.duplicate,
+        };
+      case 'payment_not_found':
+        throw new NotFoundException('Payment not found');
+      case 'expired_before_webhook':
+        throw new ConflictException('Payment expired before webhook');
+      case 'invalid_transition':
+        throw new ConflictException('Invalid payment status transition');
+      case 'missing_amount':
+        throw new BadRequestException('Missing amount in webhook payload');
+      case 'amount_mismatch':
+        throw new BadRequestException('Amount mismatch');
+      default:
+        this.logger.error('Payku webhook unhandled action', {
+          event: 'payku_webhook_unhandled',
+          action: (result as WebhookResult).action,
+        });
+        throw new BadRequestException('Webhook processing failed');
+    }
   }
 
   private async processWebhookInTransaction(

@@ -1,14 +1,30 @@
-import { BadGatewayException, Injectable } from '@nestjs/common';
+import {
+  BadGatewayException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { InjectRepository } from '@nestjs/typeorm';
 import OpenAI from 'openai';
+import { Repository } from 'typeorm';
+import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
+import { AuthorizationService } from '../authorization/authorization.service';
+import { Consultation } from '../consultations/consultation.entity';
 import type { GenerateAiDto } from './dto/generate-ai.dto';
 import type { ClinicalSummaryResult } from './ai.types';
 
 @Injectable()
 export class AiService {
   private readonly client: OpenAI;
+  private readonly logger = new Logger(AiService.name);
 
-  constructor(private readonly config: ConfigService) {
+  constructor(
+    private readonly config: ConfigService,
+    private readonly authorizationService: AuthorizationService,
+    @InjectRepository(Consultation)
+    private readonly consultationsRepository: Repository<Consultation>,
+  ) {
     const apiKey = this.config.get<string>('OPENAI_API_KEY');
     this.client = new OpenAI({
       apiKey: apiKey || 'sk-not-configured',
@@ -16,7 +32,45 @@ export class AiService {
   }
 
   /**
+   * Resumen clínico: solo campos persistidos en la consulta; validación multi-tenant vía {@link AuthorizationService}.
+   */
+  async generateClinicalSummaryForConsultation(
+    consultationId: string,
+    authUser: AuthenticatedUser,
+  ): Promise<ClinicalSummaryResult> {
+    const { clinicId, user } =
+      await this.authorizationService.getUserWithClinic(authUser);
+
+    const consultation = await this.consultationsRepository.findOne({
+      where: { id: consultationId, clinicId },
+    });
+    if (!consultation) {
+      throw new NotFoundException('Consultation not found');
+    }
+    await this.authorizationService.assertUserInClinic(
+      authUser,
+      consultation.clinicId,
+      user,
+    );
+
+    this.logger.log('AI consultation-summary: using DB clinical fields', {
+      event: 'ai_consultation_summary_start',
+      consultationId,
+      clinicId,
+    });
+
+    const dto: GenerateAiDto = {
+      reason: consultation.reason,
+      notes: consultation.notes ?? '',
+      diagnosis: consultation.diagnosis ?? '',
+      treatment: consultation.treatment ?? '',
+    };
+    return this.generateClinicalSummary(dto);
+  }
+
+  /**
    * Calls OpenAI once; returns parsed JSON only (no DB writes).
+   * Expuesto para flujos internos (p. ej. {@link ConsultationsService}) que ya validaron contexto.
    */
   async generateClinicalSummary(dto: GenerateAiDto): Promise<ClinicalSummaryResult> {
     const model =

@@ -16,7 +16,6 @@ export class CreateRatingDto {
   @MaxLength(1000)
   comment?: string;
 
-  @IsOptional()
   @IsUUID('4')
-  consultationId?: string;
+  consultationId: string;
 }

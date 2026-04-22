@@ -2,7 +2,6 @@ import {
   Body,
   Controller,
   Headers,
-  HttpCode,
   Post,
   UseGuards,
 } from '@nestjs/common';
@@ -28,12 +27,15 @@ export class PaykuController {
 
   @Public()
   @Post('webhook')
-  @HttpCode(200)
   async handleWebhook(
     @Headers() headers: Record<string, string | string[] | undefined>,
     @Body() body: Record<string, unknown>,
-  ): Promise<{ ok: true }> {
-    await this.paykuService.handleWebhook(headers, body);
-    return { ok: true };
+  ): Promise<{
+    ok: true;
+    action: string;
+    paymentId?: string;
+    duplicate?: boolean;
+  }> {
+    return this.paykuService.handleWebhook(headers, body);
   }
 }

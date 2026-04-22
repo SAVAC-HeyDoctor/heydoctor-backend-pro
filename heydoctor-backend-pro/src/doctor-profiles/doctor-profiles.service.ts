@@ -1,4 +1,5 @@
 import {
+  ForbiddenException,
   forwardRef,
   Inject,
   Injectable,
@@ -8,6 +9,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import { AuthorizationService } from '../authorization/authorization.service';
+import { Consultation } from '../consultations/consultation.entity';
 import { assignClinic } from '../common/entity-clinic.util';
 import { DoctorProfile } from './doctor-profile.entity';
 import { DoctorRating } from './doctor-rating.entity';
@@ -20,6 +22,8 @@ export class DoctorProfilesService {
     private readonly profileRepo: Repository<DoctorProfile>,
     @InjectRepository(DoctorRating)
     private readonly ratingRepo: Repository<DoctorRating>,
+    @InjectRepository(Consultation)
+    private readonly consultationsRepository: Repository<Consultation>,
     @Inject(forwardRef(() => AuthorizationService))
     private readonly authorizationService: AuthorizationService,
   ) {}
@@ -64,15 +68,42 @@ export class DoctorProfilesService {
   async addRating(
     slug: string,
     dto: CreateRatingDto,
+    authUser: AuthenticatedUser,
   ): Promise<DoctorRating> {
+    const { clinicId, user } =
+      await this.authorizationService.getUserWithClinic(authUser);
     const profile = await this.findBySlug(slug);
+
+    const consultation = await this.consultationsRepository.findOne({
+      where: { id: dto.consultationId },
+      relations: { patient: true },
+    });
+    if (!consultation) {
+      throw new ForbiddenException('Cannot rate this consultation');
+    }
+    if (consultation.clinicId !== clinicId) {
+      throw new ForbiddenException('Cannot rate this consultation');
+    }
+    await this.authorizationService.assertUserInClinic(
+      authUser,
+      consultation.clinicId,
+      user,
+    );
+    if (consultation.doctorId !== profile.userId) {
+      throw new ForbiddenException('Cannot rate this consultation');
+    }
+    const patientEmail = consultation.patient?.email?.trim().toLowerCase();
+    const userEmail = authUser.email?.trim().toLowerCase();
+    if (!patientEmail || !userEmail || patientEmail !== userEmail) {
+      throw new ForbiddenException('Cannot rate this consultation');
+    }
 
     const entity = this.ratingRepo.create({
       doctorProfileId: profile.id,
       patientName: dto.patientName,
       rating: dto.rating,
       comment: dto.comment ?? '',
-      consultationId: dto.consultationId ?? null,
+      consultationId: dto.consultationId,
     });
     assignClinic(entity, profile.clinicId);
     const saved = await this.ratingRepo.save(entity);
