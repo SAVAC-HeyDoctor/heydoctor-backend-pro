@@ -4,6 +4,7 @@ node_modules/
 # Build
 dist/
 build/
+*.tsbuildinfo
 
 # Environment
 .env
@@ -22,3 +23,8 @@ logs/
 
 # Test
 coverage/
+
+# Local tsc artifacts next to scripts/*.ts (Nest build excludes scripts/)
+scripts/*.js
+scripts/*.js.map
+scripts/*.d.ts

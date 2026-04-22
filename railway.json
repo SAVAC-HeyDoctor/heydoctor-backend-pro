@@ -2,10 +2,10 @@
   "$schema": "https://railway.app/railway.schema.json",
   "build": {
     "builder": "NIXPACKS",
-    "buildCommand": "cd heydoctor-backend-pro && npm ci && rm -rf dist && npm run build"
+    "buildCommand": "cd heydoctor-backend-pro && npm ci && npm run build"
   },
   "deploy": {
-    "startCommand": "cd heydoctor-backend-pro && node dist/main",
+    "startCommand": "cd heydoctor-backend-pro && npm run start:prod",
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 10
   }
