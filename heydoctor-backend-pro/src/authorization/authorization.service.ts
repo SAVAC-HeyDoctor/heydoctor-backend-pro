@@ -6,6 +6,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
+import { DoctorProfilesService } from '../doctor-profiles/doctor-profiles.service';
 import { Patient } from '../patients/patient.entity';
 import { User } from '../users/user.entity';
 import { UsersService } from '../users/users.service';
@@ -19,9 +20,33 @@ export type UserWithClinicContext = {
 export class AuthorizationService {
   constructor(
     private readonly usersService: UsersService,
+    private readonly doctorProfilesService: DoctorProfilesService,
     @InjectRepository(Patient)
     private readonly patientsRepository: Repository<Patient>,
   ) {}
+
+  /**
+   * Si el usuario pertenece a la clínica y tiene perfil de médico, devuelve `{ id: userId }`
+   * para filtrar `consultations.doctor_id`. Si no es médico o no aplica, `null`.
+   */
+  async resolveDoctorForUser(
+    userId: string,
+    clinicId: string,
+  ): Promise<{ id: string } | null> {
+    try {
+      const user = await this.usersService.findById(userId);
+      if (!user?.clinicId || user.clinicId !== clinicId) {
+        return null;
+      }
+      const profile = await this.doctorProfilesService.findByUserId(userId);
+      if (!profile) {
+        return null;
+      }
+      return { id: userId };
+    } catch {
+      return null;
+    }
+  }
 
   /**
    * Single DB read: authenticated user + verified clinicId (never from JWT).

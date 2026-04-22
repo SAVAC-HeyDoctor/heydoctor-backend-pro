@@ -8,15 +8,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import {
-  Between,
-  FindOperator,
-  FindOptionsWhere,
-  LessThanOrEqual,
-  MoreThanOrEqual,
-  QueryFailedError,
-  Repository,
-} from 'typeorm';
+import { QueryFailedError, Repository } from 'typeorm';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import { AiService } from '../ai/ai.service';
 import { AuditService } from '../audit/audit.service';
@@ -40,7 +32,13 @@ import {
   DEFAULT_CONSULTATION_PRICE_CLP,
   type ConsultationPriceResponse,
 } from './consultation-price.dto';
+import {
+  clampListPagination,
+  parseConsultationListDate,
+  requireClinicId,
+} from './consultation-list.utils';
 import { CreateConsultationDto } from './dto/create-consultation.dto';
+import type { ConsultationFiltersDto } from './dto/consultation-filters.dto';
 import { SignConsultationDto } from './dto/sign-consultation.dto';
 import { UpdateConsultationDto } from './dto/update-consultation.dto';
 
@@ -221,129 +219,117 @@ export class ConsultationsService {
   ): Promise<Consultation[] | PaginatedResult<Consultation>> {
     const { clinicId } =
       await this.authorizationService.getUserWithClinic(authUser);
-    const restrictToDoctorUserId =
-      await this.resolveDoctorForUser(authUser);
-    const where = this.buildConsultationListWhere(
-      clinicId,
-      pagination,
-      restrictToDoctorUserId,
-    );
+
+    /** Admin: todas las consultas de la clínica. Médico con perfil: solo las suyas. */
+    let restrictToDoctorId: string | undefined;
+    if (authUser.role !== UserRole.ADMIN) {
+      try {
+        const profile = await this.doctorProfilesService.findByUserId(
+          authUser.sub,
+        );
+        if (profile) {
+          restrictToDoctorId = authUser.sub;
+        }
+      } catch (err) {
+        this.logger.warn(
+          'findAll: could not resolve doctor profile; listing without doctorId filter',
+          {
+            userId: authUser.sub,
+            detail: err instanceof Error ? err.message : String(err),
+          },
+        );
+      }
+    }
 
     const paginate =
       pagination !== undefined &&
       (pagination.page !== undefined || pagination.limit !== undefined);
 
-    if (!paginate) {
-      return this.consultationsRepository.find({
-        where,
-        relations: { patient: true },
-        order: { createdAt: 'DESC' },
-      });
-    }
+    const limit = Math.min(pagination?.limit ?? 20, 100);
+    const page = pagination?.page ?? 1;
+    const offset = (page - 1) * limit;
 
-    const page = pagination.page ?? 1;
-    const limit = Math.min(pagination.limit ?? 20, 100);
-    const skip = (page - 1) * limit;
+    const filters: ConsultationFiltersDto | undefined = {
+      patientId: pagination?.patientId,
+      status: pagination?.status,
+      from: pagination?.from,
+      to: pagination?.to,
+      ...(paginate ? { limit, offset } : {}),
+    };
 
-    const [data, total] = await this.consultationsRepository.findAndCount({
-      where,
-      relations: { patient: true },
-      order: { createdAt: 'DESC' },
-      skip,
-      take: limit,
+    const { data, total } = await this.findAllForClinic(clinicId, filters, {
+      restrictToDoctorId,
     });
+
+    if (!paginate) {
+      return data;
+    }
 
     return { data, total, page, limit };
   }
 
   /**
-   * Si el usuario tiene perfil de médico, el listado queda acotado a `doctorId === user.sub`.
-   * Admin u otros sin perfil: sin filtro por médico (solo `clinicId` y query params).
+   * Listado con QueryBuilder: clínica obligatoria, filtro por `doctorId` solo si se indica,
+   * joins `patient` y `clinic`, orden por `createdAt`.
    */
-  private async resolveDoctorForUser(
-    authUser: AuthenticatedUser,
-  ): Promise<string | undefined> {
-    try {
-      const profile = await this.doctorProfilesService.findByUserId(
-        authUser.sub,
-      );
-      if (profile) {
-        return authUser.sub;
-      }
-    } catch (err) {
-      this.logger.warn('resolveDoctorForUser failed; listing without doctorId filter', {
-        userId: authUser.sub,
-        detail: err instanceof Error ? err.message : String(err),
+  async findAllForClinic(
+    clinicId: string | undefined | null,
+    filters: ConsultationFiltersDto | undefined,
+    options?: { restrictToDoctorId?: string },
+  ): Promise<{ data: Consultation[]; total: number }> {
+    const cid = requireClinicId(clinicId);
+
+    const qb = this.consultationsRepository
+      .createQueryBuilder('c')
+      .leftJoinAndSelect('c.patient', 'patient')
+      .leftJoinAndSelect('c.clinic', 'clinic')
+      .where('c.clinicId = :clinicId', { clinicId: cid });
+
+    if (options?.restrictToDoctorId) {
+      qb.andWhere('c.doctorId = :doctorId', {
+        doctorId: options.restrictToDoctorId,
       });
     }
-    return undefined;
-  }
 
-  private buildConsultationListWhere(
-    clinicId: string,
-    pagination?: PaginationQueryDto,
-    restrictToDoctorUserId?: string,
-  ): FindOptionsWhere<Consultation> {
-    const where: FindOptionsWhere<Consultation> = { clinicId };
-
-    if (restrictToDoctorUserId !== undefined) {
-      where.doctorId = restrictToDoctorUserId;
+    if (filters?.patientId) {
+      qb.andWhere('c.patientId = :patientId', {
+        patientId: filters.patientId,
+      });
     }
 
-    if (pagination?.status !== undefined) {
-      where.status = pagination.status;
+    if (filters?.status) {
+      qb.andWhere('c.status = :status', {
+        status: filters.status,
+      });
     }
 
-    if (pagination?.patientId !== undefined) {
-      where.patient = { id: pagination.patientId };
+    if (filters?.from) {
+      qb.andWhere('c.createdAt >= :from', {
+        from: parseConsultationListDate(filters.from.trim(), 'start'),
+      });
     }
 
-    const createdAt = this.consultationCreatedAtFilter(
-      pagination?.from,
-      pagination?.to,
-    );
-    if (createdAt !== undefined) {
-      where.createdAt = createdAt;
+    if (filters?.to) {
+      qb.andWhere('c.createdAt <= :to', {
+        to: parseConsultationListDate(filters.to.trim(), 'end'),
+      });
     }
 
-    return where;
-  }
-
-  private consultationCreatedAtFilter(
-    from?: string,
-    to?: string,
-  ): FindOperator<Date> | undefined {
-    if (!from?.trim() && !to?.trim()) {
-      return undefined;
-    }
-
-    const start = from?.trim()
-      ? this.parseConsultationListDate(from.trim(), 'start')
-      : undefined;
-    const end = to?.trim()
-      ? this.parseConsultationListDate(to.trim(), 'end')
-      : undefined;
-
-    if (start && end) {
-      return Between(start, end);
-    }
-    if (start) {
-      return MoreThanOrEqual(start);
-    }
-    if (end) {
-      return LessThanOrEqual(end);
-    }
-    return undefined;
-  }
-
-  /** Fecha calendario `YYYY-MM-DD` → día UTC completo; ISO con hora → tal cual. */
-  private parseConsultationListDate(iso: string, bound: 'start' | 'end'): Date {
-    if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) {
-      return new Date(
-        bound === 'start' ? `${iso}T00:00:00.000Z` : `${iso}T23:59:59.999Z`,
+    const hasPagination =
+      filters?.limit !== undefined || filters?.offset !== undefined;
+    if (hasPagination) {
+      const { limit, offset } = clampListPagination(
+        filters!.limit,
+        filters!.offset,
       );
+      qb.skip(offset).take(limit);
     }
-    return new Date(iso);
+
+    const [items, total] = await qb
+      .orderBy('c.createdAt', 'DESC')
+      .getManyAndCount();
+
+    return { data: items, total };
   }
 
   async findOne(
