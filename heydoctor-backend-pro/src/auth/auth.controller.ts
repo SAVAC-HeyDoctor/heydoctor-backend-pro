@@ -4,14 +4,18 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Inject,
   Patch,
   Post,
   Req,
   Res,
   UnauthorizedException,
   UseGuards,
+  type LoggerService,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
+import { getCurrentRequestId } from '../common/request-context.storage';
+import { APP_LOGGER } from '../common/logger/logger.tokens';
 import type { Request, Response } from 'express';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { Public } from './decorators/public.decorator';
@@ -71,7 +75,11 @@ function extractContext(req: Request): RequestContext {
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    @Inject(APP_LOGGER)
+    private readonly logger: LoggerService,
+  ) {}
 
   /**
    * Diagnóstico deploy/routing: si este log NO aparece en Railway ante GET /api/auth/me,
@@ -83,9 +91,11 @@ export class AuthController {
     @CurrentUser() user: AuthenticatedUser,
     @Req() req: Request,
   ): Promise<MeResponse> {
-    // eslint-disable-next-line no-console -- visibilidad explícita en logs Railway
-    console.log('🔥 LLEGUÉ A /me', {
-      user: req.user,
+    this.logger.log('auth_me_request', {
+      event: 'auth_me',
+      userId: user.sub,
+      clinicId: user.clinicId ?? null,
+      requestId: getCurrentRequestId(),
       path: req.path,
       authHeaderPresent: Boolean(req.headers.authorization),
     });

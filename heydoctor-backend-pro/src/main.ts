@@ -107,7 +107,9 @@ async function bootstrap() {
   bootstrapLogger.log(
     `Listening 0.0.0.0:${port} — JWT global + ClinicGuard; login/register con @Public()`,
   );
-  console.log('[HeyDoctor] PORT from ENV:', port);
+  bootstrapLogger.log(
+    `bootstrap_listening | ${JSON.stringify({ event: 'listening', port, host: '0.0.0.0' })}`,
+  );
   logExpressRouteStackIfEnabled(app);
 }
 

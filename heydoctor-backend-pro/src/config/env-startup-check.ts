@@ -1,4 +1,7 @@
+import { Logger } from '@nestjs/common';
 import type { EnvConfig } from './env.config';
+
+const envLogger = new Logger('EnvStartup');
 
 type EnvVarStatus = {
   name: string;
@@ -43,27 +46,31 @@ export function validateAndLogEnv(env: EnvConfig): string[] {
   ];
 
   if (process.env.NODE_ENV === 'production') {
-    console.log('[HeyDoctor] Environment configuration validated (production).');
+    envLogger.log(
+      `env_config_validated | ${JSON.stringify({ event: 'env_config_validated', nodeEnv: 'production' })}`,
+    );
   } else {
-    console.log('\n╔══════════════════════════════════════════════════════════╗');
-    console.log('║           HeyDoctor — Environment Configuration         ║');
-    console.log('╠══════════════════════════════════════════════════════════╣');
-
-    for (const v of vars) {
-      const icon = v.status === 'SET' ? '✓' : v.status === 'DEFAULT' ? '~' : '✗';
-      const display = v.value ?? v.status;
-      const req = v.required ? ' [REQUIRED]' : '';
-      console.log(`║  ${icon} ${v.name.padEnd(38)} ${display}${req}`);
-    }
-
-    console.log('╚══════════════════════════════════════════════════════════╝\n');
+    envLogger.log(
+      `env_config_table | ${JSON.stringify({
+        event: 'env_config_table',
+        rows: vars.map((v) => ({
+          name: v.name,
+          status: v.status,
+          required: v.required,
+          value: v.value,
+        })),
+      })}`,
+    );
   }
 
   const missing = vars.filter((v) => v.required && v.status === 'MISSING');
 
   if (missing.length > 0) {
-    console.error(
-      `[FATAL] Missing required env vars: ${missing.map((v) => v.name).join(', ')}`,
+    envLogger.error(
+      `env_config_missing_required | ${JSON.stringify({
+        event: 'env_config_missing_required',
+        missing: missing.map((v) => v.name),
+      })}`,
     );
   }
 

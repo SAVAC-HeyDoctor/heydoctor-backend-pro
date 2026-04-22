@@ -9,6 +9,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Public } from '../auth/decorators/public.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -27,6 +28,7 @@ export class DoctorApplicationsController {
 
   @Public()
   @Post()
+  @Throttle({ default: { limit: 8, ttl: 60_000 } })
   create(@Body() dto: CreateDoctorApplicationDto) {
     return this.service.create(dto);
   }
@@ -34,15 +36,21 @@ export class DoctorApplicationsController {
   @Get()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
-  findAll(@Query('status') status?: ApplicationStatus) {
-    return this.service.findAll(status);
+  findAll(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('status') status?: ApplicationStatus,
+  ) {
+    return this.service.findAll(user, status);
   }
 
   @Get(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
-  findOne(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string) {
-    return this.service.findOne(id);
+  findOne(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+  ) {
+    return this.service.findOne(id, user);
   }
 
   @Patch(':id/review')

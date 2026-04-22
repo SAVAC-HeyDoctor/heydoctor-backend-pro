@@ -7,9 +7,10 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AuditService } from '../audit/audit.service';
+import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
+import { AuthorizationService } from '../authorization/authorization.service';
 import { assignClinic, assertClinicIdForSave } from '../common/entity-clinic.util';
 import { ClinicService } from '../clinic/clinic.service';
-import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import {
   ApplicationStatus,
   DoctorApplication,
@@ -24,6 +25,7 @@ export class DoctorApplicationsService {
     private readonly repo: Repository<DoctorApplication>,
     private readonly auditService: AuditService,
     private readonly clinicService: ClinicService,
+    private readonly authorizationService: AuthorizationService,
   ) {}
 
   async create(dto: CreateDoctorApplicationDto): Promise<DoctorApplication> {
@@ -63,13 +65,25 @@ export class DoctorApplicationsService {
     return saved;
   }
 
-  async findAll(status?: ApplicationStatus): Promise<DoctorApplication[]> {
-    const where = status ? { status } : {};
+  async findAll(
+    authUser: AuthenticatedUser,
+    status?: ApplicationStatus,
+  ): Promise<DoctorApplication[]> {
+    const { clinicId } =
+      await this.authorizationService.getUserWithClinic(authUser);
+    const where = status
+      ? { clinicId, status }
+      : { clinicId };
     return this.repo.find({ where, order: { createdAt: 'DESC' } });
   }
 
-  async findOne(id: string): Promise<DoctorApplication> {
-    const app = await this.repo.findOne({ where: { id } });
+  async findOne(
+    id: string,
+    authUser: AuthenticatedUser,
+  ): Promise<DoctorApplication> {
+    const { clinicId } =
+      await this.authorizationService.getUserWithClinic(authUser);
+    const app = await this.repo.findOne({ where: { id, clinicId } });
     if (!app) throw new NotFoundException('Application not found');
     return app;
   }
@@ -79,7 +93,7 @@ export class DoctorApplicationsService {
     dto: ReviewApplicationDto,
     authUser: AuthenticatedUser,
   ): Promise<DoctorApplication> {
-    const app = await this.findOne(id);
+    const app = await this.findOne(id, authUser);
 
     if (app.status !== ApplicationStatus.PENDING) {
       throw new ConflictException('Application has already been reviewed');

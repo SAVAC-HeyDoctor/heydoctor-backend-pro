@@ -5,6 +5,7 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Public } from '../auth/decorators/public.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -27,6 +28,7 @@ export class PaykuController {
 
   @Public()
   @Post('webhook')
+  @Throttle({ default: { limit: 120, ttl: 60_000 } })
   async handleWebhook(
     @Headers() headers: Record<string, string | string[] | undefined>,
     @Body() body: Record<string, unknown>,

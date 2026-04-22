@@ -11,7 +11,7 @@ import { DoctorProfilesService } from './doctor-profiles.service';
 @Module({
   imports: [
     TypeOrmModule.forFeature([DoctorProfile, DoctorRating, Consultation]),
-    AuthModule,
+    forwardRef(() => AuthModule),
     forwardRef(() => AuthorizationModule),
   ],
   controllers: [DoctorProfilesController],

@@ -93,10 +93,11 @@ export class ConsultationsService {
     dto: CreateConsultationDto,
     authUser: AuthenticatedUser,
   ): Promise<Consultation> {
-    // eslint-disable-next-line no-console -- visibilidad en logs Railway (diagnóstico 500)
-    console.log('create consultation', {
+    this.logger.log('consultation_create_start', {
+      event: 'consultation_create_start',
       userId: authUser.sub,
-      clinicId: 'pending_authz',
+      clinicId: null,
+      requestId: getCurrentRequestId(),
       patientId: dto.patientId,
       step: 'start',
     });
@@ -104,10 +105,11 @@ export class ConsultationsService {
     const { clinicId } =
       await this.authorizationService.getUserWithClinic(authUser);
 
-    // eslint-disable-next-line no-console -- visibilidad en logs Railway (diagnóstico 500)
-    console.log('create consultation', {
+    this.logger.log('consultation_create_after_user_clinic', {
+      event: 'consultation_create_after_user_clinic',
       userId: authUser.sub,
       clinicId,
+      requestId: getCurrentRequestId(),
       patientId: dto.patientId,
       step: 'after_user_clinic',
     });
@@ -118,20 +120,22 @@ export class ConsultationsService {
       clinicId,
     );
 
-    // eslint-disable-next-line no-console -- visibilidad en logs Railway (diagnóstico 500)
-    console.log('create consultation', {
+    this.logger.log('consultation_create_after_patient_validated', {
+      event: 'consultation_create_after_patient_validated',
       userId: authUser.sub,
       clinicId,
+      requestId: getCurrentRequestId(),
       patientId: dto.patientId,
       step: 'after_patient_validated',
     });
 
     const consent = await this.consentService.getLatestConsent(authUser.sub);
 
-    // eslint-disable-next-line no-console -- visibilidad en logs Railway (diagnóstico 500)
-    console.log('create consultation', {
+    this.logger.log('consultation_create_after_consent_load', {
+      event: 'consultation_create_after_consent_load',
       userId: authUser.sub,
       clinicId,
+      requestId: getCurrentRequestId(),
       patientId: dto.patientId,
       step: 'after_consent_load',
       consentId: consent?.id ?? null,
@@ -156,10 +160,11 @@ export class ConsultationsService {
     });
     assignClinic(entity, clinicId);
 
-    // eslint-disable-next-line no-console -- visibilidad en logs Railway (diagnóstico 500)
-    console.log('create consultation', {
+    this.logger.log('consultation_create_before_save', {
+      event: 'consultation_create_before_save',
       userId: authUser.sub,
       clinicId,
+      requestId: getCurrentRequestId(),
       patientId: dto.patientId,
       step: 'before_save',
     });
@@ -174,17 +179,23 @@ export class ConsultationsService {
           : err instanceof Error
             ? err.message
             : String(err);
-      // eslint-disable-next-line no-console -- visibilidad en logs Railway (diagnóstico 500)
-      console.log('create consultation:save_failed', {
+      this.logger.log('consultation_create_save_failed', {
+        event: 'consultation_create_save_failed',
         userId: authUser.sub,
         clinicId,
+        requestId: getCurrentRequestId(),
         patientId: dto.patientId,
         detail,
       });
       this.logger.error(
         'Consultation save failed',
         err instanceof Error ? err : new Error(String(err)),
-        { userId: authUser.sub, clinicId, patientId: dto.patientId },
+        {
+          userId: authUser.sub,
+          clinicId,
+          requestId: getCurrentRequestId(),
+          patientId: dto.patientId,
+        },
       );
       throw new BadRequestException(
         `Could not create consultation: ${detail}`,
