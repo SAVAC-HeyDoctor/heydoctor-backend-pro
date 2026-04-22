@@ -7,7 +7,9 @@ import React, {
   useState,
   useEffect,
 } from 'react';
-import { apiFetch, getApiBase } from '../lib/api-client';
+import { getApiBase } from '../lib/api-client';
+import { clientLogger } from '../lib/client-logger';
+import { apiFetchWithRefresh } from '../lib/session-fetch';
 
 export interface Clinic {
   id: number;
@@ -23,7 +25,10 @@ interface ClinicContextValue {
   clinicName: string;
   clinicSlug: string;
   isLoading: boolean;
+  /** Último fallo al cargar /api/clinics/me (401 tras refresh, red, etc.). */
+  sessionError: string | null;
   setClinic: (clinic: Clinic | null) => void;
+  refetchClinic: () => void;
 }
 
 const ClinicContext = createContext<ClinicContextValue | undefined>(undefined);
@@ -31,26 +36,43 @@ const ClinicContext = createContext<ClinicContextValue | undefined>(undefined);
 export function ClinicProvider({ children }: { children: React.ReactNode }) {
   const [clinic, setClinic] = useState<Clinic | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [sessionError, setSessionError] = useState<string | null>(null);
+  const [loadTick, setLoadTick] = useState(0);
+
+  const refetchClinic = () => setLoadTick((n) => n + 1);
 
   useEffect(() => {
     const fetchClinic = async () => {
+      setIsLoading(true);
+      setSessionError(null);
       try {
         const base = getApiBase();
-        const res = await apiFetch(`${base}/api/clinics/me`);
+        const res = await apiFetchWithRefresh(`${base}/api/clinics/me`);
         if (res.ok) {
           const json = await res.json();
           setClinic(json.data ?? json);
         } else {
           setClinic(null);
+          const msg =
+            res.status === 401
+              ? 'Sesión expirada o no autenticado'
+              : `Error ${res.status}`;
+          setSessionError(msg);
+          clientLogger.warn('clinic_me_failed', {
+            status: res.status,
+            requestId: res.headers.get('X-Request-Id'),
+          });
         }
-      } catch {
+      } catch (e) {
         setClinic(null);
+        setSessionError('No se pudo conectar con el servidor');
+        clientLogger.error('clinic_me_network', e);
       } finally {
         setIsLoading(false);
       }
     };
     fetchClinic();
-  }, []);
+  }, [loadTick]);
 
   const value = useMemo(
     () => ({
@@ -59,9 +81,11 @@ export function ClinicProvider({ children }: { children: React.ReactNode }) {
       clinicName: clinic?.name ?? '',
       clinicSlug: clinic?.slug ?? '',
       isLoading,
+      sessionError,
       setClinic,
+      refetchClinic,
     }),
-    [clinic, isLoading]
+    [clinic, isLoading, sessionError]
   );
 
   return <ClinicContext.Provider value={value}>{children}</ClinicContext.Provider>;

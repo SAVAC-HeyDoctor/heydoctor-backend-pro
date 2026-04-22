@@ -1,7 +1,8 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { ClinicProvider } from './context';
+import { initClientObservability } from './lib/client-logger';
 
 /**
  * Root app wrapper with ClinicProvider.
@@ -23,5 +24,9 @@ import { ClinicProvider } from './context';
  * }
  */
 export function AppWithClinic({ children }: { children: React.ReactNode }) {
+  useEffect(() => {
+    initClientObservability();
+  }, []);
+
   return <ClinicProvider>{children}</ClinicProvider>;
 }

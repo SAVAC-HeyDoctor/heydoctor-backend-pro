@@ -1,7 +1,13 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { fetchFavoriteOrders, createFavoriteOrder, deleteFavoriteOrder, type FavoriteOrderItem } from '../lib/api-stickiness';
+import { clientLogger } from '../lib/client-logger';
+import {
+  fetchFavoriteOrders,
+  createFavoriteOrder,
+  deleteFavoriteOrder,
+  type FavoriteOrderItem,
+} from '../lib/api-stickiness';
 
 interface FavoriteOrder {
   id: number;
@@ -29,20 +35,33 @@ export function FavoriteOrdersPanel({
   const [favorites, setFavorites] = useState<FavoriteOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [listError, setListError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchFavoriteOrders()
-      .then((data) => setFavorites(Array.isArray(data) ? data : []))
-      .catch(() => setFavorites([]))
+      .then((data) => {
+        setFavorites(Array.isArray(data) ? data : []);
+        setListError(null);
+      })
+      .catch((e) => {
+        setFavorites([]);
+        setListError('No se pudieron cargar favoritos');
+        clientLogger.error('favorite_orders_load_failed', e);
+      })
       .finally(() => setLoading(false));
   }, []);
 
-  const normalize = (f: any): FavoriteOrder => ({
-    id: f.id,
-    attributes: f.attributes ?? f,
-    name: f.attributes?.name ?? f.name,
-    items: f.attributes?.items ?? f.items ?? [],
-  });
+  function normalize(raw: unknown): FavoriteOrder {
+    const f = raw as Partial<FavoriteOrder> & {
+      attributes?: Partial<FavoriteOrder> & { items?: FavoriteOrderItem[] };
+    };
+    return {
+      id: Number(f.id),
+      attributes: f.attributes,
+      name: f.attributes?.name ?? f.name,
+      items: f.attributes?.items ?? f.items ?? [],
+    };
+  }
 
   const handleApply = (f: FavoriteOrder) => {
     const items = normalize(f).items ?? [];
@@ -57,7 +76,7 @@ export function FavoriteOrdersPanel({
       await createFavoriteOrder({ name: name.trim(), items: currentItems });
       fetchFavoriteOrders().then((data) => setFavorites(Array.isArray(data) ? data : []));
     } catch (e) {
-      console.error(e);
+      clientLogger.error('favorite_orders_save_failed', e);
     } finally {
       setSaving(false);
     }
@@ -69,11 +88,18 @@ export function FavoriteOrdersPanel({
       await deleteFavoriteOrder(id);
       setFavorites((prev) => prev.filter((f) => f.id !== id));
     } catch (e) {
-      console.error(e);
+      clientLogger.error('favorite_orders_delete_failed', e);
     }
   };
 
-  if (loading) return null;
+  if (loading) {
+    return (
+      <div className={`animate-pulse space-y-2 ${className}`}>
+        <div className="h-3 w-24 rounded bg-gray-200" />
+        <div className="h-8 rounded bg-gray-100" />
+      </div>
+    );
+  }
 
   const list = favorites.map(normalize);
   if (list.length === 0 && currentItems.length === 0) return null;
@@ -81,6 +107,11 @@ export function FavoriteOrdersPanel({
   return (
     <div className={`space-y-2 ${className}`}>
       <h4 className="text-xs font-medium text-gray-600">Favoritos</h4>
+      {listError && (
+        <p className="text-xs text-amber-700" role="status">
+          {listError}
+        </p>
+      )}
       {list.length > 0 && (
         <ul className="space-y-1">
           {list.map((f) => (

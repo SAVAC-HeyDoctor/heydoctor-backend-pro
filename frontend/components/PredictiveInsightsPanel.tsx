@@ -71,7 +71,11 @@ export function PredictiveInsightsPanel({
             <ul className="space-y-1">
               {conditions.map((c, i) => (
                 <li key={i} className="flex justify-between">
-                  <span>{c.description ?? c.code}</span>
+                  <span>
+                    {'description' in c && typeof c.description === 'string'
+                      ? c.description
+                      : c.code}
+                  </span>
                   <span className={`font-medium ${
                     (c.risk_score ?? 0) >= 0.7 ? 'text-red-600' :
                     (c.risk_score ?? 0) >= 0.4 ? 'text-amber-600' : 'text-gray-500'

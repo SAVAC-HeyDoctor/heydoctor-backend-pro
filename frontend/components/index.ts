@@ -1,3 +1,4 @@
+export { AppErrorBoundary } from './AppErrorBoundary';
 export { CopilotPanel } from './CopilotPanel';
 export { ClinicalAlertsPanel } from './ClinicalAlertsPanel';
 export { PredictiveInsightsPanel } from './PredictiveInsightsPanel';
