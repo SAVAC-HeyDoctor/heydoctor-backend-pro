@@ -7,6 +7,7 @@ import { AuthModule } from '../auth/auth.module';
 import { AuthorizationModule } from '../authorization/authorization.module';
 import { ConsentModule } from '../consents/consent.module';
 import { LoggerModule } from '../common/logger/logger.module';
+import { DoctorProfilesModule } from '../doctor-profiles/doctor-profiles.module';
 import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 import { Consultation } from './consultation.entity';
 import { ConsultationsController } from './consultations.controller';
@@ -19,6 +20,7 @@ import { ConsultationsService } from './consultations.service';
     AuthModule,
     AuthorizationModule,
     ConsentModule,
+    DoctorProfilesModule,
     SubscriptionsModule,
     AuditModule,
     AiModule,

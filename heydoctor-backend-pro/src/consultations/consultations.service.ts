@@ -26,6 +26,7 @@ import { AuthorizationService } from '../authorization/authorization.service';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import type { PaginatedResult } from '../common/types/paginated-result.type';
 import { ConsentService } from '../consents/consent.service';
+import { DoctorProfilesService } from '../doctor-profiles/doctor-profiles.service';
 import { UserRole } from '../users/user-role.enum';
 import { Consultation } from './consultation.entity';
 import { ConsultationStatus } from './consultation-status.enum';
@@ -61,6 +62,7 @@ export class ConsultationsService {
     private readonly consultationsRepository: Repository<Consultation>,
     private readonly authorizationService: AuthorizationService,
     private readonly consentService: ConsentService,
+    private readonly doctorProfilesService: DoctorProfilesService,
     private readonly auditService: AuditService,
     private readonly aiService: AiService,
     private readonly configService: ConfigService,
@@ -219,7 +221,13 @@ export class ConsultationsService {
   ): Promise<Consultation[] | PaginatedResult<Consultation>> {
     const { clinicId } =
       await this.authorizationService.getUserWithClinic(authUser);
-    const where = this.buildConsultationListWhere(clinicId, pagination);
+    const restrictToDoctorUserId =
+      await this.resolveDoctorForUser(authUser);
+    const where = this.buildConsultationListWhere(
+      clinicId,
+      pagination,
+      restrictToDoctorUserId,
+    );
 
     const paginate =
       pagination !== undefined &&
@@ -248,11 +256,39 @@ export class ConsultationsService {
     return { data, total, page, limit };
   }
 
+  /**
+   * Si el usuario tiene perfil de médico, el listado queda acotado a `doctorId === user.sub`.
+   * Admin u otros sin perfil: sin filtro por médico (solo `clinicId` y query params).
+   */
+  private async resolveDoctorForUser(
+    authUser: AuthenticatedUser,
+  ): Promise<string | undefined> {
+    try {
+      const profile = await this.doctorProfilesService.findByUserId(
+        authUser.sub,
+      );
+      if (profile) {
+        return authUser.sub;
+      }
+    } catch (err) {
+      this.logger.warn('resolveDoctorForUser failed; listing without doctorId filter', {
+        userId: authUser.sub,
+        detail: err instanceof Error ? err.message : String(err),
+      });
+    }
+    return undefined;
+  }
+
   private buildConsultationListWhere(
     clinicId: string,
     pagination?: PaginationQueryDto,
+    restrictToDoctorUserId?: string,
   ): FindOptionsWhere<Consultation> {
     const where: FindOptionsWhere<Consultation> = { clinicId };
+
+    if (restrictToDoctorUserId !== undefined) {
+      where.doctorId = restrictToDoctorUserId;
+    }
 
     if (pagination?.status !== undefined) {
       where.status = pagination.status;
