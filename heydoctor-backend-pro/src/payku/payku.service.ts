@@ -34,6 +34,7 @@ const SYSTEM_USER: AuthenticatedUser = {
   sub: 'system-payku-webhook',
   email: 'system@heydoctor.internal',
   role: UserRole.ADMIN,
+  clinicId: null,
 };
 
 type WebhookResult = {

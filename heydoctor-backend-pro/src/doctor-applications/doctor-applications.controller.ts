@@ -10,6 +10,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { Public } from '../auth/decorators/public.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -24,6 +25,7 @@ import { ReviewApplicationDto } from './dto/review-application.dto';
 export class DoctorApplicationsController {
   constructor(private readonly service: DoctorApplicationsService) {}
 
+  @Public()
   @Post()
   create(@Body() dto: CreateDoctorApplicationDto) {
     return this.service.create(dto);

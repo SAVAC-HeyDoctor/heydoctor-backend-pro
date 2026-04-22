@@ -1,6 +1,8 @@
 import { Controller, Get, Header } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
+import { Public } from '../auth/decorators/public.decorator';
 
+@Public()
 @Controller()
 export class HealthController {
   @SkipThrottle()
@@ -14,6 +16,7 @@ export class HealthController {
 /**
  * GET /api/health — mismo prefijo global que el resto del API (útil para probar integración).
  */
+@Public()
 @Controller('health')
 export class HealthApiController {
   @SkipThrottle()

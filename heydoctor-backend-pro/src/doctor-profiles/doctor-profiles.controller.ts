@@ -5,9 +5,11 @@ import {
   Param,
   Post,
 } from '@nestjs/common';
+import { Public } from '../auth/decorators/public.decorator';
 import { DoctorProfilesService } from './doctor-profiles.service';
 import { CreateRatingDto } from './dto/create-rating.dto';
 
+@Public()
 @Controller('doctors')
 export class DoctorProfilesController {
   constructor(private readonly service: DoctorProfilesService) {}

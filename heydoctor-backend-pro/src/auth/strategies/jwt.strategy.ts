@@ -127,6 +127,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       sub: user.id,
       email: user.email,
       role: user.role,
+      clinicId: user.clinicId ?? null,
     };
     await this.cache.set(key, validated, JWT_USER_CACHE_TTL_MS);
     return validated;

@@ -47,6 +47,7 @@ export type AuthUserView = {
   id: string;
   email: string;
   role: UserRole;
+  clinicId: string | null;
 };
 
 export type MeResponse = {
@@ -133,6 +134,7 @@ export class AuthService {
       sub: publicUser.id,
       email: publicUser.email,
       role: publicUser.role,
+      clinicId: publicUser.clinicId ?? null,
     };
     const access_token = await this.jwtService.signAsync(payload);
     return { access_token, user: publicUser };
@@ -212,6 +214,7 @@ export class AuthService {
       sub: user.id,
       email: user.email,
       role: user.role,
+      clinicId: user.clinicId ?? null,
     };
     const accessToken = await this.jwtService.signAsync(payload);
     const newRefreshToken = await this.createRefreshToken(user.id, ctx);
@@ -334,6 +337,7 @@ export class AuthService {
       id: user.id,
       email: user.email,
       role: user.role,
+      clinicId: user.clinicId ?? null,
     };
   }
 }

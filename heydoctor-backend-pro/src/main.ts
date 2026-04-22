@@ -56,7 +56,7 @@ async function bootstrap() {
   });
 
   app.use(new RequestIdMiddleware().use);
-  /** Solo Throttler global; JwtAuthGuard aplica en rutas con @UseGuards (no bloquea login). */
+  /** Throttler global; JWT + clínica vía APP_GUARD en AppModule; rutas públicas con @Public(). */
   app.useGlobalGuards(app.get(ThrottlerGuard));
 
   const envConfig = app.get<EnvConfig>(ENV_CONFIG_TOKEN);
@@ -105,7 +105,7 @@ async function bootstrap() {
   await app.listen(port, '0.0.0.0');
 
   bootstrapLogger.log(
-    `Listening 0.0.0.0:${port} — AuthModule: POST /api/auth/login (JwtAuthGuard no es global; login es público)`,
+    `Listening 0.0.0.0:${port} — JWT global + ClinicGuard; login/register con @Public()`,
   );
   console.log('[HeyDoctor] PORT from ENV:', port);
   logExpressRouteStackIfEnabled(app);

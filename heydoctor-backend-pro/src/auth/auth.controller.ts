@@ -14,6 +14,7 @@ import {
 import { Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 import { CurrentUser } from './decorators/current-user.decorator';
+import { Public } from './decorators/public.decorator';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import {
   AuthService,
@@ -102,6 +103,7 @@ export class AuthController {
     return { ok: true };
   }
 
+  @Public()
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
@@ -120,6 +122,7 @@ export class AuthController {
     return { access_token: result.access_token, user: result.user };
   }
 
+  @Public()
   @Post('login')
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   async login(
@@ -137,6 +140,7 @@ export class AuthController {
     return { access_token: result.access_token, user: result.user };
   }
 
+  @Public()
   @Post('refresh')
   async refresh(
     @Req() req: Request,
@@ -155,6 +159,7 @@ export class AuthController {
     return { access_token: accessToken };
   }
 
+  @Public()
   @Post('logout')
   async logout(
     @Req() req: Request,

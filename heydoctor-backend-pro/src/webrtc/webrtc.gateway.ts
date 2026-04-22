@@ -81,6 +81,7 @@ export class WebrtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
         sub: user.id,
         email: user.email,
         role: user.role,
+        clinicId: user.clinicId ?? null,
       };
       const canUseWebrtc = await this.subscriptionsService.hasRequiredPlan(
         authUser.sub,

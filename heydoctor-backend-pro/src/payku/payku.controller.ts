@@ -7,6 +7,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { Public } from '../auth/decorators/public.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import { CreatePaymentSessionDto } from './dto/create-payment-session.dto';
@@ -25,6 +26,7 @@ export class PaykuController {
     return this.paykuService.createPaymentSession(dto.consultationId, user);
   }
 
+  @Public()
   @Post('webhook')
   @HttpCode(200)
   async handleWebhook(

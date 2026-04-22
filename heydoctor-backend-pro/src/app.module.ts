@@ -1,5 +1,6 @@
 import { join } from 'path';
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
@@ -11,7 +12,9 @@ import { AiModule } from './ai/ai.module';
 import { AppointmentsModule } from './appointments/appointments.module';
 import { AuditModule } from './audit/audit.module';
 import { LoggerModule } from './common/logger/logger.module';
+import { ClinicGuard } from './common/guards/clinic.guard';
 import { AuthModule } from './auth/auth.module';
+import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { JwtUserCacheModule } from './auth/jwt-user-cache.module';
 import { AuthorizationModule } from './authorization/authorization.module';
 import { ComplianceModule } from './compliance/compliance.module';
@@ -93,6 +96,10 @@ const dbUrl = process.env.DATABASE_PUBLIC_URL || process.env.DATABASE_URL;
     WebrtcModule,
   ],
   controllers: [AppController, HealthController, HealthApiController],
-  providers: [ThrottlerGuard],
+  providers: [
+    ThrottlerGuard,
+    { provide: APP_GUARD, useExisting: JwtAuthGuard },
+    { provide: APP_GUARD, useClass: ClinicGuard },
+  ],
 })
 export class AppModule {}
