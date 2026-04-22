@@ -2,7 +2,7 @@
  * Logging cliente estructurado (sin PII). En producción: nivel mínimo; preparado para Sentry.
  */
 
-import { captureException, captureMessage, initSentry } from './sentry.stub';
+import { captureException, captureMessage, initSentry } from './sentry';
 
 /** Llamar una vez desde el root del cliente Next (p. ej. layout cliente). */
 export function initClientObservability(): void {

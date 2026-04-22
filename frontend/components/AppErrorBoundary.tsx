@@ -1,6 +1,7 @@
 'use client';
 
 import React, { Component, type ErrorInfo, type ReactNode } from 'react';
+import { ApiError } from '../lib/api-error';
 import { clientLogger } from '../lib/client-logger';
 
 type Props = {
@@ -37,12 +38,16 @@ export class AppErrorBoundary extends Component<Props, State> {
       if (this.props.fallback) {
         return this.props.fallback({ error, reset: this.reset });
       }
+      const status = error instanceof ApiError ? error.status : null;
       return (
         <div
           role="alert"
           className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-800"
         >
           <p className="font-medium">Algo salió mal</p>
+          {status != null && (
+            <p className="mt-1 text-xs font-medium text-red-700">HTTP {status}</p>
+          )}
           <p className="mt-1 text-sm">{error.message}</p>
           <button
             type="button"

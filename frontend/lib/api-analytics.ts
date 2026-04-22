@@ -2,7 +2,8 @@
  * API client para métricas de adopción clínica.
  */
 
-import { apiFetch, getApiBase } from './api-client';
+import { getApiBase } from './api-client';
+import { apiFetchWithRefresh } from './session-fetch';
 
 export interface DoctorAdoptionMetrics {
   daily_active_doctors: number;
@@ -17,7 +18,7 @@ export interface DoctorAdoptionMetrics {
 
 export async function fetchDoctorAdoptionMetrics(days = 7): Promise<DoctorAdoptionMetrics> {
   const base = getApiBase();
-  const res = await apiFetch(
+  const res = await apiFetchWithRefresh(
     `${base}/api/analytics/doctor-adoption?days=${days}`,
   );
   if (!res.ok) throw new Error('Failed to fetch doctor adoption metrics');

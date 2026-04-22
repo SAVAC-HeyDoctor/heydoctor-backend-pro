@@ -32,7 +32,7 @@
 2. **Root layout**: envolver con `AppErrorBoundary` + llamar `initClientObservability()` (ya invocado desde `AppWithClinic`).
 3. Sustituir progresivamente paneles que hacen `useEffect + fetch` manual por **`useApiQuery`** (mismo patrón que `DoctorAnalyticsPanel`).
 4. **CSP + headers** en `next.config` del app real (`Content-Security-Policy`, `Strict-Transport-Security` detrás de HTTPS).
-5. **Instalar `@sentry/nextjs`** y reemplazar `lib/sentry.stub.ts` por inicialización real + `instrumentation.ts`.
+5. **`@sentry/nextjs`**: `lib/sentry.ts` + `instrumentation.ts` + `sentry.*.config.ts` (activo solo si `NEXT_PUBLIC_SENTRY_DSN`).
 6. Unificar **`apiFetchWithRefresh`** en todas las llamadas autenticadas (`api-ai`, `api-stickiness`, etc.) — trabajo incremental.
 7. Añadir **`package.json` + `tsc`** en este kit para CI de tipos al importarlo como subcarpeta.
 

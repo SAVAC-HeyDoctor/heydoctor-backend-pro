@@ -4,6 +4,7 @@
  */
 
 import { apiFetch, getApiBase, jsonHeaders } from './api-client';
+import { parseApiErrorResponse } from './api-error';
 
 export interface LoginCredentials {
   email: string;
@@ -35,8 +36,7 @@ export async function login(credentials: LoginCredentials): Promise<LoginRespons
   });
 
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ message: res.statusText }));
-    throw new Error((err as { message?: string }).message || 'Login failed');
+    throw await parseApiErrorResponse(res);
   }
 
   return res.json() as Promise<LoginResponse>;
@@ -59,8 +59,7 @@ export async function refreshSession(): Promise<{ access_token: string }> {
     body: JSON.stringify({}),
   });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ message: res.statusText }));
-    throw new Error((err as { message?: string }).message || 'Refresh failed');
+    throw await parseApiErrorResponse(res);
   }
   return res.json() as Promise<{ access_token: string }>;
 }

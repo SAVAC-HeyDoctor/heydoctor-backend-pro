@@ -2,7 +2,8 @@
  * API client para Templates, Favorite Orders y Patient Reminders.
  */
 
-import { apiFetch, getApiBase, jsonHeaders } from './api-client';
+import { getApiBase, jsonHeaders } from './api-client';
+import { apiFetchWithRefresh } from './session-fetch';
 
 const toData = (body: any) => (body?.data ? body : { data: body });
 
@@ -17,7 +18,7 @@ export interface TemplateData {
 
 export async function fetchTemplates() {
   const base = getApiBase();
-  const res = await apiFetch(`${base}/api/templates`);
+  const res = await apiFetchWithRefresh(`${base}/api/templates`);
   if (!res.ok) throw new Error('Failed to fetch templates');
   const json = await res.json();
   return json.data ?? json;
@@ -25,7 +26,7 @@ export async function fetchTemplates() {
 
 export async function createTemplate(data: TemplateData) {
   const base = getApiBase();
-  const res = await apiFetch(`${base}/api/templates`, {
+  const res = await apiFetchWithRefresh(`${base}/api/templates`, {
     method: 'POST',
     headers: jsonHeaders(),
     body: JSON.stringify(toData(data)),
@@ -36,7 +37,7 @@ export async function createTemplate(data: TemplateData) {
 
 export async function updateTemplate(id: number | string, data: Partial<TemplateData>) {
   const base = getApiBase();
-  const res = await apiFetch(`${base}/api/templates/${id}`, {
+  const res = await apiFetchWithRefresh(`${base}/api/templates/${id}`, {
     method: 'PUT',
     headers: jsonHeaders(),
     body: JSON.stringify(toData(data)),
@@ -47,7 +48,7 @@ export async function updateTemplate(id: number | string, data: Partial<Template
 
 export async function deleteTemplate(id: number | string) {
   const base = getApiBase();
-  const res = await apiFetch(`${base}/api/templates/${id}`, {
+  const res = await apiFetchWithRefresh(`${base}/api/templates/${id}`, {
     method: 'DELETE',
   });
   if (!res.ok) throw new Error('Failed to delete template');
@@ -67,7 +68,7 @@ export interface FavoriteOrderData {
 
 export async function fetchFavoriteOrders() {
   const base = getApiBase();
-  const res = await apiFetch(`${base}/api/favorite-orders`);
+  const res = await apiFetchWithRefresh(`${base}/api/favorite-orders`);
   if (!res.ok) throw new Error('Failed to fetch favorite orders');
   const json = await res.json();
   return json.data ?? json;
@@ -75,7 +76,7 @@ export async function fetchFavoriteOrders() {
 
 export async function createFavoriteOrder(data: FavoriteOrderData) {
   const base = getApiBase();
-  const res = await apiFetch(`${base}/api/favorite-orders`, {
+  const res = await apiFetchWithRefresh(`${base}/api/favorite-orders`, {
     method: 'POST',
     headers: jsonHeaders(),
     body: JSON.stringify(toData(data)),
@@ -86,7 +87,7 @@ export async function createFavoriteOrder(data: FavoriteOrderData) {
 
 export async function deleteFavoriteOrder(id: number | string) {
   const base = getApiBase();
-  const res = await apiFetch(`${base}/api/favorite-orders/${id}`, {
+  const res = await apiFetchWithRefresh(`${base}/api/favorite-orders/${id}`, {
     method: 'DELETE',
   });
   if (!res.ok) throw new Error('Failed to delete favorite order');
@@ -104,7 +105,7 @@ export interface PatientReminderData {
 export async function fetchPatientReminders(patientId?: number | string) {
   const base = getApiBase();
   const params = patientId ? `?filters[patient][id][$eq]=${patientId}` : '';
-  const res = await apiFetch(`${base}/api/patient-reminders${params}`);
+  const res = await apiFetchWithRefresh(`${base}/api/patient-reminders${params}`);
   if (!res.ok) throw new Error('Failed to fetch patient reminders');
   const json = await res.json();
   return json.data ?? json;
@@ -112,7 +113,7 @@ export async function fetchPatientReminders(patientId?: number | string) {
 
 export async function createPatientReminder(data: PatientReminderData) {
   const base = getApiBase();
-  const res = await apiFetch(`${base}/api/patient-reminders`, {
+  const res = await apiFetchWithRefresh(`${base}/api/patient-reminders`, {
     method: 'POST',
     headers: jsonHeaders(),
     body: JSON.stringify(toData(data)),
@@ -126,7 +127,7 @@ export async function updatePatientReminder(
   data: Partial<PatientReminderData> & { status?: string },
 ) {
   const base = getApiBase();
-  const res = await apiFetch(`${base}/api/patient-reminders/${id}`, {
+  const res = await apiFetchWithRefresh(`${base}/api/patient-reminders/${id}`, {
     method: 'PUT',
     headers: jsonHeaders(),
     body: JSON.stringify(toData(data)),

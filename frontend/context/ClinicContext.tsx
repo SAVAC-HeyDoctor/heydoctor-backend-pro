@@ -8,6 +8,7 @@ import React, {
   useEffect,
 } from 'react';
 import { getApiBase } from '../lib/api-client';
+import { parseApiErrorResponse } from '../lib/api-error';
 import { clientLogger } from '../lib/client-logger';
 import { apiFetchWithRefresh } from '../lib/session-fetch';
 
@@ -53,11 +54,8 @@ export function ClinicProvider({ children }: { children: React.ReactNode }) {
           setClinic(json.data ?? json);
         } else {
           setClinic(null);
-          const msg =
-            res.status === 401
-              ? 'Sesión expirada o no autenticado'
-              : `Error ${res.status}`;
-          setSessionError(msg);
+          const apiErr = await parseApiErrorResponse(res);
+          setSessionError(apiErr.message);
           clientLogger.warn('clinic_me_failed', {
             status: res.status,
             requestId: res.headers.get('X-Request-Id'),
