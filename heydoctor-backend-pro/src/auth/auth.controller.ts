@@ -37,6 +37,7 @@ import {
   REFRESH_TOKEN_MAX_AGE_MS,
   authCookieBase,
 } from './auth-cookies';
+import { clearCsrfCookie, setCsrfCookie } from '../common/csrf/csrf-cookie';
 
 const AUTH_COOKIE_PATH = '/api/auth';
 const ACCESS_COOKIE_PATH = '/';
@@ -156,6 +157,7 @@ export class AuthController {
     );
     setRefreshCookie(res, refreshToken);
     setAccessCookie(res, result.access_token);
+    setCsrfCookie(res);
     return { user: result.user };
   }
 
@@ -175,6 +177,7 @@ export class AuthController {
     );
     setRefreshCookie(res, refreshToken);
     setAccessCookie(res, result.access_token);
+    setCsrfCookie(res);
     return { user: result.user };
   }
 
@@ -195,6 +198,7 @@ export class AuthController {
 
     setRefreshCookie(res, newRefreshToken);
     setAccessCookie(res, accessToken);
+    setCsrfCookie(res);
     return { ok: true as const };
   }
 
@@ -207,6 +211,7 @@ export class AuthController {
     }
     clearRefreshCookie(res);
     clearAccessCookie(res);
+    clearCsrfCookie(res);
     return { ok: true };
   }
 }

@@ -55,6 +55,7 @@ npm run start:dev
 ## Cookies de sesión (JWT)
 
 - `access_token` y `refresh_token`: **HttpOnly**, **Secure** solo en producción, **SameSite** `none` en producción (cross-domain) y `lax` en desarrollo.
+- `csrf_token`: **no HttpOnly** (double-submit); en mutaciones el cliente debe enviar el mismo valor en la cabecera `X-CSRF-Token`. Exento: `POST /api/auth/login`, `register`, `refresh` y webhook Payku.
 - Opcional: `COOKIE_DOMAIN` para compartir cookies entre subdominios del mismo sitio.
 
 ## CI/CD y protección de `main`

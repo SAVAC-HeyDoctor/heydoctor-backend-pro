@@ -2,14 +2,17 @@ import {
   CallHandler,
   ExecutionContext,
   HttpException,
+  Inject,
   Injectable,
   NestInterceptor,
+  type LoggerService,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { catchError, Observable, tap, throwError } from 'rxjs';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import { AuthorizationService } from '../authorization/authorization.service';
 import { normalizeAuditPath, resolveAuditAction } from './audit-action-map';
+import { APP_LOGGER } from '../common/logger/logger.tokens';
 import { AuditService } from './audit.service';
 
 type RequestWithUser = Request & { user?: AuthenticatedUser };
@@ -19,6 +22,7 @@ export class AuditInterceptor implements NestInterceptor {
   constructor(
     private readonly auditService: AuditService,
     private readonly authorizationService: AuthorizationService,
+    @Inject(APP_LOGGER) private readonly logger: LoggerService,
   ) {}
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
@@ -46,7 +50,7 @@ export class AuditInterceptor implements NestInterceptor {
 
     return next.handle().pipe(
       tap(() => {
-        void this.recordSuccess(req, res, {
+        void this.safeRecordSuccess(req, res, {
           action,
           resource,
           resourceId,
@@ -54,7 +58,7 @@ export class AuditInterceptor implements NestInterceptor {
         });
       }),
       catchError((err: unknown) => {
-        void this.recordError(req, err, {
+        void this.safeRecordError(req, err, {
           action,
           resource,
           resourceId,
@@ -63,6 +67,51 @@ export class AuditInterceptor implements NestInterceptor {
         return throwError(() => err);
       }),
     );
+  }
+
+  /** Fail-safe: la petición HTTP no debe fallar por errores imprevistos en auditoría. */
+  private async safeRecordSuccess(
+    req: RequestWithUser,
+    res: Response,
+    ctx: {
+      action: string;
+      resource: string;
+      resourceId: string | null;
+      baseMetadata: Record<string, unknown>;
+    },
+  ): Promise<void> {
+    try {
+      await this.recordSuccess(req, res, ctx);
+    } catch (err) {
+      const e = err instanceof Error ? err : new Error(String(err));
+      this.logger.error('audit_interceptor_record_success_failed', e, {
+        event: 'audit_interceptor_record_success_failed',
+        action: ctx.action,
+        resource: ctx.resource,
+      });
+    }
+  }
+
+  private async safeRecordError(
+    req: RequestWithUser,
+    err: unknown,
+    ctx: {
+      action: string;
+      resource: string;
+      resourceId: string | null;
+      baseMetadata: Record<string, unknown>;
+    },
+  ): Promise<void> {
+    try {
+      await this.recordError(req, err, ctx);
+    } catch (inner) {
+      const e = inner instanceof Error ? inner : new Error(String(inner));
+      this.logger.error('audit_interceptor_record_error_failed', e, {
+        event: 'audit_interceptor_record_error_failed',
+        action: ctx.action,
+        resource: ctx.resource,
+      });
+    }
   }
 
   /**

@@ -44,6 +44,8 @@ import {
 } from './health/health.controller';
 import { WebrtcModule } from './webrtc/webrtc.module';
 import { HttpRequestLoggingInterceptor } from './common/interceptors/http-request-logging.interceptor';
+import { CsrfCookieInterceptor } from './common/csrf/csrf-cookie.interceptor';
+import { CsrfGuard } from './common/csrf/csrf.guard';
 import { buildTypeOrmSslConfig } from './config/typeorm-ssl';
 
 const dbUrl = process.env.DATABASE_PUBLIC_URL || process.env.DATABASE_URL;
@@ -112,7 +114,9 @@ const dbUrl = process.env.DATABASE_PUBLIC_URL || process.env.DATABASE_URL;
     ThrottlerGuard,
     { provide: APP_GUARD, useExisting: JwtAuthGuard },
     { provide: APP_GUARD, useClass: ClinicGuard },
+    { provide: APP_GUARD, useClass: CsrfGuard },
     { provide: APP_INTERCEPTOR, useClass: HttpRequestLoggingInterceptor },
+    { provide: APP_INTERCEPTOR, useClass: CsrfCookieInterceptor },
     {
       provide: APP_FILTER,
       useFactory: (httpAdapterHost: HttpAdapterHost, logger: LoggerService) =>

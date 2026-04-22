@@ -5,6 +5,8 @@
  * Opcional: `NEXT_PUBLIC_USE_API_PROXY=1` + rewrites en next.config → base '' (mismo origen).
  */
 
+import { CSRF_HEADER, readCsrfTokenFromDocument } from './csrf';
+
 export function getApiBase(): string {
   if (
     typeof window !== 'undefined' &&
@@ -32,6 +34,10 @@ export function apiFetch(input: RequestInfo | URL, init?: RequestInit): Promise<
     : new Headers();
   if (isMutation) {
     headers.set('X-Requested-With', 'XMLHttpRequest');
+    const csrf = readCsrfTokenFromDocument();
+    if (csrf) {
+      headers.set(CSRF_HEADER, csrf);
+    }
   }
   return fetch(input, {
     ...init,

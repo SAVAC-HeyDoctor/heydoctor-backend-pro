@@ -10,42 +10,6 @@ import { withSentryConfig } from '@sentry/nextjs';
 const target = (process.env.BACKEND_PROXY_TARGET ?? '').replace(/\/$/, '');
 const isProd = process.env.NODE_ENV === 'production';
 
-function buildContentSecurityPolicy() {
-  let connect = "'self'";
-  const api = process.env.NEXT_PUBLIC_API_URL?.trim();
-  if (api) {
-    try {
-      connect += ` ${new URL(api).origin}`;
-    } catch {
-      /* ignore invalid URL */
-    }
-  }
-  if (process.env.NEXT_PUBLIC_SENTRY_DSN?.trim()) {
-    connect +=
-      ' https://*.ingest.sentry.io https://*.ingest.de.sentry.io https://*.ingest.us.sentry.io';
-  }
-
-  const directives = [
-    "default-src 'self'",
-    "base-uri 'self'",
-    "object-src 'none'",
-    "frame-ancestors 'none'",
-    `connect-src ${connect}`,
-    "img-src 'self' data: blob:",
-    "font-src 'self'",
-    /**
-     * style/script unsafe-inline: exigido hoy por el runtime de Next sin pipeline de nonces.
-     * Endurecimiento progresivo: nonces (middleware + `next/script`) y retirar unsafe-inline.
-     */
-    "style-src 'self' 'unsafe-inline'",
-    isProd
-      ? "script-src 'self' 'unsafe-inline'"
-      : "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-    "form-action 'self'",
-  ];
-  return directives.join('; ');
-}
-
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   /** Solo el App Router; el resto del toolkit se valida con `tsc`. */
@@ -66,10 +30,7 @@ const nextConfig = {
         key: 'Permissions-Policy',
         value: 'camera=(), microphone=(), geolocation=()',
       },
-      {
-        key: 'Content-Security-Policy',
-        value: buildContentSecurityPolicy(),
-      },
+      /** CSP (nonce + connect-src): ver `middleware.ts` para no duplicar directivas. */
     ];
     if (isProd) {
       list.push({

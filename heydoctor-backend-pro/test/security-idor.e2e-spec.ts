@@ -31,6 +31,20 @@ function cookieHeaderFromSetCookie(
     .join('; ');
 }
 
+function csrfTokenFromSetCookie(
+  setCookie: string | string[] | undefined,
+): string {
+  if (!setCookie) return '';
+  const arr = Array.isArray(setCookie) ? setCookie : [setCookie];
+  for (const line of arr) {
+    const part = line.split(';')[0].trim();
+    if (part.startsWith('csrf_token=')) {
+      return decodeURIComponent(part.slice('csrf_token='.length));
+    }
+  }
+  return '';
+}
+
 (runIdorE2e ? describe : describe.skip)(
   'Security — multi-tenant IDOR (e2e)',
   () => {
@@ -42,6 +56,9 @@ function cookieHeaderFromSetCookie(
     let cookieDoctorA: string;
     let cookieDoctorB: string;
     let cookieAdminA: string;
+    let csrfDoctorA: string;
+    let csrfDoctorB: string;
+    let csrfAdminA: string;
     let patientBId: string;
     let consultationBId: string;
     let applicationBId: string;
@@ -131,27 +148,32 @@ function cookieHeaderFromSetCookie(
         .send({ email: emailDocA, password })
         .expect(200);
       cookieDoctorA = cookieHeaderFromSetCookie(loginA.headers['set-cookie']);
+      csrfDoctorA = csrfTokenFromSetCookie(loginA.headers['set-cookie']);
 
       const loginB = await request(server)
         .post('/api/auth/login')
         .send({ email: emailDocB, password })
         .expect(200);
       cookieDoctorB = cookieHeaderFromSetCookie(loginB.headers['set-cookie']);
+      csrfDoctorB = csrfTokenFromSetCookie(loginB.headers['set-cookie']);
 
       const loginAdminA = await request(server)
         .post('/api/auth/login')
         .send({ email: emailAdminA, password })
         .expect(200);
       cookieAdminA = cookieHeaderFromSetCookie(loginAdminA.headers['set-cookie']);
+      csrfAdminA = csrfTokenFromSetCookie(loginAdminA.headers['set-cookie']);
 
       await request(server)
         .post('/api/consents/telemedicine')
         .set('Cookie', cookieDoctorB)
+        .set('X-CSRF-Token', csrfDoctorB)
         .expect(201);
 
       const patientRes = await request(server)
         .post('/api/patients')
         .set('Cookie', cookieDoctorB)
+        .set('X-CSRF-Token', csrfDoctorB)
         .send({
           name: 'Patient B',
           email: `patient_b_${suffix}@e2e.test`,
@@ -162,6 +184,7 @@ function cookieHeaderFromSetCookie(
       const consRes = await request(server)
         .post('/api/consultations')
         .set('Cookie', cookieDoctorB)
+        .set('X-CSRF-Token', csrfDoctorB)
         .send({
           patientId: patientBId,
           reason: 'E2E IDOR cross-clinic consultation in clinic B',
@@ -212,6 +235,7 @@ function cookieHeaderFromSetCookie(
       await request(app.getHttpServer())
         .post('/api/consultations')
         .set('Cookie', cookieDoctorA)
+        .set('X-CSRF-Token', csrfDoctorA)
         .send({
           patientId: patientBId,
           reason: 'cross-tenant attempt',
@@ -230,6 +254,7 @@ function cookieHeaderFromSetCookie(
       await request(app.getHttpServer())
         .post(`/api/doctors/${doctorSlugB}/ratings`)
         .set('Cookie', cookieDoctorA)
+        .set('X-CSRF-Token', csrfDoctorA)
         .send({
           patientName: 'X',
           rating: 5,
