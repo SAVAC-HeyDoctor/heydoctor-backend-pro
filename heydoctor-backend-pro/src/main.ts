@@ -28,8 +28,8 @@ function resolveCorsOrigins(envConfig: EnvConfig): string[] {
 
 async function bootstrap() {
   if (process.env.NODE_ENV === 'production' && !process.env.REDIS_URL?.trim()) {
-    throw new Error(
-      'REDIS_URL is required in production for distributed rate limiting',
+    bootstrapLogger.warn(
+      'REDIS_URL is not set: throttling uses in-memory storage per instance (not shared across replicas). Add Redis for distributed rate limits in multi-instance production.',
     );
   }
 

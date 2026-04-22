@@ -46,7 +46,7 @@ npm run start:dev
 | `JWT_SECRET`   | Secreto para firmar tokens           |
 | `PORT`         | Puerto HTTP (default 3001)           |
 | `NODE_ENV`     | `production` desactiva `synchronize`   |
-| `REDIS_URL`    | **Obligatorio en producción**: rate limiting distribuido (Throttler) |
+| `REDIS_URL`    | **Recomendado en producción** si hay varias réplicas: Throttler distribuido; sin Redis el límite es por instancia (memoria) |
 | `DATABASE_SSL_CA` | Opcional en producción: PEM del CA si el proveedor Postgres lo requiere |
 | `ENABLE_PUBLIC_REGISTRATION` | `true` para permitir `POST /api/auth/register` en producción (por defecto deshabilitado) |
 | `CORS_ORIGIN`  | Opcional: lista separada por comas   |
