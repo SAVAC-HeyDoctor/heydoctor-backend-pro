@@ -1,4 +1,9 @@
-import { ConflictException, Inject, Injectable, type LoggerService } from '@nestjs/common';
+import {
+  ConflictException,
+  Inject,
+  Injectable,
+  type LoggerService,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';

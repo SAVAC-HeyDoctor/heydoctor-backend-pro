@@ -3,10 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { APP_INTERCEPTOR } from '@nestjs/core';
 import { AuditModule } from '../audit/audit.module';
 import { LoggerModule } from '../common/logger/logger.module';
-import {
-  ComplianceConfig,
-  COMPLIANCE_CONFIG_TOKEN,
-} from './compliance.config';
+import { ComplianceConfig, COMPLIANCE_CONFIG_TOKEN } from './compliance.config';
 import { PhiAccessLogInterceptorV2 } from './phi-access-log-v2.interceptor';
 
 /**

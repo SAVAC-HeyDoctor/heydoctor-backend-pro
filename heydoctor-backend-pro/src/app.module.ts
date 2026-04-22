@@ -1,6 +1,6 @@
 import { join } from 'path';
 import { Module } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
@@ -31,8 +31,12 @@ import { UsersModule } from './users/users.module';
 import { DoctorApplicationsModule } from './doctor-applications/doctor-applications.module';
 import { DoctorProfilesModule } from './doctor-profiles/doctor-profiles.module';
 import { GdprModule } from './gdpr/gdpr.module';
-import { HealthApiController, HealthController } from './health/health.controller';
+import {
+  HealthApiController,
+  HealthController,
+} from './health/health.controller';
 import { WebrtcModule } from './webrtc/webrtc.module';
+import { HttpRequestLoggingInterceptor } from './common/interceptors/http-request-logging.interceptor';
 
 const dbUrl = process.env.DATABASE_PUBLIC_URL || process.env.DATABASE_URL;
 
@@ -100,6 +104,7 @@ const dbUrl = process.env.DATABASE_PUBLIC_URL || process.env.DATABASE_URL;
     ThrottlerGuard,
     { provide: APP_GUARD, useExisting: JwtAuthGuard },
     { provide: APP_GUARD, useClass: ClinicGuard },
+    { provide: APP_INTERCEPTOR, useClass: HttpRequestLoggingInterceptor },
   ],
 })
 export class AppModule {}

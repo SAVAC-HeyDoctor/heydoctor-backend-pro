@@ -1,10 +1,4 @@
-import {
-  Body,
-  Controller,
-  Headers,
-  Post,
-  UseGuards,
-} from '@nestjs/common';
+import { Body, Controller, Headers, Post, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Public } from '../auth/decorators/public.decorator';

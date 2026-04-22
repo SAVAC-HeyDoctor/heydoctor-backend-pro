@@ -20,9 +20,7 @@ export class AuditController {
   constructor(private readonly auditService: AuditService) {}
 
   @Get('export')
-  async export(
-    @Query() query: AuditExportQueryDto,
-  ): Promise<StreamableFile> {
+  async export(@Query() query: AuditExportQueryDto): Promise<StreamableFile> {
     const rows = await this.auditService.findLogsForExport({
       clinicId: query.clinicId,
       action: query.action,

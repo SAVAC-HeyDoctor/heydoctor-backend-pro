@@ -8,7 +8,7 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { createHash, randomBytes } from 'crypto';
-import { IsNull, LessThan, MoreThan, Repository } from 'typeorm';
+import { IsNull, MoreThan, Repository } from 'typeorm';
 import { AuditLog } from '../audit/audit-log.entity';
 import { AuditOutcome } from '../audit/audit-outcome.enum';
 import {
@@ -17,7 +17,10 @@ import {
 } from '../subscriptions/subscription.entity';
 import { User } from '../users/user.entity';
 import { UserRole } from '../users/user-role.enum';
-import { assignClinic, assertClinicIdForSave } from '../common/entity-clinic.util';
+import {
+  assignClinic,
+  assertClinicIdForSave,
+} from '../common/entity-clinic.util';
 import { APP_LOGGER } from '../common/logger/logger.tokens';
 import { ClinicService } from '../clinic/clinic.service';
 import { UsersService } from '../users/users.service';
@@ -192,16 +195,11 @@ export class AuthService {
     // ── Reuse detection: revoked token used again → full revocation ──
     if (stored.revokedAt) {
       await this.revokeAllUserTokens(stored.userId);
-      await this.logSecurityEvent(
-        'TOKEN_REUSE_DETECTED',
-        stored.userId,
-        ctx,
-        {
-          tokenId: stored.id,
-          originalRevokedAt: stored.revokedAt.toISOString(),
-          severity: 'critical',
-        },
-      );
+      await this.logSecurityEvent('TOKEN_REUSE_DETECTED', stored.userId, ctx, {
+        tokenId: stored.id,
+        originalRevokedAt: stored.revokedAt.toISOString(),
+        severity: 'critical',
+      });
       throw new UnauthorizedException('Refresh token reuse detected');
     }
 
@@ -313,9 +311,10 @@ export class AuthService {
         action,
         resource: 'auth',
         resourceId: null,
-        status: action.includes('FAIL') || action.includes('REUSE')
-          ? AuditOutcome.ERROR
-          : AuditOutcome.SUCCESS,
+        status:
+          action.includes('FAIL') || action.includes('REUSE')
+            ? AuditOutcome.ERROR
+            : AuditOutcome.SUCCESS,
         httpStatus: action.includes('FAIL') ? 401 : 200,
         errorMessage: null,
         metadata: {
@@ -327,8 +326,7 @@ export class AuthService {
       assignClinic(row, clinicId);
       await this.auditLogRepository.save(row);
     } catch (err) {
-      const error =
-        err instanceof Error ? err : new Error(String(err));
+      const error = err instanceof Error ? err : new Error(String(err));
       this.logger.error(
         'Unexpected error in AuthService.logSecurityEvent',
         error,

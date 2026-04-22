@@ -72,7 +72,9 @@ export class AiService {
    * Calls OpenAI once; returns parsed JSON only (no DB writes).
    * Expuesto para flujos internos (p. ej. {@link ConsultationsService}) que ya validaron contexto.
    */
-  async generateClinicalSummary(dto: GenerateAiDto): Promise<ClinicalSummaryResult> {
+  async generateClinicalSummary(
+    dto: GenerateAiDto,
+  ): Promise<ClinicalSummaryResult> {
     const model =
       this.config.get<string>('OPENAI_MODEL')?.trim() || 'gpt-4o-mini';
     const userBlock = this.buildUserContent(dto);
@@ -97,7 +99,9 @@ export class AiService {
       if (err instanceof BadGatewayException) {
         throw err;
       }
-      throw new BadGatewayException('Clinical assistant temporarily unavailable');
+      throw new BadGatewayException(
+        'Clinical assistant temporarily unavailable',
+      );
     }
 
     return this.parseClinicalJson(raw);
@@ -163,7 +167,9 @@ export class AiService {
 
     let diagnoses: string[];
     if (Array.isArray(suggestedDiagnosis)) {
-      diagnoses = suggestedDiagnosis.filter((x): x is string => typeof x === 'string');
+      diagnoses = suggestedDiagnosis.filter(
+        (x): x is string => typeof x === 'string',
+      );
     } else if (typeof suggestedDiagnosis === 'string') {
       diagnoses = [suggestedDiagnosis];
     } else {

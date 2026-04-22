@@ -86,8 +86,7 @@ export class AuthorizationService {
     clinicId: string,
     loadedUser?: User,
   ): Promise<void> {
-    const user =
-      loadedUser ?? (await this.usersService.findById(authUser.sub));
+    const user = loadedUser ?? (await this.usersService.findById(authUser.sub));
 
     if (!user?.clinicId) {
       throw new ForbiddenException('User has no clinic assigned');
@@ -127,9 +126,7 @@ export class AuthorizationService {
       throw new NotFoundException('Patient not found');
     }
     if (patient.clinicId !== clinicId) {
-      throw new ForbiddenException(
-        'Patient does not belong to your clinic',
-      );
+      throw new ForbiddenException('Patient does not belong to your clinic');
     }
 
     await this.assertPatientOwnership(authUser, patient);

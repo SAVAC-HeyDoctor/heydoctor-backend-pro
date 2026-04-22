@@ -11,9 +11,7 @@ export class InitialSchema1743298123456 implements MigrationInterface {
   name = 'InitialSchema1743298123456';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(
-      `CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`,
-    );
+    await queryRunner.query(`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`);
 
     await queryRunner.query(
       `CREATE TYPE "users_role_enum" AS ENUM ('doctor', 'admin')`,
@@ -342,7 +340,9 @@ export class InitialSchema1743298123456 implements MigrationInterface {
     await queryRunner.query(`DROP TABLE IF EXISTS "audit_logs" CASCADE`);
     await queryRunner.query(`DROP TABLE IF EXISTS "refresh_tokens" CASCADE`);
     await queryRunner.query(`DROP TABLE IF EXISTS "subscriptions" CASCADE`);
-    await queryRunner.query(`DROP TABLE IF EXISTS "doctor_applications" CASCADE`);
+    await queryRunner.query(
+      `DROP TABLE IF EXISTS "doctor_applications" CASCADE`,
+    );
     await queryRunner.query(`DROP TABLE IF EXISTS "patients" CASCADE`);
     await queryRunner.query(
       `DROP TABLE IF EXISTS "telemedicine_consents" CASCADE`,
@@ -356,17 +356,11 @@ export class InitialSchema1743298123456 implements MigrationInterface {
     await queryRunner.query(
       `DROP TYPE IF EXISTS "doctor_applications_status_enum"`,
     );
-    await queryRunner.query(
-      `DROP TYPE IF EXISTS "payku_payments_status_enum"`,
-    );
-    await queryRunner.query(
-      `DROP TYPE IF EXISTS "subscriptions_status_enum"`,
-    );
+    await queryRunner.query(`DROP TYPE IF EXISTS "payku_payments_status_enum"`);
+    await queryRunner.query(`DROP TYPE IF EXISTS "subscriptions_status_enum"`);
     await queryRunner.query(`DROP TYPE IF EXISTS "subscriptions_plan_enum"`);
     await queryRunner.query(`DROP TYPE IF EXISTS "audit_logs_status_enum"`);
-    await queryRunner.query(
-      `DROP TYPE IF EXISTS "consultations_status_enum"`,
-    );
+    await queryRunner.query(`DROP TYPE IF EXISTS "consultations_status_enum"`);
     await queryRunner.query(`DROP TYPE IF EXISTS "users_role_enum"`);
   }
 }

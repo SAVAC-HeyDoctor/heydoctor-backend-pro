@@ -6,7 +6,10 @@ import { APP_LOGGER } from '../common/logger/logger.tokens';
 import { Clinic } from '../clinic/clinic.entity';
 import { AuditLog } from './audit-log.entity';
 import { AuditOutcome } from './audit-outcome.enum';
-import type { AuditLogErrorPayload, AuditLogSuccessPayload } from './audit.types';
+import type {
+  AuditLogErrorPayload,
+  AuditLogSuccessPayload,
+} from './audit.types';
 import {
   shouldEmitAuditPersistErrorLog,
   shouldEmitAuditPersistSuccessLog,

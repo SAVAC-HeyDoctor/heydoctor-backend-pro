@@ -34,6 +34,8 @@ export class EnvConfig {
   readonly paykuWebhookSecret: string | null;
   readonly paykuWebhookBearer: string | null;
   readonly paykuWebhookAllowUnsafeLocal: boolean;
+  /** `true` fuerza URL mock (sin llamada live a Payku). En producción debe ser false o unset. */
+  readonly paykuConsultationPaymentsDisabled: boolean;
   readonly consultationPaymentAmountClp: number;
   readonly paymentPendingExpireMinutes: number;
 
@@ -75,6 +77,8 @@ export class EnvConfig {
       config.get<string>('PAYKU_WEBHOOK_BEARER') ?? null;
     this.paykuWebhookAllowUnsafeLocal =
       config.get<string>('PAYKU_WEBHOOK_ALLOW_UNSAFE_LOCAL') === 'true';
+    this.paykuConsultationPaymentsDisabled =
+      config.get<string>('PAYKU_CONSULTATION_PAYMENTS_DISABLED') === 'true';
     this.consultationPaymentAmountClp = Number(
       config.get<string>('CONSULTATION_PAYMENT_AMOUNT_CLP') ?? '15000',
     );
@@ -86,8 +90,7 @@ export class EnvConfig {
     this.openaiModel =
       config.get<string>('OPENAI_MODEL')?.trim() || 'gpt-4o-mini';
 
-    this.hipaaMode =
-      config.get<string>('HIPAA_MODE')?.toLowerCase() === 'true';
+    this.hipaaMode = config.get<string>('HIPAA_MODE')?.toLowerCase() === 'true';
 
     this.frontendUrl =
       config.get<string>('FRONTEND_URL') ?? 'https://heydoctor.vercel.app';

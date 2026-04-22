@@ -69,11 +69,7 @@ export class WebrtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
     try {
       const payload = await this.jwtService.verifyAsync<JwtPayload>(token);
       const user = await this.usersService.findById(payload.sub);
-      if (
-        !user ||
-        user.email !== payload.email ||
-        user.role !== payload.role
-      ) {
+      if (!user || user.email !== payload.email || user.role !== payload.role) {
         client.disconnect(true);
         return;
       }

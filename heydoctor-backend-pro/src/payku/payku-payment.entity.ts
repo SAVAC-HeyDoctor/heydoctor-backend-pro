@@ -26,7 +26,10 @@ const FINAL_STATUSES = new Set<PaykuPaymentStatus>([
   PaykuPaymentStatus.EXPIRED,
 ]);
 
-const ALLOWED_TRANSITIONS = new Map<PaykuPaymentStatus, Set<PaykuPaymentStatus>>([
+const ALLOWED_TRANSITIONS = new Map<
+  PaykuPaymentStatus,
+  Set<PaykuPaymentStatus>
+>([
   [
     PaykuPaymentStatus.PENDING,
     new Set([

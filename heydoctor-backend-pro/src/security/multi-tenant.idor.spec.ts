@@ -54,7 +54,10 @@ describe('Multi-tenant IDOR guards (unit)', () => {
           { provide: getRepositoryToken(DoctorApplication), useValue: repo },
           { provide: AuthorizationService, useValue: authz },
           { provide: AuditService, useValue: { logSuccess: jest.fn() } },
-          { provide: ClinicService, useValue: { getOldestClinicId: jest.fn() } },
+          {
+            provide: ClinicService,
+            useValue: { getOldestClinicId: jest.fn() },
+          },
         ],
       }).compile();
       service = module.get(DoctorApplicationsService);
@@ -75,9 +78,9 @@ describe('Multi-tenant IDOR guards (unit)', () => {
 
     it('findOne throws NotFound when application belongs to another clinic', async () => {
       repo.findOne.mockResolvedValue(null);
-      await expect(service.findOne('foreign-app', userA)).rejects.toBeInstanceOf(
-        NotFoundException,
-      );
+      await expect(
+        service.findOne('foreign-app', userA),
+      ).rejects.toBeInstanceOf(NotFoundException);
     });
 
     it('findAll filters by clinicId', async () => {
@@ -109,14 +112,20 @@ describe('Multi-tenant IDOR guards (unit)', () => {
       const module: TestingModule = await Test.createTestingModule({
         providers: [
           ConsultationsService,
-          { provide: getRepositoryToken(Consultation), useValue: consultationsRepo },
+          {
+            provide: getRepositoryToken(Consultation),
+            useValue: consultationsRepo,
+          },
           { provide: AuthorizationService, useValue: authz },
           { provide: ConsentService, useValue: {} },
           { provide: DoctorProfilesService, useValue: {} },
           { provide: AuditService, useValue: { logSuccess: jest.fn() } },
           { provide: AiService, useValue: {} },
           { provide: ConfigService, useValue: {} },
-          { provide: APP_LOGGER, useValue: { log: jest.fn(), error: jest.fn() } },
+          {
+            provide: APP_LOGGER,
+            useValue: { log: jest.fn(), error: jest.fn() },
+          },
         ],
       }).compile();
       service = module.get(ConsultationsService);
@@ -165,7 +174,10 @@ describe('Multi-tenant IDOR guards (unit)', () => {
           { provide: getRepositoryToken(Patient), useValue: patientsRepo },
           { provide: AuthorizationService, useValue: authz },
           { provide: AuditService, useValue: { logSuccess: jest.fn() } },
-          { provide: APP_LOGGER, useValue: { log: jest.fn(), warn: jest.fn() } },
+          {
+            provide: APP_LOGGER,
+            useValue: { log: jest.fn(), warn: jest.fn() },
+          },
         ],
       }).compile();
       service = module.get(PatientsService);
@@ -239,7 +251,10 @@ describe('Multi-tenant IDOR guards (unit)', () => {
           DoctorProfilesService,
           { provide: getRepositoryToken(DoctorProfile), useValue: profileRepo },
           { provide: getRepositoryToken(DoctorRating), useValue: ratingRepo },
-          { provide: getRepositoryToken(Consultation), useValue: consultationsRepo },
+          {
+            provide: getRepositoryToken(Consultation),
+            useValue: consultationsRepo,
+          },
           { provide: AuthorizationService, useValue: authz },
         ],
       }).compile();
@@ -252,9 +267,9 @@ describe('Multi-tenant IDOR guards (unit)', () => {
         rating: 5,
         consultationId: 'cons-1',
       };
-      await expect(service.addRating('dr-b', dto, userA)).rejects.toBeInstanceOf(
-        ForbiddenException,
-      );
+      await expect(
+        service.addRating('dr-b', dto, userA),
+      ).rejects.toBeInstanceOf(ForbiddenException);
     });
   });
 });

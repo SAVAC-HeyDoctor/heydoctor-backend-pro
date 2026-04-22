@@ -1,16 +1,19 @@
 import {
   BadRequestException,
   ConflictException,
+  Inject,
   Injectable,
-  Logger,
   NotFoundException,
   UnauthorizedException,
+  type LoggerService,
 } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import { assignClinic } from '../common/entity-clinic.util';
+import { APP_LOGGER } from '../common/logger/logger.tokens';
 import { AuditService } from '../audit/audit.service';
 import { AuthorizationService } from '../authorization/authorization.service';
 import { Consultation } from '../consultations/consultation.entity';
@@ -48,7 +51,6 @@ type WebhookResult = {
 
 @Injectable()
 export class PaykuService {
-  private readonly logger = new Logger(PaykuService.name);
   private readonly authConfig: PaykuWebhookAuthConfig;
   private readonly pendingExpireMinutes: number;
 
@@ -62,6 +64,8 @@ export class PaykuService {
     private readonly authorizationService: AuthorizationService,
     private readonly subscriptionsService: SubscriptionsService,
     private readonly auditService: AuditService,
+    @Inject(APP_LOGGER)
+    private readonly logger: LoggerService,
   ) {
     this.authConfig = {
       webhookSecret: this.config.get<string>('PAYKU_WEBHOOK_SECRET'),
@@ -151,7 +155,8 @@ export class PaykuService {
     const paykuApiUrl = this.config.get<string>('PAYKU_API_URL');
     const paykuApiKey = this.config.get<string>('PAYKU_API_KEY');
     const paykuLiveDisabled =
-      this.config.get<string>('PAYKU_CONSULTATION_PAYMENTS_DISABLED') === 'true';
+      this.config.get<string>('PAYKU_CONSULTATION_PAYMENTS_DISABLED') ===
+      'true';
 
     const mockPaymentUrl = `${frontendUrl}/panel/consultas/${consultationId}?payment=mock&paymentId=${saved.id}`;
 
@@ -197,7 +202,7 @@ export class PaykuService {
       } catch (err) {
         this.logger.error(
           'Payku API call failed; using mock checkout URL',
-          err instanceof Error ? err.stack : err,
+          err instanceof Error ? err : new Error(String(err)),
         );
       }
     } else {
@@ -209,6 +214,19 @@ export class PaykuService {
     if (!paymentUrl) {
       paymentUrl = mockPaymentUrl;
     }
+
+    this.logger.log('payku_payment_created', {
+      event: 'payku_payment_created',
+      paymentId: saved.id,
+      consultationId,
+      clinicId,
+      amount,
+      mockMode:
+        paykuLiveDisabled ||
+        !paykuApiUrl ||
+        !paykuApiKey ||
+        paymentUrl === mockPaymentUrl,
+    });
 
     void this.auditService.logSuccess({
       userId: authUser.sub,
@@ -268,9 +286,7 @@ export class PaykuService {
 
     this.logger.log('Payku webhook authenticated', {
       event: 'payku_webhook_authenticated',
-      paymentIdHint: String(
-        body.payment_id ?? body.paymentId ?? body.id ?? '',
-      ),
+      paymentIdHint: String(body.payment_id ?? body.paymentId ?? body.id ?? ''),
     });
 
     const paymentId = String(
@@ -333,9 +349,9 @@ export class PaykuService {
       case 'amount_mismatch':
         throw new BadRequestException('Amount mismatch');
       default:
-        this.logger.error('Payku webhook unhandled action', {
+        this.logger.warn('Payku webhook unhandled action', {
           event: 'payku_webhook_unhandled',
-          action: (result as WebhookResult).action,
+          action: result.action,
         });
         throw new BadRequestException('Webhook processing failed');
     }
@@ -495,6 +511,27 @@ export class PaykuService {
       });
 
       if (incomingStatus === PaykuPaymentStatus.PAID) {
+        this.logger.log('payku_payment_confirmed', {
+          event: 'payku_payment_confirmed',
+          paymentId,
+          consultationId: payment.consultationId,
+          clinicId: payment.clinicId,
+          amount: payment.amount,
+        });
+        void this.auditService.logSuccess({
+          action: 'PAYMENT_CONFIRMED',
+          resource: 'payment',
+          resourceId: paymentId,
+          userId: payment.userId,
+          clinicId: payment.clinicId,
+          httpStatus: 200,
+          metadata: {
+            consultationId: payment.consultationId,
+            amount: payment.amount,
+            transactionId: payment.transactionId,
+          },
+        });
+
         try {
           const webhookActor: AuthenticatedUser = {
             ...SYSTEM_USER,
@@ -510,7 +547,7 @@ export class PaykuService {
         } catch (err) {
           this.logger.error(
             `Failed to upgrade user ${payment.userId} after payment ${paymentId}`,
-            err,
+            err instanceof Error ? err : new Error(String(err)),
           );
         }
 
@@ -541,14 +578,57 @@ export class PaykuService {
           } catch (err) {
             this.logger.error(
               `Failed to lock consultation ${payment.consultationId} after payment`,
-              err,
+              err instanceof Error ? err : new Error(String(err)),
             );
           }
         }
       }
 
+      if (incomingStatus === PaykuPaymentStatus.FAILED) {
+        this.logger.warn('payku_payment_failed', {
+          event: 'payku_payment_failed',
+          paymentId,
+          consultationId: payment.consultationId,
+          clinicId: payment.clinicId,
+        });
+      }
+
       return { action: 'processed', paymentId };
     });
+  }
+
+  /**
+   * Marca pagos `pending` vencidos como `expired` (misma regla que en webhook).
+   * No llama a Payku (solo reconciliación local); desactivar con PAYKU_RECONCILIATION_DISABLED=true.
+   */
+  @Cron(CronExpression.EVERY_10_MINUTES)
+  async reconcileStalePendingPayments(): Promise<void> {
+    if (this.config.get<string>('PAYKU_RECONCILIATION_DISABLED') === 'true') {
+      return;
+    }
+
+    const pending = await this.paymentsRepository.find({
+      where: { status: PaykuPaymentStatus.PENDING },
+      order: { createdAt: 'ASC' },
+      take: 500,
+    });
+
+    let expired = 0;
+    for (const p of pending) {
+      const before = p.status;
+      this.expireIfStale(p);
+      if (p.status !== before) {
+        await this.paymentsRepository.save(p);
+        expired += 1;
+      }
+    }
+
+    if (expired > 0) {
+      this.logger.log('payku_reconciliation_expired', {
+        event: 'payku_reconciliation_expired',
+        count: expired,
+      });
+    }
   }
 
   private expireIfStale(payment: PaykuPayment): void {
@@ -559,7 +639,9 @@ export class PaykuService {
 
     if (ageMs > limitMs) {
       payment.status = PaykuPaymentStatus.EXPIRED;
-      this.logger.log(`Payment ${payment.id} auto-expired (age: ${Math.round(ageMs / 60_000)}min)`);
+      this.logger.log(
+        `Payment ${payment.id} auto-expired (age: ${Math.round(ageMs / 60_000)}min)`,
+      );
     }
   }
 

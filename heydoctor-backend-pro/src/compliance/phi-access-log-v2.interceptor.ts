@@ -9,10 +9,7 @@ import { Observable, tap } from 'rxjs';
 import type { Request } from 'express';
 import { AuditService } from '../audit/audit.service';
 import { APP_LOGGER } from '../common/logger/logger.tokens';
-import {
-  ComplianceConfig,
-  COMPLIANCE_CONFIG_TOKEN,
-} from './compliance.config';
+import { ComplianceConfig, COMPLIANCE_CONFIG_TOKEN } from './compliance.config';
 
 /**
  * Interceptor that logs PHI access events when HIPAA_MODE is enabled.
@@ -57,7 +54,8 @@ export class PhiAccessLogInterceptorV2 implements NestInterceptor {
     const isPhiAccess = PHI_ACCESS_PATTERNS.some((p) => p.test(path));
     if (!isPhiAccess) return next.handle();
 
-    const userId = (req as unknown as { user?: { sub?: string } }).user?.sub ?? null;
+    const userId =
+      (req as unknown as { user?: { sub?: string } }).user?.sub ?? null;
     const ip = this.extractIp(req);
     const ua = req.headers['user-agent'] ?? null;
 
@@ -80,7 +78,9 @@ export class PhiAccessLogInterceptorV2 implements NestInterceptor {
           });
         },
         error: () => {
-          this.logger.warn(`PHI access denied: ${method} ${path} by ${userId ?? 'anonymous'}`);
+          this.logger.warn(
+            `PHI access denied: ${method} ${path} by ${userId ?? 'anonymous'}`,
+          );
         },
       }),
     );

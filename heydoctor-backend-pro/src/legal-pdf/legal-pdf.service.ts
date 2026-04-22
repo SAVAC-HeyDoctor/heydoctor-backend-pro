@@ -28,7 +28,8 @@ type FullConsultationPdf = {
 
 function val(value: string | Date | null | undefined): string {
   if (value == null) return 'N/A';
-  if (value instanceof Date) return value.toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
+  if (value instanceof Date)
+    return value.toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
   const v = String(value).trim();
   return v.length > 0 ? v : 'N/A';
 }
@@ -124,7 +125,11 @@ export class LegalPdfService {
       doc.on('end', () => resolve(Buffer.concat(chunks)));
       doc.on('error', (err) => reject(err));
 
-      doc.font('Helvetica-Bold').fontSize(22).fillColor('#078a92').text(LEGAL_ENTITY.product);
+      doc
+        .font('Helvetica-Bold')
+        .fontSize(22)
+        .fillColor('#078a92')
+        .text(LEGAL_ENTITY.product);
       doc.font('Helvetica').fontSize(9).fillColor('#64748b');
       doc.text(`${LEGAL_ENTITY.name} · RUT ${LEGAL_ENTITY.rut}`);
       doc.text(LEGAL_ENTITY.brand);
@@ -154,8 +159,16 @@ export class LegalPdfService {
       this.pdfRow(doc, 'Diagnóstico', val(c.diagnosis));
       this.pdfRow(doc, 'Tratamiento', val(c.treatment));
       if (c.notes) {
-        doc.font('Helvetica-Bold').fontSize(10).fillColor('#334155').text('Notas:');
-        doc.font('Helvetica').fontSize(10).fillColor('#475569').text(c.notes, { indent: 10 });
+        doc
+          .font('Helvetica-Bold')
+          .fontSize(10)
+          .fillColor('#334155')
+          .text('Notas:');
+        doc
+          .font('Helvetica')
+          .fontSize(10)
+          .fillColor('#475569')
+          .text(c.notes, { indent: 10 });
       }
       doc.moveDown(0.6);
 
@@ -169,11 +182,16 @@ export class LegalPdfService {
       this.pdfSection(doc, 'FIRMA DIGITAL');
       this.pdfRow(doc, 'Fecha de firma', val(c.signedAt));
       if (c.doctorSignature) {
-        doc.font('Helvetica').fontSize(9).fillColor('#64748b').text('Firma del profesional (base64 almacenada):');
-        doc.font('Helvetica').fontSize(8).fillColor('#94a3b8').text(
-          c.doctorSignature.slice(0, 80) + '...',
-          { indent: 10 },
-        );
+        doc
+          .font('Helvetica')
+          .fontSize(9)
+          .fillColor('#64748b')
+          .text('Firma del profesional (base64 almacenada):');
+        doc
+          .font('Helvetica')
+          .fontSize(8)
+          .fillColor('#94a3b8')
+          .text(c.doctorSignature.slice(0, 80) + '...', { indent: 10 });
       } else {
         this.pdfRow(doc, 'Firma', 'No firmada');
       }
@@ -201,7 +219,11 @@ export class LegalPdfService {
   }
 
   private pdfRow(doc: PDFKit.PDFDocument, label: string, value: string): void {
-    doc.font('Helvetica-Bold').fontSize(10).fillColor('#334155').text(`${label}: `, { continued: true });
+    doc
+      .font('Helvetica-Bold')
+      .fontSize(10)
+      .fillColor('#334155')
+      .text(`${label}: `, { continued: true });
     doc.font('Helvetica').fillColor('#475569').text(value);
   }
 

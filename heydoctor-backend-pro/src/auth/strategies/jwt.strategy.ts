@@ -8,7 +8,9 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
 import type { Cache } from 'cache-manager';
+import type { Request } from 'express';
 import { ExtractJwt, Strategy } from 'passport-jwt';
+import { ACCESS_TOKEN_COOKIE } from '../auth-cookies';
 import { UserRole } from '../../users/user-role.enum';
 import { UsersService } from '../../users/users.service';
 import { getJwtUserCacheKey } from '../jwt-user-cache.constants';
@@ -20,10 +22,7 @@ export type AuthenticatedUser = JwtPayload;
 
 const JWT_USER_CACHE_TTL_MS = 5 * 60 * 1000;
 
-type JwtValidateFailReason =
-  | 'user_not_found'
-  | 'inactive'
-  | 'claims_mismatch';
+type JwtValidateFailReason = 'user_not_found' | 'inactive' | 'claims_mismatch';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
@@ -35,14 +34,23 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     @Inject(CACHE_MANAGER) private readonly cache: Cache,
   ) {
     super({
-      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      jwtFromRequest: ExtractJwt.fromExtractors([
+        (req: Request): string | null => {
+          const cookieVal: unknown = req?.cookies?.[ACCESS_TOKEN_COOKIE];
+          const raw = typeof cookieVal === 'string' ? cookieVal : null;
+          return raw && raw.length > 0 ? raw : null;
+        },
+        ExtractJwt.fromAuthHeaderAsBearerToken(),
+      ]),
       ignoreExpiration: false,
       secretOrKey: resolveJwtSecret(configService),
     });
   }
 
   private isJwtDebug(): boolean {
-    return this.configService.get<string>('JWT_DEBUG')?.toLowerCase() === 'true';
+    return (
+      this.configService.get<string>('JWT_DEBUG')?.toLowerCase() === 'true'
+    );
   }
 
   /**
@@ -86,9 +94,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       .toLowerCase()
       .trim();
     const pRole = String(payload.role ?? '').trim();
-    return (
-      email.toLowerCase().trim() === pEmail && String(role) === pRole
-    );
+    return email.toLowerCase().trim() === pEmail && String(role) === pRole;
   }
 
   async validate(payload: JwtPayload): Promise<AuthenticatedUser> {
@@ -103,7 +109,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     const key = getJwtUserCacheKey(payload.sub);
     const cached = await this.cache.get<AuthenticatedUser>(key);
     if (cached) {
-      if (!this.claimsMatchDb(cached.email, cached.role as UserRole, payload)) {
+      if (!this.claimsMatchDb(cached.email, cached.role, payload)) {
         this.throwValidateFail('claims_mismatch', payload?.sub);
       }
       const active = await this.usersService.isUserActive(payload.sub);

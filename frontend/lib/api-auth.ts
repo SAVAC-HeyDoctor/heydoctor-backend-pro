@@ -1,50 +1,66 @@
 /**
- * Auth API - Login contra el backend Nest (Railway).
- * Usa NEXT_PUBLIC_API_URL para todas las llamadas.
+ * Auth contra el backend Nest: sesión en cookies HttpOnly (access + refresh).
+ * El cliente usa credentials: 'include'; no guardar tokens en localStorage.
  */
 
-const getApiBase = () =>
-  (typeof window !== 'undefined' && (window as any).__API_URL__) ||
-  process.env.NEXT_PUBLIC_API_URL ||
-  '';
+import { apiFetch, getApiBase, jsonHeaders } from './api-client';
 
 export interface LoginCredentials {
   email: string;
   password: string;
 }
 
+export interface AuthUser {
+  id: string;
+  email: string;
+  role?: string;
+  clinicId?: string | null;
+}
+
+/** Respuesta alineada con Nest: access_token + user. */
 export interface LoginResponse {
-  jwt: string;
-  user: {
-    id: string;
-    email: string;
-    firstName?: string;
-    lastName?: string;
-  };
+  access_token: string;
+  user: AuthUser;
 }
 
 /**
- * Login contra el backend Nest en Railway.
- * POST /api/auth/login
+ * POST /api/auth/login — Set-Cookie: access_token, refresh_token
  */
 export async function login(credentials: LoginCredentials): Promise<LoginResponse> {
   const base = getApiBase();
-  if (!base) {
-    throw new Error('NEXT_PUBLIC_API_URL is not configured');
-  }
-
-  const res = await fetch(`${base}/api/auth/login`, {
+  const res = await apiFetch(`${base}/api/auth/login`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: jsonHeaders(),
     body: JSON.stringify(credentials),
   });
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ message: res.statusText }));
-    throw new Error(err.message || 'Login failed');
+    throw new Error((err as { message?: string }).message || 'Login failed');
   }
 
-  return res.json();
+  return res.json() as Promise<LoginResponse>;
+}
+
+export async function logout(): Promise<void> {
+  const base = getApiBase();
+  await apiFetch(`${base}/api/auth/logout`, {
+    method: 'POST',
+    headers: jsonHeaders(),
+    body: JSON.stringify({}),
+  });
+}
+
+export async function refreshSession(): Promise<{ access_token: string }> {
+  const base = getApiBase();
+  const res = await apiFetch(`${base}/api/auth/refresh`, {
+    method: 'POST',
+    headers: jsonHeaders(),
+    body: JSON.stringify({}),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error((err as { message?: string }).message || 'Refresh failed');
+  }
+  return res.json() as Promise<{ access_token: string }>;
 }

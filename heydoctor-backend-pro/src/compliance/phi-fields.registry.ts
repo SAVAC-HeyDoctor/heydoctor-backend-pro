@@ -33,35 +33,151 @@ export type PhiFieldDescriptor = {
 
 export const PHI_FIELDS_REGISTRY: PhiFieldDescriptor[] = [
   // --- users ---
-  { entity: 'User', table: 'users', column: 'email', classification: PhiClassification.DIRECT_IDENTIFIER, anonymizationStrategy: 'replace' },
-  { entity: 'User', table: 'users', column: 'password_hash', classification: PhiClassification.DIRECT_IDENTIFIER, anonymizationStrategy: 'replace' },
+  {
+    entity: 'User',
+    table: 'users',
+    column: 'email',
+    classification: PhiClassification.DIRECT_IDENTIFIER,
+    anonymizationStrategy: 'replace',
+  },
+  {
+    entity: 'User',
+    table: 'users',
+    column: 'password_hash',
+    classification: PhiClassification.DIRECT_IDENTIFIER,
+    anonymizationStrategy: 'replace',
+  },
 
   // --- patients ---
-  { entity: 'Patient', table: 'patients', column: 'name', classification: PhiClassification.DIRECT_IDENTIFIER, anonymizationStrategy: 'replace' },
-  { entity: 'Patient', table: 'patients', column: 'email', classification: PhiClassification.DIRECT_IDENTIFIER, anonymizationStrategy: 'replace' },
+  {
+    entity: 'Patient',
+    table: 'patients',
+    column: 'name',
+    classification: PhiClassification.DIRECT_IDENTIFIER,
+    anonymizationStrategy: 'replace',
+  },
+  {
+    entity: 'Patient',
+    table: 'patients',
+    column: 'email',
+    classification: PhiClassification.DIRECT_IDENTIFIER,
+    anonymizationStrategy: 'replace',
+  },
 
   // --- consultations ---
-  { entity: 'Consultation', table: 'consultations', column: 'reason', classification: PhiClassification.CLINICAL, anonymizationStrategy: 'replace' },
-  { entity: 'Consultation', table: 'consultations', column: 'diagnosis', classification: PhiClassification.CLINICAL, anonymizationStrategy: 'replace' },
-  { entity: 'Consultation', table: 'consultations', column: 'treatment', classification: PhiClassification.CLINICAL, anonymizationStrategy: 'replace' },
-  { entity: 'Consultation', table: 'consultations', column: 'notes', classification: PhiClassification.CLINICAL, anonymizationStrategy: 'replace' },
-  { entity: 'Consultation', table: 'consultations', column: 'ai_summary', classification: PhiClassification.CLINICAL, anonymizationStrategy: 'replace' },
-  { entity: 'Consultation', table: 'consultations', column: 'ai_improved_notes', classification: PhiClassification.CLINICAL, anonymizationStrategy: 'replace' },
-  { entity: 'Consultation', table: 'consultations', column: 'ai_suggested_diagnosis', classification: PhiClassification.CLINICAL, anonymizationStrategy: 'nullify' },
-  { entity: 'Consultation', table: 'consultations', column: 'doctor_signature', classification: PhiClassification.SIGNATURE, anonymizationStrategy: 'nullify' },
-  { entity: 'Consultation', table: 'consultations', column: 'patient_signature', classification: PhiClassification.SIGNATURE, anonymizationStrategy: 'nullify' },
+  {
+    entity: 'Consultation',
+    table: 'consultations',
+    column: 'reason',
+    classification: PhiClassification.CLINICAL,
+    anonymizationStrategy: 'replace',
+  },
+  {
+    entity: 'Consultation',
+    table: 'consultations',
+    column: 'diagnosis',
+    classification: PhiClassification.CLINICAL,
+    anonymizationStrategy: 'replace',
+  },
+  {
+    entity: 'Consultation',
+    table: 'consultations',
+    column: 'treatment',
+    classification: PhiClassification.CLINICAL,
+    anonymizationStrategy: 'replace',
+  },
+  {
+    entity: 'Consultation',
+    table: 'consultations',
+    column: 'notes',
+    classification: PhiClassification.CLINICAL,
+    anonymizationStrategy: 'replace',
+  },
+  {
+    entity: 'Consultation',
+    table: 'consultations',
+    column: 'ai_summary',
+    classification: PhiClassification.CLINICAL,
+    anonymizationStrategy: 'replace',
+  },
+  {
+    entity: 'Consultation',
+    table: 'consultations',
+    column: 'ai_improved_notes',
+    classification: PhiClassification.CLINICAL,
+    anonymizationStrategy: 'replace',
+  },
+  {
+    entity: 'Consultation',
+    table: 'consultations',
+    column: 'ai_suggested_diagnosis',
+    classification: PhiClassification.CLINICAL,
+    anonymizationStrategy: 'nullify',
+  },
+  {
+    entity: 'Consultation',
+    table: 'consultations',
+    column: 'doctor_signature',
+    classification: PhiClassification.SIGNATURE,
+    anonymizationStrategy: 'nullify',
+  },
+  {
+    entity: 'Consultation',
+    table: 'consultations',
+    column: 'patient_signature',
+    classification: PhiClassification.SIGNATURE,
+    anonymizationStrategy: 'nullify',
+  },
 
   // --- telemedicine_consents ---
-  { entity: 'TelemedicineConsent', table: 'telemedicine_consents', column: 'ip', classification: PhiClassification.QUASI_IDENTIFIER, anonymizationStrategy: 'nullify' },
-  { entity: 'TelemedicineConsent', table: 'telemedicine_consents', column: 'user_agent', classification: PhiClassification.QUASI_IDENTIFIER, anonymizationStrategy: 'nullify' },
+  {
+    entity: 'TelemedicineConsent',
+    table: 'telemedicine_consents',
+    column: 'ip',
+    classification: PhiClassification.QUASI_IDENTIFIER,
+    anonymizationStrategy: 'nullify',
+  },
+  {
+    entity: 'TelemedicineConsent',
+    table: 'telemedicine_consents',
+    column: 'user_agent',
+    classification: PhiClassification.QUASI_IDENTIFIER,
+    anonymizationStrategy: 'nullify',
+  },
 
   // --- refresh_tokens ---
-  { entity: 'RefreshToken', table: 'refresh_tokens', column: 'ip_address', classification: PhiClassification.QUASI_IDENTIFIER, anonymizationStrategy: 'nullify' },
-  { entity: 'RefreshToken', table: 'refresh_tokens', column: 'user_agent', classification: PhiClassification.QUASI_IDENTIFIER, anonymizationStrategy: 'nullify' },
+  {
+    entity: 'RefreshToken',
+    table: 'refresh_tokens',
+    column: 'ip_address',
+    classification: PhiClassification.QUASI_IDENTIFIER,
+    anonymizationStrategy: 'nullify',
+  },
+  {
+    entity: 'RefreshToken',
+    table: 'refresh_tokens',
+    column: 'user_agent',
+    classification: PhiClassification.QUASI_IDENTIFIER,
+    anonymizationStrategy: 'nullify',
+  },
 
   // --- audit_logs (NEVER anonymized — legal retention) ---
-  { entity: 'AuditLog', table: 'audit_logs', column: 'user_id', classification: PhiClassification.QUASI_IDENTIFIER, anonymizationStrategy: 'retain', retentionReason: 'Legal audit trail — indefinite retention required' },
-  { entity: 'AuditLog', table: 'audit_logs', column: 'metadata', classification: PhiClassification.QUASI_IDENTIFIER, anonymizationStrategy: 'retain', retentionReason: 'Legal audit trail — indefinite retention required' },
+  {
+    entity: 'AuditLog',
+    table: 'audit_logs',
+    column: 'user_id',
+    classification: PhiClassification.QUASI_IDENTIFIER,
+    anonymizationStrategy: 'retain',
+    retentionReason: 'Legal audit trail — indefinite retention required',
+  },
+  {
+    entity: 'AuditLog',
+    table: 'audit_logs',
+    column: 'metadata',
+    classification: PhiClassification.QUASI_IDENTIFIER,
+    anonymizationStrategy: 'retain',
+    retentionReason: 'Legal audit trail — indefinite retention required',
+  },
 ];
 
 /** Group PHI fields by entity for quick lookup. */

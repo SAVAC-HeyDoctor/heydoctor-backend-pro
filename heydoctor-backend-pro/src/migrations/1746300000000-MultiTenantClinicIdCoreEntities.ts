@@ -10,9 +10,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  *
  * daily_metrics: de métrica global por fecha a una fila por (clinic_id, date).
  */
-export class MultiTenantClinicIdCoreEntities1746300000000
-  implements MigrationInterface
-{
+export class MultiTenantClinicIdCoreEntities1746300000000 implements MigrationInterface {
   name = 'MultiTenantClinicIdCoreEntities1746300000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
@@ -37,9 +35,12 @@ export class MultiTenantClinicIdCoreEntities1746300000000
       FROM users u
       WHERE dp.user_id = u.id AND dp.clinic_id IS NULL
     `);
-    await queryRunner.query(`
+    await queryRunner.query(
+      `
       UPDATE doctor_profiles SET clinic_id = $1 WHERE clinic_id IS NULL
-    `, [defaultClinicId]);
+    `,
+      [defaultClinicId],
+    );
     await queryRunner.query(`
       ALTER TABLE doctor_profiles ALTER COLUMN clinic_id SET NOT NULL
     `);
@@ -68,9 +69,12 @@ export class MultiTenantClinicIdCoreEntities1746300000000
       FROM doctor_profiles dp
       WHERE dr.doctor_profile_id = dp.id AND dr.clinic_id IS NULL
     `);
-    await queryRunner.query(`
+    await queryRunner.query(
+      `
       UPDATE doctor_ratings SET clinic_id = $1 WHERE clinic_id IS NULL
-    `, [defaultClinicId]);
+    `,
+      [defaultClinicId],
+    );
     await queryRunner.query(`
       ALTER TABLE doctor_ratings ALTER COLUMN clinic_id SET NOT NULL
     `);
@@ -99,9 +103,12 @@ export class MultiTenantClinicIdCoreEntities1746300000000
       FROM users u
       WHERE s.user_id = u.id AND s.clinic_id IS NULL
     `);
-    await queryRunner.query(`
+    await queryRunner.query(
+      `
       UPDATE subscriptions SET clinic_id = $1 WHERE clinic_id IS NULL
-    `, [defaultClinicId]);
+    `,
+      [defaultClinicId],
+    );
     await queryRunner.query(`
       ALTER TABLE subscriptions ALTER COLUMN clinic_id SET NOT NULL
     `);
@@ -137,9 +144,12 @@ export class MultiTenantClinicIdCoreEntities1746300000000
       ) sub
       WHERE p.id = sub.id AND sub.cid IS NOT NULL AND p.clinic_id IS NULL
     `);
-    await queryRunner.query(`
+    await queryRunner.query(
+      `
       UPDATE payku_payments SET clinic_id = $1 WHERE clinic_id IS NULL
-    `, [defaultClinicId]);
+    `,
+      [defaultClinicId],
+    );
     await queryRunner.query(`
       ALTER TABLE payku_payments ALTER COLUMN clinic_id SET NOT NULL
     `);
@@ -162,9 +172,12 @@ export class MultiTenantClinicIdCoreEntities1746300000000
       ALTER TABLE doctor_applications
       ADD COLUMN IF NOT EXISTS clinic_id uuid
     `);
-    await queryRunner.query(`
+    await queryRunner.query(
+      `
       UPDATE doctor_applications SET clinic_id = $1 WHERE clinic_id IS NULL
-    `, [defaultClinicId]);
+    `,
+      [defaultClinicId],
+    );
     await queryRunner.query(`
       ALTER TABLE doctor_applications ALTER COLUMN clinic_id SET NOT NULL
     `);
@@ -189,9 +202,12 @@ export class MultiTenantClinicIdCoreEntities1746300000000
       FROM users u
       WHERE al.user_id = u.id AND al.clinic_id IS NULL
     `);
-    await queryRunner.query(`
+    await queryRunner.query(
+      `
       UPDATE audit_logs SET clinic_id = $1 WHERE clinic_id IS NULL
-    `, [defaultClinicId]);
+    `,
+      [defaultClinicId],
+    );
     await queryRunner.query(`
       ALTER TABLE audit_logs ALTER COLUMN clinic_id SET NOT NULL
     `);
@@ -216,9 +232,12 @@ export class MultiTenantClinicIdCoreEntities1746300000000
       FROM users u
       WHERE g.user_id = u.id AND g.clinic_id IS NULL
     `);
-    await queryRunner.query(`
+    await queryRunner.query(
+      `
       UPDATE gdpr_deletion_requests SET clinic_id = $1 WHERE clinic_id IS NULL
-    `, [defaultClinicId]);
+    `,
+      [defaultClinicId],
+    );
     await queryRunner.query(`
       ALTER TABLE gdpr_deletion_requests ALTER COLUMN clinic_id SET NOT NULL
     `);
@@ -247,9 +266,12 @@ export class MultiTenantClinicIdCoreEntities1746300000000
       FROM users u
       WHERE r.user_id = u.id AND r.clinic_id IS NULL
     `);
-    await queryRunner.query(`
+    await queryRunner.query(
+      `
       UPDATE refresh_tokens SET clinic_id = $1 WHERE clinic_id IS NULL
-    `, [defaultClinicId]);
+    `,
+      [defaultClinicId],
+    );
     await queryRunner.query(`
       ALTER TABLE refresh_tokens ALTER COLUMN clinic_id SET NOT NULL
     `);
@@ -283,9 +305,12 @@ export class MultiTenantClinicIdCoreEntities1746300000000
       ALTER TABLE daily_metrics
       ADD COLUMN IF NOT EXISTS clinic_id uuid
     `);
-    await queryRunner.query(`
+    await queryRunner.query(
+      `
       UPDATE daily_metrics SET clinic_id = $1 WHERE clinic_id IS NULL
-    `, [defaultClinicId]);
+    `,
+      [defaultClinicId],
+    );
     await queryRunner.query(`
       DROP INDEX IF EXISTS "UQ_daily_metrics_date"
     `);

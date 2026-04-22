@@ -1,6 +1,13 @@
 'use client';
 
-import React, { createContext, useContext, useMemo, useState, useEffect } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useMemo,
+  useState,
+  useEffect,
+} from 'react';
+import { apiFetch, getApiBase } from '../lib/api-client';
 
 export interface Clinic {
   id: number;
@@ -21,11 +28,6 @@ interface ClinicContextValue {
 
 const ClinicContext = createContext<ClinicContextValue | undefined>(undefined);
 
-const getApiBase = () =>
-  (typeof window !== 'undefined' && (window as any).__API_URL__) ||
-  process.env.NEXT_PUBLIC_API_URL ||
-  '';
-
 export function ClinicProvider({ children }: { children: React.ReactNode }) {
   const [clinic, setClinic] = useState<Clinic | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -33,18 +35,8 @@ export function ClinicProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const fetchClinic = async () => {
       try {
-        const token =
-          typeof window !== 'undefined'
-            ? localStorage.getItem('jwt') || localStorage.getItem('token')
-            : null;
-        if (!token) {
-          setClinic(null);
-          return;
-        }
         const base = getApiBase();
-        const res = await fetch(`${base}/api/clinics/me`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const res = await apiFetch(`${base}/api/clinics/me`);
         if (res.ok) {
           const json = await res.json();
           setClinic(json.data ?? json);

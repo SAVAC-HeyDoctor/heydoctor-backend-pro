@@ -3,28 +3,13 @@
  * Integración con el backend HeyDoctor.
  */
 
-const getAuthHeaders = () => {
-  if (typeof window === 'undefined') return {};
-  const token = localStorage.getItem('jwt') || localStorage.getItem('token');
-  return token ? { Authorization: `Bearer ${token}` } : {};
-};
-
-const getApiBase = () =>
-  (typeof window !== 'undefined' && (window as any).__API_URL__) ||
-  process.env.NEXT_PUBLIC_API_URL ||
-  '';
-
-const jsonHeaders = () => ({
-  ...getAuthHeaders(),
-  'Content-Type': 'application/json',
-});
+import { apiFetch, getApiBase, jsonHeaders } from './api-client';
 
 /** Copilot: sugerencias durante consulta activa */
 export async function fetchCopilotSuggestions(consultationId: number | string) {
   const base = getApiBase();
-  const res = await fetch(
+  const res = await apiFetch(
     `${base}/api/copilot/suggestions?consultationId=${consultationId}`,
-    { headers: getAuthHeaders() }
   );
   if (!res.ok) throw new Error('Failed to fetch copilot suggestions');
   return res.json();
@@ -33,7 +18,7 @@ export async function fetchCopilotSuggestions(consultationId: number | string) {
 /** CDSS: evaluación clínica completa */
 export async function evaluateCdss(symptoms: string[], context?: Record<string, unknown>) {
   const base = getApiBase();
-  const res = await fetch(`${base}/api/cdss/evaluate`, {
+  const res = await apiFetch(`${base}/api/cdss/evaluate`, {
     method: 'POST',
     headers: jsonHeaders(),
     body: JSON.stringify({ symptoms, context: context ?? {} }),
@@ -45,7 +30,7 @@ export async function evaluateCdss(symptoms: string[], context?: Record<string, 
 /** Predictive Medicine: riesgos y acciones preventivas */
 export async function fetchPredictiveRisk(symptoms: string[], context?: Record<string, unknown>) {
   const base = getApiBase();
-  const res = await fetch(`${base}/api/predictive-medicine/risk`, {
+  const res = await apiFetch(`${base}/api/predictive-medicine/risk`, {
     method: 'POST',
     headers: jsonHeaders(),
     body: JSON.stringify({ symptoms, context: context ?? {} }),
@@ -57,9 +42,8 @@ export async function fetchPredictiveRisk(symptoms: string[], context?: Record<s
 /** Clinical Intelligence: sugerencias basadas en datos históricos */
 export async function fetchClinicalSuggestions(symptoms: string) {
   const base = getApiBase();
-  const res = await fetch(
+  const res = await apiFetch(
     `${base}/api/clinical-intelligence/suggest?symptoms=${encodeURIComponent(symptoms)}`,
-    { headers: getAuthHeaders() }
   );
   if (!res.ok) throw new Error('Failed to fetch clinical suggestions');
   return res.json();
@@ -71,9 +55,8 @@ export async function searchMedical(
   type: 'patient' | 'doctor' | 'diagnostic' = 'patient'
 ) {
   const base = getApiBase();
-  const res = await fetch(
+  const res = await apiFetch(
     `${base}/api/search?q=${encodeURIComponent(query)}&type=${type}`,
-    { headers: getAuthHeaders() }
   );
   if (!res.ok) throw new Error('Failed to search');
   return res.json();
@@ -88,7 +71,7 @@ export async function generateClinicalNote(params: {
   messages?: Array<{ role: string; content: string }>;
 }) {
   const base = getApiBase();
-  const res = await fetch(`${base}/api/copilot/generate-clinical-note`, {
+  const res = await apiFetch(`${base}/api/copilot/generate-clinical-note`, {
     method: 'POST',
     headers: jsonHeaders(),
     body: JSON.stringify({
@@ -114,7 +97,7 @@ export async function createLabOrder(data: {
   appointment?: number;
 }) {
   const base = getApiBase();
-  const res = await fetch(`${base}/api/lab-orders`, {
+  const res = await apiFetch(`${base}/api/lab-orders`, {
     method: 'POST',
     headers: jsonHeaders(),
     body: JSON.stringify({ data }),
@@ -125,9 +108,7 @@ export async function createLabOrder(data: {
 
 export async function fetchLabOrdersByPatient(patientId: number | string) {
   const base = getApiBase();
-  const res = await fetch(`${base}/api/lab-orders/patient/${patientId}`, {
-    headers: getAuthHeaders(),
-  });
+  const res = await apiFetch(`${base}/api/lab-orders/patient/${patientId}`);
   if (!res.ok) throw new Error('Failed to fetch lab orders');
   return res.json();
 }
@@ -135,9 +116,7 @@ export async function fetchLabOrdersByPatient(patientId: number | string) {
 export async function suggestLabTests(diagnosis?: string) {
   const base = getApiBase();
   const q = diagnosis ? `?diagnosis=${encodeURIComponent(diagnosis)}` : '';
-  const res = await fetch(`${base}/api/lab-orders/suggest-tests${q}`, {
-    headers: getAuthHeaders(),
-  });
+  const res = await apiFetch(`${base}/api/lab-orders/suggest-tests${q}`);
   if (!res.ok) throw new Error('Failed to suggest lab tests');
   return res.json();
 }
@@ -152,7 +131,7 @@ export async function createPrescription(data: {
   appointment?: number;
 }) {
   const base = getApiBase();
-  const res = await fetch(`${base}/api/prescriptions`, {
+  const res = await apiFetch(`${base}/api/prescriptions`, {
     method: 'POST',
     headers: jsonHeaders(),
     body: JSON.stringify({ data }),
@@ -163,9 +142,7 @@ export async function createPrescription(data: {
 
 export async function fetchPrescriptionsByPatient(patientId: number | string) {
   const base = getApiBase();
-  const res = await fetch(`${base}/api/prescriptions/patient/${patientId}`, {
-    headers: getAuthHeaders(),
-  });
+  const res = await apiFetch(`${base}/api/prescriptions/patient/${patientId}`);
   if (!res.ok) throw new Error('Failed to fetch prescriptions');
   return res.json();
 }
@@ -173,9 +150,7 @@ export async function fetchPrescriptionsByPatient(patientId: number | string) {
 export async function suggestMedications(diagnosis?: string) {
   const base = getApiBase();
   const q = diagnosis ? `?diagnosis=${encodeURIComponent(diagnosis)}` : '';
-  const res = await fetch(`${base}/api/prescriptions/suggest-medications${q}`, {
-    headers: getAuthHeaders(),
-  });
+  const res = await apiFetch(`${base}/api/prescriptions/suggest-medications${q}`);
   if (!res.ok) throw new Error('Failed to suggest medications');
   return res.json();
 }
@@ -184,9 +159,7 @@ export async function suggestMedications(diagnosis?: string) {
 export async function fetchClinicalInsights(patientId: number | string, symptoms?: string[]) {
   const base = getApiBase();
   const q = symptoms?.length ? `?symptoms=${symptoms.map(encodeURIComponent).join(',')}` : '';
-  const res = await fetch(`${base}/api/clinical-insight/patient/${patientId}${q}`, {
-    headers: getAuthHeaders(),
-  });
+  const res = await apiFetch(`${base}/api/clinical-insight/patient/${patientId}${q}`);
   if (!res.ok) throw new Error('Failed to fetch clinical insights');
   return res.json();
 }
@@ -195,9 +168,7 @@ export async function fetchClinicalInsights(patientId: number | string, symptoms
 export async function fetchClinicalApps(clinicId?: number | null) {
   const base = getApiBase();
   const q = clinicId != null ? `?clinicId=${clinicId}` : '';
-  const res = await fetch(`${base}/api/clinical-apps${q}`, {
-    headers: getAuthHeaders(),
-  });
+  const res = await apiFetch(`${base}/api/clinical-apps${q}`);
   if (!res.ok) throw new Error('Failed to fetch clinical apps');
   return res.json();
 }

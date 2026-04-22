@@ -236,7 +236,10 @@ export class UsersService {
 
     if (dto.email !== undefined) {
       const normalized = dto.email.trim().toLowerCase();
-      const existing = await this.findByEmailAndClinic(normalized, user.clinicId);
+      const existing = await this.findByEmailAndClinic(
+        normalized,
+        user.clinicId,
+      );
       if (existing && existing.id !== userId) {
         this.logger.warn('Business rule violation', {
           reason: 'email already in use in clinic',

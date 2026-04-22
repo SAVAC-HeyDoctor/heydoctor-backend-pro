@@ -41,7 +41,11 @@ export class GdprDeletionRequest {
   @Column({ name: 'user_id', type: 'uuid' })
   userId: string;
 
-  @Column({ type: 'enum', enum: DeletionStatus, default: DeletionStatus.PENDING })
+  @Column({
+    type: 'enum',
+    enum: DeletionStatus,
+    default: DeletionStatus.PENDING,
+  })
   status: DeletionStatus;
 
   @Column({ name: 'confirmed_at', type: 'timestamptz', nullable: true })

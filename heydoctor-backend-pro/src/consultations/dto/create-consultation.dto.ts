@@ -1,4 +1,10 @@
-import { IsNotEmpty, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsString,
+  IsUUID,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
 
 export class CreateConsultationDto {
   @IsUUID('4')

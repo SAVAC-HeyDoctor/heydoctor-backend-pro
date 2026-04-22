@@ -95,7 +95,9 @@ export class AppointmentsService {
     return this.appointmentsRepository.save(entity);
   }
 
-  async confirmByToken(rawToken: string): Promise<AppointmentPublicActionResponse> {
+  async confirmByToken(
+    rawToken: string,
+  ): Promise<AppointmentPublicActionResponse> {
     if (!isUuidV4(rawToken)) {
       this.logger.warn('Invalid appointment confirmation attempt', {
         reason: 'malformed_token',
@@ -177,7 +179,9 @@ export class AppointmentsService {
     };
   }
 
-  async cancelByToken(rawToken: string): Promise<AppointmentPublicActionResponse> {
+  async cancelByToken(
+    rawToken: string,
+  ): Promise<AppointmentPublicActionResponse> {
     if (!isUuidV4(rawToken)) {
       this.logger.warn('Invalid appointment confirmation attempt', {
         reason: 'malformed_token_cancel',

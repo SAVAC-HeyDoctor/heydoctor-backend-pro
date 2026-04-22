@@ -21,7 +21,9 @@ export class RolesGuard implements CanActivate {
     if (!required?.length) {
       return true;
     }
-    const request = context.switchToHttp().getRequest<{ user?: AuthenticatedUser }>();
+    const request = context
+      .switchToHttp()
+      .getRequest<{ user?: AuthenticatedUser }>();
     const user = request.user;
     if (!user || !required.includes(user.role)) {
       throw new ForbiddenException('Insufficient permissions');

@@ -69,23 +69,39 @@ async function bootstrap() {
 
   // Orígenes con credenciales: si CORS_ORIGIN está vacío, incluir Vercel + FRONTEND_URL.
   const corsOrigins = resolveCorsOrigins(envConfig);
-  bootstrapLogger.log(`CORS allowed origins (${corsOrigins.length}): ${corsOrigins.join(', ')}`);
+  bootstrapLogger.log(
+    `CORS allowed origins (${corsOrigins.length}): ${corsOrigins.join(', ')}`,
+  );
 
   app.enableCors({
     origin: corsOrigins,
     credentials: true,
     methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Cookie', 'X-Requested-With'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'Cookie',
+      'X-Requested-With',
+    ],
     exposedHeaders: ['Set-Cookie'],
   });
 
-  app.use((_req: unknown, res: { setHeader: (k: string, v: string) => void }, next: () => void) => {
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('X-Frame-Options', 'DENY');
-    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-    res.setHeader('Permissions-Policy', 'camera=(self), microphone=(self), geolocation=()');
-    next();
-  });
+  app.use(
+    (
+      _req: unknown,
+      res: { setHeader: (k: string, v: string) => void },
+      next: () => void,
+    ) => {
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('X-Frame-Options', 'DENY');
+      res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+      res.setHeader(
+        'Permissions-Policy',
+        'camera=(self), microphone=(self), geolocation=()',
+      );
+      next();
+    },
+  );
 
   app.useGlobalPipes(
     new ValidationPipe({

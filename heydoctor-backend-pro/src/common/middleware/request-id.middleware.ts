@@ -7,8 +7,7 @@ const REQUEST_ID_MAX = 128;
 const REQUEST_ID_MIN = 8;
 
 function pickRequestId(req: Request): string {
-  const raw =
-    req.headers['x-request-id'] ?? req.headers['x-correlation-id'];
+  const raw = req.headers['x-request-id'] ?? req.headers['x-correlation-id'];
   const header = Array.isArray(raw) ? raw[0] : raw;
   if (typeof header !== 'string') {
     return randomUUID();
@@ -29,9 +28,10 @@ function pickRequestId(req: Request): string {
  * Use as Express middleware: `app.use(new RequestIdMiddleware().use)`.
  */
 export class RequestIdMiddleware {
-  use = (req: Request, _res: Response, next: NextFunction): void => {
+  use = (req: Request, res: Response, next: NextFunction): void => {
     const requestId = pickRequestId(req);
     req.requestId = requestId;
+    res.setHeader('X-Request-Id', requestId);
     enterRequestContext(requestId);
     next();
   };

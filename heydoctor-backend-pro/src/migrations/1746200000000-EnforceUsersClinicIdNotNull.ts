@@ -10,9 +10,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * Si tras el UPDATE quedan filas con NULL (p. ej. mismo email en varios usuarios
  * huérfanos y una sola clínica), la migración falla: revisar datos o crear clínicas.
  */
-export class EnforceUsersClinicIdNotNull1746200000000
-  implements MigrationInterface
-{
+export class EnforceUsersClinicIdNotNull1746200000000 implements MigrationInterface {
   name = 'EnforceUsersClinicIdNotNull1746200000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {

@@ -55,7 +55,12 @@ export class GdprService {
   async exportUserData(userId: string): Promise<{
     user: { id: string; email: string; role: string; createdAt: Date };
     consents: Array<{ version: string; consentGivenAt: Date; createdAt: Date }>;
-    patients: Array<{ id: string; name: string; email: string; createdAt: Date }>;
+    patients: Array<{
+      id: string;
+      name: string;
+      email: string;
+      createdAt: Date;
+    }>;
     consultationsCount: number;
     exportedAt: string;
     format: string;
@@ -240,8 +245,7 @@ export class GdprService {
         });
       } catch (err) {
         request.status = DeletionStatus.FAILED;
-        request.errorDetail =
-          err instanceof Error ? err.message : String(err);
+        request.errorDetail = err instanceof Error ? err.message : String(err);
         await this.deletionRepo.save(request);
 
         this.logger.error(
@@ -322,24 +326,24 @@ export class GdprService {
     }
     if (consultations.length > 0) {
       fields['consultations'] = [
-        'reason', 'diagnosis', 'treatment', 'notes',
-        'ai_summary', 'ai_improved_notes', 'ai_suggested_diagnosis',
-        'doctor_signature', 'patient_signature',
+        'reason',
+        'diagnosis',
+        'treatment',
+        'notes',
+        'ai_summary',
+        'ai_improved_notes',
+        'ai_suggested_diagnosis',
+        'doctor_signature',
+        'patient_signature',
       ];
     }
 
     // 4. Revoke all refresh tokens
-    await this.refreshTokensRepo.update(
-      { userId },
-      { revokedAt: new Date() },
-    );
+    await this.refreshTokensRepo.update({ userId }, { revokedAt: new Date() });
     fields['refresh_tokens'] = ['revoked_at (all revoked)'];
 
     // 5. Clear PII from consent records (preserve consent fact + version)
-    await this.consentsRepo.update(
-      { userId },
-      { ip: null, userAgent: null },
-    );
+    await this.consentsRepo.update({ userId }, { ip: null, userAgent: null });
     fields['telemedicine_consents'] = ['ip', 'user_agent'];
 
     return { anonymizedFields: fields };
@@ -357,7 +361,12 @@ export class GdprService {
       order: { createdAt: 'DESC' },
     });
     if (!latest) {
-      return { status: 'none', requestId: null, createdAt: null, processedAt: null };
+      return {
+        status: 'none',
+        requestId: null,
+        createdAt: null,
+        processedAt: null,
+      };
     }
     return {
       status: latest.status,

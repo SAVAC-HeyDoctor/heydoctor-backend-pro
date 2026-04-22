@@ -9,10 +9,7 @@ import type { Request, Response } from 'express';
 import { catchError, Observable, tap, throwError } from 'rxjs';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import { AuthorizationService } from '../authorization/authorization.service';
-import {
-  normalizeAuditPath,
-  resolveAuditAction,
-} from './audit-action-map';
+import { normalizeAuditPath, resolveAuditAction } from './audit-action-map';
 import { AuditService } from './audit.service';
 
 type RequestWithUser = Request & { user?: AuthenticatedUser };
@@ -122,7 +119,8 @@ export class AuditInterceptor implements NestInterceptor {
   ): Promise<void> {
     const userId = req.user?.sub ?? null;
     const clinicId = await this.resolveClinicId(req.user);
-    const httpStatus = res.statusCode && res.statusCode > 0 ? res.statusCode : 200;
+    const httpStatus =
+      res.statusCode && res.statusCode > 0 ? res.statusCode : 200;
 
     await this.auditService.logSuccess({
       userId,
@@ -158,7 +156,9 @@ export class AuditInterceptor implements NestInterceptor {
         errorMessage = body;
       } else if (body && typeof body === 'object' && 'message' in body) {
         const msg = (body as { message?: string | string[] }).message;
-        errorMessage = Array.isArray(msg) ? msg.join('; ') : String(msg ?? err.message);
+        errorMessage = Array.isArray(msg)
+          ? msg.join('; ')
+          : String(msg ?? err.message);
       } else {
         errorMessage = err.message;
       }

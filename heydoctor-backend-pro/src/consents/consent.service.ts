@@ -144,8 +144,7 @@ export class ConsentService {
     } catch (e) {
       if (
         e instanceof QueryFailedError &&
-        (e as { driverError?: { code?: string } }).driverError?.code ===
-          '23505'
+        (e as { driverError?: { code?: string } }).driverError?.code === '23505'
       ) {
         const again = await this.consentsRepository.findOne({
           where: { userId: user.id, version },

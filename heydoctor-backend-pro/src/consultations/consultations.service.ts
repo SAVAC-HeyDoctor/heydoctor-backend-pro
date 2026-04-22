@@ -73,7 +73,9 @@ export class ConsultationsService {
    * Precio fijo desde env (o 15000). No usa Payku; nunca lanza por fallos externos.
    */
   getConsultationPrice(): ConsultationPriceResponse {
-    const raw = this.configService.get<string>('CONSULTATION_PAYMENT_AMOUNT_CLP');
+    const raw = this.configService.get<string>(
+      'CONSULTATION_PAYMENT_AMOUNT_CLP',
+    );
     const parsed = raw !== undefined && raw !== '' ? Number(raw) : NaN;
     if (Number.isFinite(parsed) && parsed > 0) {
       return {
@@ -142,9 +144,7 @@ export class ConsultationsService {
     });
 
     if (!consent) {
-      throw new ForbiddenException(
-        'Consent required before consultation',
-      );
+      throw new ForbiddenException('Consent required before consultation');
     }
 
     const entity = this.consultationsRepository.create({
@@ -197,9 +197,7 @@ export class ConsultationsService {
           patientId: dto.patientId,
         },
       );
-      throw new BadRequestException(
-        `Could not create consultation: ${detail}`,
-      );
+      throw new BadRequestException(`Could not create consultation: ${detail}`);
     }
 
     void this.auditService.logSuccess({
@@ -330,8 +328,8 @@ export class ConsultationsService {
       filters?.limit !== undefined || filters?.offset !== undefined;
     if (hasPagination) {
       const { limit, offset } = clampListPagination(
-        filters!.limit,
-        filters!.offset,
+        filters.limit,
+        filters.offset,
       );
       qb.skip(offset).take(limit);
     }
@@ -481,7 +479,9 @@ export class ConsultationsService {
       throw new ForbiddenException('Only doctor can sign first');
     }
     if (consultation.doctorId !== authUser.sub) {
-      throw new ForbiddenException('Only assigned doctor can sign consultation');
+      throw new ForbiddenException(
+        'Only assigned doctor can sign consultation',
+      );
     }
     if (consultation.doctorSignature) {
       throw new ForbiddenException('Doctor signature already set');
@@ -556,7 +556,9 @@ export class ConsultationsService {
     );
 
     if (consultation.status === ConsultationStatus.LOCKED) {
-      throw new ForbiddenException('Consultation is locked and cannot be modified');
+      throw new ForbiddenException(
+        'Consultation is locked and cannot be modified',
+      );
     }
 
     const previousStatus =
@@ -564,11 +566,7 @@ export class ConsultationsService {
 
     if (dto.status !== undefined) {
       assertClinicalStatusTransition(consultation.status, dto.status);
-      assertRoleForTransition(
-        authUser.role,
-        consultation.status,
-        dto.status,
-      );
+      assertRoleForTransition(authUser.role, consultation.status, dto.status);
     }
 
     const prevNotes = consultation.notes;
@@ -613,6 +611,21 @@ export class ConsultationsService {
           ].filter(Boolean),
         },
       });
+
+      if (saved.diagnosis !== prevDiagnosis) {
+        void this.auditService.logSuccess({
+          userId: authUser.sub,
+          action: 'DIAGNOSIS_UPDATED',
+          resource: 'consultation',
+          resourceId: saved.id,
+          clinicId: saved.clinicId ?? clinicId,
+          httpStatus: 200,
+          metadata: {
+            previousLength: prevDiagnosis?.length ?? 0,
+            newLength: saved.diagnosis?.length ?? 0,
+          },
+        });
+      }
     }
 
     if (
@@ -659,9 +672,28 @@ export class ConsultationsService {
           },
         );
         this.logger.log('AI summary generated', {
+          event: 'AI_SUMMARY_GENERATED',
           consultationId: consultation.id,
           patientId: consultation.patientId,
           clinicId: consultation.clinicId,
+          requestId: getCurrentRequestId(),
+          summaryChars: result.summary?.length ?? 0,
+        });
+        void this.auditService.logSuccess({
+          userId: consultation.doctorId,
+          action: 'AI_SUMMARY_GENERATED',
+          resource: 'consultation',
+          resourceId: consultation.id,
+          clinicId: consultation.clinicId ?? null,
+          httpStatus: 200,
+          metadata: {
+            summaryChars: result.summary?.length ?? 0,
+            suggestedDiagnosisKeys:
+              result.suggestedDiagnosis != null &&
+              typeof result.suggestedDiagnosis === 'object'
+                ? Object.keys(result.suggestedDiagnosis as object).length
+                : 0,
+          },
         });
       } catch (err) {
         this.logger.error(
@@ -693,7 +725,9 @@ export class ConsultationsService {
     );
 
     if (consultation.status === ConsultationStatus.LOCKED) {
-      throw new ForbiddenException('Consultation is locked and cannot be deleted');
+      throw new ForbiddenException(
+        'Consultation is locked and cannot be deleted',
+      );
     }
 
     const snapshot = { ...consultation };

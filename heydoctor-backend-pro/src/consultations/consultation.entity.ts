@@ -52,7 +52,12 @@ export class Consultation {
    * Copia inmutable de los datos del consentimiento en el momento de crear la consulta.
    * Permite prueba legal aunque el registro en `telemedicine_consents` cambie o el FK quede en null.
    */
-  @Column({ name: 'consent_version', type: 'varchar', length: 32, nullable: true })
+  @Column({
+    name: 'consent_version',
+    type: 'varchar',
+    length: 32,
+    nullable: true,
+  })
   consentVersion: string | null;
 
   @Column({ name: 'consent_given_at', type: 'timestamptz', nullable: true })

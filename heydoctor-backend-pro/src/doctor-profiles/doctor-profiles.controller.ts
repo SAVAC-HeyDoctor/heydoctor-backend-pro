@@ -1,11 +1,4 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Param,
-  Post,
-  UseGuards,
-} from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Public } from '../auth/decorators/public.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -32,9 +25,9 @@ export class DoctorProfilesController {
   @Public()
   @Get(':slug/ratings')
   getRatings(@Param('slug') slug: string) {
-    return this.service.findBySlug(slug).then((p) =>
-      this.service.getRatings(p.id),
-    );
+    return this.service
+      .findBySlug(slug)
+      .then((p) => this.service.getRatings(p.id));
   }
 
   @Post(':slug/ratings')

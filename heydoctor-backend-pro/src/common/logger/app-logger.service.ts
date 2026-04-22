@@ -37,8 +37,7 @@ export class AppLoggerService implements LoggerService {
   }
 
   private formatMessage(message: unknown): string {
-    const text =
-      typeof message === 'string' ? message : String(message ?? '');
+    const text = typeof message === 'string' ? message : String(message ?? '');
     const requestId = getCurrentRequestId();
     if (requestId) {
       return `[requestId=${requestId}] ${text}`;
@@ -107,23 +106,14 @@ export class AppLoggerService implements LoggerService {
     this.nestLogger.log(this.formatMessage(message), String(second));
   }
 
-  error(
-    message: any,
-    trace?: string,
-    context?: string,
-  ): void;
-  error(
-    message: any,
-    err: Error,
-    meta?: Record<string, unknown>,
-  ): void;
+  error(message: any, trace?: string, context?: string): void;
+  error(message: any, err: Error, meta?: Record<string, unknown>): void;
   error(
     message: any,
     second?: string | Error,
     third?: string | Record<string, unknown>,
   ): void {
-    const text =
-      typeof message === 'string' ? message : String(message ?? '');
+    const text = typeof message === 'string' ? message : String(message ?? '');
 
     if (second instanceof Error) {
       const stack = second.stack ?? second.message;

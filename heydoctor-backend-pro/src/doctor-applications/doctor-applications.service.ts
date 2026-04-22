@@ -9,7 +9,10 @@ import { Repository } from 'typeorm';
 import { AuditService } from '../audit/audit.service';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import { AuthorizationService } from '../authorization/authorization.service';
-import { assignClinic, assertClinicIdForSave } from '../common/entity-clinic.util';
+import {
+  assignClinic,
+  assertClinicIdForSave,
+} from '../common/entity-clinic.util';
 import { ClinicService } from '../clinic/clinic.service';
 import {
   ApplicationStatus,
@@ -33,7 +36,9 @@ export class DoctorApplicationsService {
       where: { email: dto.email.toLowerCase() },
     });
     if (existing) {
-      throw new ConflictException('An application for this email already exists');
+      throw new ConflictException(
+        'An application for this email already exists',
+      );
     }
 
     const rawClinicId = await this.clinicService.getOldestClinicId();
@@ -71,9 +76,7 @@ export class DoctorApplicationsService {
   ): Promise<DoctorApplication[]> {
     const { clinicId } =
       await this.authorizationService.getUserWithClinic(authUser);
-    const where = status
-      ? { clinicId, status }
-      : { clinicId };
+    const where = status ? { clinicId, status } : { clinicId };
     return this.repo.find({ where, order: { createdAt: 'DESC' } });
   }
 

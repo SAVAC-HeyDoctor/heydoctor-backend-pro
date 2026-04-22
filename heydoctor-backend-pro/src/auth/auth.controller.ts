@@ -29,37 +29,42 @@ import type { AuthenticatedUser } from './strategies/jwt.strategy';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import {
+  ACCESS_TOKEN_COOKIE,
+  ACCESS_TOKEN_MAX_AGE_MS,
+  REFRESH_TOKEN_COOKIE,
+  REFRESH_TOKEN_MAX_AGE_MS,
+  authCookieBase,
+} from './auth-cookies';
 
-const REFRESH_TOKEN_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
-const REFRESH_COOKIE = 'refresh_token';
+const AUTH_COOKIE_PATH = '/api/auth';
+const ACCESS_COOKIE_PATH = '/';
 
-function cookieOptions(
-  isProduction: boolean,
-): {
-  httpOnly: true;
-  secure: boolean;
-  sameSite: 'none' | 'lax';
-  path: string;
-} {
-  return {
-    httpOnly: true,
-    secure: isProduction,
-    sameSite: isProduction ? 'none' : 'lax',
-    path: '/api/auth',
-  };
+function setAccessCookie(res: Response, token: string): void {
+  res.cookie(ACCESS_TOKEN_COOKIE, token, {
+    ...authCookieBase(ACCESS_COOKIE_PATH),
+    maxAge: ACCESS_TOKEN_MAX_AGE_MS,
+  });
+}
+
+function clearAccessCookie(res: Response): void {
+  res.clearCookie(ACCESS_TOKEN_COOKIE, authCookieBase(ACCESS_COOKIE_PATH));
 }
 
 function setRefreshCookie(res: Response, token: string): void {
-  const isProd = process.env.NODE_ENV === 'production';
-  res.cookie(REFRESH_COOKIE, token, {
-    ...cookieOptions(isProd),
+  res.cookie(REFRESH_TOKEN_COOKIE, token, {
+    ...authCookieBase(AUTH_COOKIE_PATH),
     maxAge: REFRESH_TOKEN_MAX_AGE_MS,
   });
 }
 
 function clearRefreshCookie(res: Response): void {
-  const isProd = process.env.NODE_ENV === 'production';
-  res.clearCookie(REFRESH_COOKIE, cookieOptions(isProd));
+  res.clearCookie(REFRESH_TOKEN_COOKIE, authCookieBase(AUTH_COOKIE_PATH));
+}
+
+function readCookie(req: Request, name: string): string | undefined {
+  const v: unknown = req.cookies?.[name];
+  return typeof v === 'string' ? v : undefined;
 }
 
 function extractContext(req: Request): RequestContext {
@@ -68,8 +73,13 @@ function extractContext(req: Request): RequestContext {
     typeof forwarded === 'string'
       ? forwarded.split(',')[0].trim()
       : (req.ip ?? null);
+  const uaRaw = req.headers['user-agent'];
   const userAgent =
-    (req.headers['user-agent'] as string | undefined) ?? null;
+    typeof uaRaw === 'string'
+      ? uaRaw
+      : Array.isArray(uaRaw)
+        ? (uaRaw[0] ?? null)
+        : null;
   return { ip, userAgent };
 }
 
@@ -98,6 +108,7 @@ export class AuthController {
       requestId: getCurrentRequestId(),
       path: req.path,
       authHeaderPresent: Boolean(req.headers.authorization),
+      accessCookiePresent: readCookie(req, ACCESS_TOKEN_COOKIE) !== undefined,
     });
     return this.authService.getMe(user.sub);
   }
@@ -129,6 +140,7 @@ export class AuthController {
       ctx,
     );
     setRefreshCookie(res, refreshToken);
+    setAccessCookie(res, result.access_token);
     return { access_token: result.access_token, user: result.user };
   }
 
@@ -147,6 +159,7 @@ export class AuthController {
       ctx,
     );
     setRefreshCookie(res, refreshToken);
+    setAccessCookie(res, result.access_token);
     return { access_token: result.access_token, user: result.user };
   }
 
@@ -156,7 +169,7 @@ export class AuthController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const rawToken = req.cookies?.[REFRESH_COOKIE];
+    const rawToken = readCookie(req, REFRESH_TOKEN_COOKIE);
     if (!rawToken) {
       throw new UnauthorizedException('No refresh token');
     }
@@ -166,20 +179,19 @@ export class AuthController {
       await this.authService.validateAndRotateRefreshToken(rawToken, ctx);
 
     setRefreshCookie(res, newRefreshToken);
+    setAccessCookie(res, accessToken);
     return { access_token: accessToken };
   }
 
   @Public()
   @Post('logout')
-  async logout(
-    @Req() req: Request,
-    @Res({ passthrough: true }) res: Response,
-  ) {
-    const rawToken = req.cookies?.[REFRESH_COOKIE];
+  async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const rawToken = readCookie(req, REFRESH_TOKEN_COOKIE);
     if (rawToken) {
       await this.authService.revokeRefreshToken(rawToken);
     }
     clearRefreshCookie(res);
+    clearAccessCookie(res);
     return { ok: true };
   }
 }

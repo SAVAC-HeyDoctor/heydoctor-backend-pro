@@ -19,11 +19,7 @@ function stableStringify(obj: unknown): string {
   return '{' + pairs.join(',') + '}';
 }
 
-function verifyHmac(
-  body: unknown,
-  signature: string,
-  secret: string,
-): boolean {
+function verifyHmac(body: unknown, signature: string, secret: string): boolean {
   const payload = stableStringify(body);
   const expected = createHmac('sha256', secret).update(payload).digest('hex');
 
@@ -69,9 +65,7 @@ export function assertPaykuWebhookAuthenticated(
     logger.error(
       'Payku webhook rejected: no auth configured and unsafe local not allowed',
     );
-    throw new UnauthorizedException(
-      'Webhook authentication not configured',
-    );
+    throw new UnauthorizedException('Webhook authentication not configured');
   }
 
   if (hasSecretConfig) {
@@ -85,7 +79,7 @@ export function assertPaykuWebhookAuthenticated(
       );
     }
 
-    if (!verifyHmac(body, sig, webhookSecret!)) {
+    if (!verifyHmac(body, sig, webhookSecret)) {
       throw new UnauthorizedException('Invalid HMAC signature');
     }
   }
@@ -100,7 +94,7 @@ export function assertPaykuWebhookAuthenticated(
 
     const token = authHeader.slice(7);
     const tokenBuf = Buffer.from(token);
-    const expectedBuf = Buffer.from(webhookBearer!);
+    const expectedBuf = Buffer.from(webhookBearer);
 
     if (
       tokenBuf.length !== expectedBuf.length ||
@@ -111,9 +105,7 @@ export function assertPaykuWebhookAuthenticated(
   }
 }
 
-function firstHeader(
-  value: string | string[] | undefined,
-): string | undefined {
+function firstHeader(value: string | string[] | undefined): string | undefined {
   if (Array.isArray(value)) return value[0];
   return value;
 }

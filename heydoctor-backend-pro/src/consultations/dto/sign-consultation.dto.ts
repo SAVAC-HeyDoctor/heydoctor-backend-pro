@@ -7,9 +7,8 @@ export class SignConsultationDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(500_000)
-  @Matches(
-    /^(?:data:[\w/+.-]+;base64,)?[A-Za-z0-9+/=\r\n]+$/,
-    { message: 'signature must be valid base64 content' },
-  )
+  @Matches(/^(?:data:[\w/+.-]+;base64,)?[A-Za-z0-9+/=\r\n]+$/, {
+    message: 'signature must be valid base64 content',
+  })
   signature: string;
 }
