@@ -1,4 +1,13 @@
-import { Body, Controller, Headers, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Headers,
+  Post,
+  Req,
+  UseGuards,
+  type RawBodyRequest,
+} from '@nestjs/common';
+import type { Request } from 'express';
 import { Throttle } from '@nestjs/throttler';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Public } from '../auth/decorators/public.decorator';
@@ -24,6 +33,7 @@ export class PaykuController {
   @Post('webhook')
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
   async handleWebhook(
+    @Req() req: RawBodyRequest<Request>,
     @Headers() headers: Record<string, string | string[] | undefined>,
     @Body() body: Record<string, unknown>,
   ): Promise<{
@@ -32,6 +42,8 @@ export class PaykuController {
     paymentId?: string;
     duplicate?: boolean;
   }> {
-    return this.paykuService.handleWebhook(headers, body);
+    const raw =
+      req.rawBody && Buffer.isBuffer(req.rawBody) ? req.rawBody : undefined;
+    return this.paykuService.handleWebhook(headers, body, raw);
   }
 }

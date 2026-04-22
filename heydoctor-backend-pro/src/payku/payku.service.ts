@@ -252,6 +252,7 @@ export class PaykuService {
   async handleWebhook(
     headers: Record<string, string | string[] | undefined>,
     body: Record<string, unknown>,
+    rawBody?: Buffer,
   ): Promise<{
     ok: true;
     action: string;
@@ -259,7 +260,7 @@ export class PaykuService {
     duplicate?: boolean;
   }> {
     try {
-      assertPaykuWebhookAuthenticated(headers, body, this.authConfig);
+      assertPaykuWebhookAuthenticated(headers, body, this.authConfig, rawBody);
     } catch (err) {
       const msg =
         err instanceof UnauthorizedException

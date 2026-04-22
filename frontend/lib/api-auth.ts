@@ -18,9 +18,8 @@ export interface AuthUser {
   clinicId?: string | null;
 }
 
-/** Respuesta alineada con Nest: access_token + user. */
+/** Respuesta alineada con Nest: usuario en JSON; tokens solo en cookies HttpOnly. */
 export interface LoginResponse {
-  access_token: string;
   user: AuthUser;
 }
 
@@ -51,7 +50,7 @@ export async function logout(): Promise<void> {
   });
 }
 
-export async function refreshSession(): Promise<{ access_token: string }> {
+export async function refreshSession(): Promise<void> {
   const base = getApiBase();
   const res = await apiFetch(`${base}/api/auth/refresh`, {
     method: 'POST',
@@ -61,5 +60,4 @@ export async function refreshSession(): Promise<{ access_token: string }> {
   if (!res.ok) {
     throw await parseApiErrorResponse(res);
   }
-  return res.json() as Promise<{ access_token: string }>;
 }

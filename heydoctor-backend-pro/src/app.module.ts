@@ -44,6 +44,7 @@ import {
 } from './health/health.controller';
 import { WebrtcModule } from './webrtc/webrtc.module';
 import { HttpRequestLoggingInterceptor } from './common/interceptors/http-request-logging.interceptor';
+import { buildTypeOrmSslConfig } from './config/typeorm-ssl';
 
 const dbUrl = process.env.DATABASE_PUBLIC_URL || process.env.DATABASE_URL;
 
@@ -59,7 +60,7 @@ const dbUrl = process.env.DATABASE_PUBLIC_URL || process.env.DATABASE_URL;
     TypeOrmModule.forRoot({
       type: 'postgres',
       url: dbUrl,
-      ssl: { rejectUnauthorized: false },
+      ssl: buildTypeOrmSslConfig(dbUrl ?? ''),
       autoLoadEntities: true,
       synchronize: false,
       logging: process.env.NODE_ENV === 'production' ? false : true,

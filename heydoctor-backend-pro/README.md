@@ -46,6 +46,9 @@ npm run start:dev
 | `JWT_SECRET`   | Secreto para firmar tokens           |
 | `PORT`         | Puerto HTTP (default 3001)           |
 | `NODE_ENV`     | `production` desactiva `synchronize`   |
+| `REDIS_URL`    | **Obligatorio en producción**: rate limiting distribuido (Throttler) |
+| `DATABASE_SSL_CA` | Opcional en producción: PEM del CA si el proveedor Postgres lo requiere |
+| `ENABLE_PUBLIC_REGISTRATION` | `true` para permitir `POST /api/auth/register` en producción (por defecto deshabilitado) |
 | `CORS_ORIGIN`  | Opcional: lista separada por comas   |
 | `COOKIE_DOMAIN` | Opcional: dominio compartido para cookies de sesión (ej. `.heydoctor.health`). Mismo valor en front si comparten dominio padre. |
 

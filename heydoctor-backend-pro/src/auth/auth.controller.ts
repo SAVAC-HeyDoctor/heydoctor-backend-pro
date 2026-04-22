@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  ForbiddenException,
   Get,
   HttpCode,
   HttpStatus,
@@ -67,6 +68,13 @@ function readCookie(req: Request, name: string): string | undefined {
   return typeof v === 'string' ? v : undefined;
 }
 
+function isPublicRegistrationAllowed(): boolean {
+  if (process.env.NODE_ENV !== 'production') {
+    return true;
+  }
+  return process.env.ENABLE_PUBLIC_REGISTRATION === 'true';
+}
+
 function extractContext(req: Request): RequestContext {
   const forwarded = req.headers['x-forwarded-for'];
   const ip =
@@ -124,6 +132,10 @@ export class AuthController {
     return { ok: true };
   }
 
+  /**
+   * En `production`, solo si `ENABLE_PUBLIC_REGISTRATION=true`.
+   * Respuesta: `{ user }`; tokens únicamente vía Set-Cookie HttpOnly.
+   */
   @Public()
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
@@ -133,6 +145,9 @@ export class AuthController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
+    if (!isPublicRegistrationAllowed()) {
+      throw new ForbiddenException('Public registration is disabled');
+    }
     const ctx = extractContext(req);
     const result = await this.authService.register(dto);
     const refreshToken = await this.authService.createRefreshToken(
@@ -141,7 +156,7 @@ export class AuthController {
     );
     setRefreshCookie(res, refreshToken);
     setAccessCookie(res, result.access_token);
-    return { access_token: result.access_token, user: result.user };
+    return { user: result.user };
   }
 
   @Public()
@@ -160,7 +175,7 @@ export class AuthController {
     );
     setRefreshCookie(res, refreshToken);
     setAccessCookie(res, result.access_token);
-    return { access_token: result.access_token, user: result.user };
+    return { user: result.user };
   }
 
   @Public()
@@ -180,7 +195,7 @@ export class AuthController {
 
     setRefreshCookie(res, newRefreshToken);
     setAccessCookie(res, accessToken);
-    return { access_token: accessToken };
+    return { ok: true as const };
   }
 
   @Public()

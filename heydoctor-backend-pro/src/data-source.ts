@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import { config } from 'dotenv';
 import { join } from 'path';
 import { DataSource } from 'typeorm';
+import { buildTypeOrmSslConfig } from './config/typeorm-ssl';
 
 config({ path: ['.env.local', '.env'] });
 
@@ -13,15 +14,10 @@ if (!url) {
   );
 }
 
-const localDb =
-  url.includes('localhost') ||
-  url.includes('127.0.0.1') ||
-  url.includes('@host.docker.internal');
-
 export default new DataSource({
   type: 'postgres',
   url,
-  ssl: localDb ? false : { rejectUnauthorized: false },
+  ssl: buildTypeOrmSslConfig(url),
   entities: [join(__dirname, '**', '*.entity.{ts,js}')],
   migrations: [join(__dirname, 'migrations', '*.{ts,js}')],
   synchronize: false,

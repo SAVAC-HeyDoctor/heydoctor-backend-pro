@@ -7,6 +7,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { DataSource } from 'typeorm';
 import request from 'supertest';
 import { App } from 'supertest/types';
+import cookieParser from 'cookie-parser';
 import { AppModule } from '../src/app.module';
 import { Clinic } from '../src/clinic/clinic.entity';
 import {
@@ -19,6 +20,17 @@ import { UserRole } from '../src/users/user-role.enum';
 /** Requiere Postgres: `DATABASE_E2E=1 npm run test:e2e`. */
 const runIdorE2e = process.env.DATABASE_E2E === '1';
 
+function cookieHeaderFromSetCookie(
+  setCookie: string | string[] | undefined,
+): string {
+  if (!setCookie) return '';
+  const arr = Array.isArray(setCookie) ? setCookie : [setCookie];
+  return arr
+    .map((c) => c.split(';')[0].trim())
+    .filter(Boolean)
+    .join('; ');
+}
+
 (runIdorE2e ? describe : describe.skip)(
   'Security — multi-tenant IDOR (e2e)',
   () => {
@@ -27,9 +39,9 @@ const runIdorE2e = process.env.DATABASE_E2E === '1';
 
     let clinicAId: string;
     let clinicBId: string;
-    let tokenDoctorA: string;
-    let tokenDoctorB: string;
-    let tokenAdminA: string;
+    let cookieDoctorA: string;
+    let cookieDoctorB: string;
+    let cookieAdminA: string;
     let patientBId: string;
     let consultationBId: string;
     let applicationBId: string;
@@ -50,6 +62,7 @@ const runIdorE2e = process.env.DATABASE_E2E === '1';
       }).compile();
 
       app = moduleFixture.createNestApplication();
+      app.use(cookieParser());
       app.setGlobalPrefix('api', {
         exclude: [
           { path: '/', method: RequestMethod.GET },
@@ -117,28 +130,28 @@ const runIdorE2e = process.env.DATABASE_E2E === '1';
         .post('/api/auth/login')
         .send({ email: emailDocA, password })
         .expect(200);
-      tokenDoctorA = loginA.body.access_token as string;
+      cookieDoctorA = cookieHeaderFromSetCookie(loginA.headers['set-cookie']);
 
       const loginB = await request(server)
         .post('/api/auth/login')
         .send({ email: emailDocB, password })
         .expect(200);
-      tokenDoctorB = loginB.body.access_token as string;
+      cookieDoctorB = cookieHeaderFromSetCookie(loginB.headers['set-cookie']);
 
       const loginAdminA = await request(server)
         .post('/api/auth/login')
         .send({ email: emailAdminA, password })
         .expect(200);
-      tokenAdminA = loginAdminA.body.access_token as string;
+      cookieAdminA = cookieHeaderFromSetCookie(loginAdminA.headers['set-cookie']);
 
       await request(server)
         .post('/api/consents/telemedicine')
-        .set('Authorization', `Bearer ${tokenDoctorB}`)
+        .set('Cookie', cookieDoctorB)
         .expect(201);
 
       const patientRes = await request(server)
         .post('/api/patients')
-        .set('Authorization', `Bearer ${tokenDoctorB}`)
+        .set('Cookie', cookieDoctorB)
         .send({
           name: 'Patient B',
           email: `patient_b_${suffix}@e2e.test`,
@@ -148,7 +161,7 @@ const runIdorE2e = process.env.DATABASE_E2E === '1';
 
       const consRes = await request(server)
         .post('/api/consultations')
-        .set('Authorization', `Bearer ${tokenDoctorB}`)
+        .set('Cookie', cookieDoctorB)
         .send({
           patientId: patientBId,
           reason: 'E2E IDOR cross-clinic consultation in clinic B',
@@ -198,7 +211,7 @@ const runIdorE2e = process.env.DATABASE_E2E === '1';
     it('doctor A cannot create a consultation for patient in clinic B', async () => {
       await request(app.getHttpServer())
         .post('/api/consultations')
-        .set('Authorization', `Bearer ${tokenDoctorA}`)
+        .set('Cookie', cookieDoctorA)
         .send({
           patientId: patientBId,
           reason: 'cross-tenant attempt',
@@ -209,14 +222,14 @@ const runIdorE2e = process.env.DATABASE_E2E === '1';
     it('doctor A cannot read consultation from clinic B', async () => {
       await request(app.getHttpServer())
         .get(`/api/consultations/${consultationBId}`)
-        .set('Authorization', `Bearer ${tokenDoctorA}`)
+        .set('Cookie', cookieDoctorA)
         .expect(404);
     });
 
     it('doctor A cannot POST rating tied to consultation in clinic B', async () => {
       await request(app.getHttpServer())
         .post(`/api/doctors/${doctorSlugB}/ratings`)
-        .set('Authorization', `Bearer ${tokenDoctorA}`)
+        .set('Cookie', cookieDoctorA)
         .send({
           patientName: 'X',
           rating: 5,
@@ -228,7 +241,7 @@ const runIdorE2e = process.env.DATABASE_E2E === '1';
     it('admin in clinic A cannot read doctor application from clinic B', async () => {
       await request(app.getHttpServer())
         .get(`/api/doctor-applications/${applicationBId}`)
-        .set('Authorization', `Bearer ${tokenAdminA}`)
+        .set('Cookie', cookieAdminA)
         .expect(404);
     });
   },

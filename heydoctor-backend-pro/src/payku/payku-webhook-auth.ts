@@ -21,11 +21,25 @@ function stableStringify(obj: unknown): string {
 
 function verifyHmac(body: unknown, signature: string, secret: string): boolean {
   const payload = stableStringify(body);
-  const expected = createHmac('sha256', secret).update(payload).digest('hex');
+  const expected = createHmac('sha256', secret)
+    .update(payload, 'utf8')
+    .digest('hex');
+  return secureCompareHex(expected, signature);
+}
 
+/** HMAC sobre los bytes exactos del cuerpo (Payku y muchos PSP firman el raw body). */
+function verifyHmacRaw(
+  rawBody: Buffer,
+  signature: string,
+  secret: string,
+): boolean {
+  const expected = createHmac('sha256', secret).update(rawBody).digest('hex');
+  return secureCompareHex(expected, signature);
+}
+
+function secureCompareHex(expectedHex: string, signature: string): boolean {
   const sigBuf = Buffer.from(signature, 'hex');
-  const expBuf = Buffer.from(expected, 'hex');
-
+  const expBuf = Buffer.from(expectedHex, 'hex');
   if (sigBuf.length !== expBuf.length) return false;
   return timingSafeEqual(sigBuf, expBuf);
 }
@@ -44,11 +58,15 @@ export type PaykuWebhookAuthConfig = {
  * - If PAYKU_WEBHOOK_BEARER → verify Authorization: Bearer
  * - If both → both must pass
  * - If neither → reject, unless explicitly opted-in for local dev
+ *
+ * Firma HMAC: si `rawBody` está presente (Nest `rawBody: true`), se valida sobre el
+ * buffer exacto; si no, fallback a canonical JSON (`stableStringify(body)`).
  */
 export function assertPaykuWebhookAuthenticated(
   headers: Record<string, string | string[] | undefined>,
   body: unknown,
   config: PaykuWebhookAuthConfig,
+  rawBody?: Buffer,
 ): void {
   const { webhookSecret, webhookBearer, allowUnsafeLocal, nodeEnv } = config;
 
@@ -79,7 +97,11 @@ export function assertPaykuWebhookAuthenticated(
       );
     }
 
-    if (!verifyHmac(body, sig, webhookSecret)) {
+    const ok =
+      rawBody && rawBody.length > 0
+        ? verifyHmacRaw(rawBody, sig, webhookSecret)
+        : verifyHmac(body, sig, webhookSecret);
+    if (!ok) {
       throw new UnauthorizedException('Invalid HMAC signature');
     }
   }

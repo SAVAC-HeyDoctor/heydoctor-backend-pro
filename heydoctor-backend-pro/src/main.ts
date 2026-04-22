@@ -27,7 +27,13 @@ function resolveCorsOrigins(envConfig: EnvConfig): string[] {
 }
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  if (process.env.NODE_ENV === 'production' && !process.env.REDIS_URL?.trim()) {
+    throw new Error(
+      'REDIS_URL is required in production for distributed rate limiting',
+    );
+  }
+
+  const app = await NestFactory.create(AppModule, { rawBody: true });
 
   const server = app.getHttpAdapter().getInstance();
 
