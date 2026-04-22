@@ -7,7 +7,7 @@ import { AuthorizationService } from './authorization.service';
 
 @Module({
   imports: [
-    UsersModule,
+    forwardRef(() => UsersModule),
     forwardRef(() => DoctorProfilesModule),
     TypeOrmModule.forFeature([Patient]),
   ],

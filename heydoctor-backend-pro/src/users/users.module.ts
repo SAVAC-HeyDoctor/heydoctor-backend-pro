@@ -11,7 +11,7 @@ import { UsersService } from './users.service';
   imports: [
     TypeOrmModule.forFeature([User]),
     ClinicModule,
-    AuthorizationModule,
+    forwardRef(() => AuthorizationModule),
     forwardRef(() => AuthModule),
   ],
   controllers: [UsersController],

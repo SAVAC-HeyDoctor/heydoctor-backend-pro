@@ -1,7 +1,9 @@
 import {
   ForbiddenException,
+  Inject,
   Injectable,
   NotFoundException,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -20,6 +22,7 @@ export type UserWithClinicContext = {
 export class AuthorizationService {
   constructor(
     private readonly usersService: UsersService,
+    @Inject(forwardRef(() => DoctorProfilesService))
     private readonly doctorProfilesService: DoctorProfilesService,
     @InjectRepository(Patient)
     private readonly patientsRepository: Repository<Patient>,
