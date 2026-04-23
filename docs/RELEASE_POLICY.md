@@ -28,6 +28,16 @@ Pre-releases opcionales: `v1.2.0-rc.1` (solo si el equipo las usa de forma expl�
 3. **CI de release** genera el **GitHub Release** (changelog automático vía GitHub).
 4. **Deploy**: Railway (backend) y Vercel (frontend) siguen sus reglas actuales (p. ej. deploy desde `main` o desde tag, según configuración del panel — **no cambia** con esta polítia).
 
+## CI en GitHub (bloqueo de merge)
+
+El workflow [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) se ejecuta en **push** y **pull_request** hacia `main` (instala dependencias, lint, build, tests). Para **impedir merge si falla**:
+
+1. En el repo: **Settings → Branches → Add branch protection rule** (o editar la regla existente) para la rama `main`.
+2. Activar **Require status checks to pass before merging**.
+3. Añadir el check requerido **`CI / backend`** (nombre del job `backend` dentro del workflow `CI`).
+
+Sin este paso en GitHub, el workflow sigue corriendo pero no bloquea el botón de merge automáticamente.
+
 ## Repositorios
 
 | Proyecto | Repo | Deploy |

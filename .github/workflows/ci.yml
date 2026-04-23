@@ -1,10 +1,18 @@
+# Comprobaciones previas a merge/release: deps, lint, build, tests.
+# Bloqueo de merge: en GitHub → Settings → Branches → proteger `main`
+# y marcar como requerido el check "CI / backend".
+
 name: CI
 
 on:
   push:
-    branches: [main, master, develop]
+    branches: [main]
   pull_request:
-    branches: [main, master, develop]
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   backend:
@@ -31,7 +39,7 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Unit tests
+      - name: Test
         run: npm test
         env:
           JWT_SECRET: ci-jwt-secret-must-be-at-least-32-chars-long
