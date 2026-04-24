@@ -14,6 +14,7 @@ import {
 import type { Server, Socket } from 'socket.io';
 import type { JwtPayload } from '../auth/types/jwt-payload.interface';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
+import { ACCESS_TOKEN_COOKIE } from '../auth/auth-cookies';
 import { ConsultationsService } from '../consultations/consultations.service';
 import { RequirePlan } from '../subscriptions/decorators/require-plan.decorator';
 import { FeatureGuard } from '../subscriptions/guards/feature.guard';
@@ -201,6 +202,19 @@ export class WebrtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   private extractToken(client: Socket): string | null {
+    const rawCookie = client.handshake.headers.cookie;
+    if (typeof rawCookie === 'string' && rawCookie.length > 0) {
+      const esc = ACCESS_TOKEN_COOKIE.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const m = new RegExp(`(?:^|;\\s*)${esc}=([^;]*)`).exec(rawCookie);
+      const rawVal = m?.[1]?.trim();
+      if (rawVal) {
+        try {
+          return decodeURIComponent(rawVal);
+        } catch {
+          return rawVal;
+        }
+      }
+    }
     const auth = client.handshake.auth as { token?: string } | undefined;
     if (auth?.token && typeof auth.token === 'string') {
       return auth.token;
