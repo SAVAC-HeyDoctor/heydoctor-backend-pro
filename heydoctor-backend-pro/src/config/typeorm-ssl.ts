@@ -10,6 +10,9 @@
  * - `DATABASE_SSL_CA` (PEM): verificación estricta con esa CA.
  * - `DATABASE_SSL_REJECT_UNAUTHORIZED=false`: confiar sin verificar cadena (último recurso).
  * - `DATABASE_SSL_REJECT_UNAUTHORIZED=true`: forzar verificación estricta (requiere CA pública o `DATABASE_SSL_CA`).
+ *
+ * TEMPORAL: en producción sin `DATABASE_SSL_CA` (y sin `DATABASE_SSL_REJECT_UNAUTHORIZED=true`),
+ * se usa `rejectUnauthorized: false` para desbloquear Railway hasta montar la CA.
  */
 
 export type TypeOrmSslConfig =
@@ -82,7 +85,8 @@ export function buildTypeOrmSslConfig(databaseUrl: string): TypeOrmSslConfig {
     if (needsRailwayStyleTlsRelief(databaseUrl)) {
       return { rejectUnauthorized: false };
     }
-    return { rejectUnauthorized: true };
+    // TEMPORAL: mismo tratamiento que Railway — sin CA, Node rechaza la cadena del proxy.
+    return { rejectUnauthorized: false };
   }
 
   return { rejectUnauthorized: false };
