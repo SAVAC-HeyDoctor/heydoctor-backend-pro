@@ -14,6 +14,7 @@ import {
   UseGuards,
   type LoggerService,
 } from '@nestjs/common';
+import { CSRF_COOKIE } from '../common/csrf/csrf.constants';
 import { Throttle } from '@nestjs/throttler';
 import { getCurrentRequestId } from '../common/request-context.storage';
 import { APP_LOGGER } from '../common/logger/logger.tokens';
@@ -104,6 +105,25 @@ export class AuthController {
    * Diagnóstico deploy/routing: si este log NO aparece en Railway ante GET /api/auth/me,
    * la request no está llegando al controller (proxy, otra instancia o ruta distinta).
    */
+  /**
+   * SPA cross-origin (p. ej. Vercel → API): el JS no puede leer `csrf_token` del dominio del API.
+   * Devuelve el valor actual o crea cookie + token para enviarlo en `X-CSRF-Token` en POST/PATCH/DELETE.
+   */
+  @Public()
+  @Get('csrf')
+  @HttpCode(HttpStatus.OK)
+  csrfBootstrap(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const existing = readCookie(req, CSRF_COOKIE);
+    if (existing && existing.length >= 16) {
+      return { csrfToken: existing };
+    }
+    const csrfToken = setCsrfCookie(res);
+    return { csrfToken };
+  }
+
   @Get('me')
   @UseGuards(JwtAuthGuard)
   getMe(
@@ -135,7 +155,7 @@ export class AuthController {
 
   /**
    * En `production`, solo si `ENABLE_PUBLIC_REGISTRATION=true`.
-   * Respuesta: `{ user }`; tokens únicamente vía Set-Cookie HttpOnly.
+   * Respuesta: `{ user, csrfToken }`; tokens vía Set-Cookie HttpOnly; `csrfToken` para cabecera `X-CSRF-Token` en cross-origin.
    */
   @Public()
   @Post('register')
@@ -157,8 +177,8 @@ export class AuthController {
     );
     setRefreshCookie(res, refreshToken);
     setAccessCookie(res, result.access_token);
-    setCsrfCookie(res);
-    return { user: result.user };
+    const csrfToken = setCsrfCookie(res);
+    return { user: result.user, csrfToken };
   }
 
   @Public()
@@ -177,8 +197,8 @@ export class AuthController {
     );
     setRefreshCookie(res, refreshToken);
     setAccessCookie(res, result.access_token);
-    setCsrfCookie(res);
-    return { user: result.user };
+    const csrfToken = setCsrfCookie(res);
+    return { user: result.user, csrfToken };
   }
 
   @Public()
@@ -198,8 +218,8 @@ export class AuthController {
 
     setRefreshCookie(res, newRefreshToken);
     setAccessCookie(res, accessToken);
-    setCsrfCookie(res);
-    return { ok: true as const };
+    const csrfToken = setCsrfCookie(res);
+    return { ok: true as const, csrfToken };
   }
 
   @Public()
