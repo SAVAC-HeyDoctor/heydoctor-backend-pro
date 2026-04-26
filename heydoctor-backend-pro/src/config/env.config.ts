@@ -24,6 +24,8 @@ export class EnvConfig {
 
   // ── CORS ──
   readonly corsOrigin: string[];
+  /** Optional regex patterns matched against the request `Origin` (e.g. Vercel previews). */
+  readonly corsOriginRegex: RegExp[];
 
   // ── CACHE / REDIS (optional) ──
   readonly redisUrl: string | null;
@@ -65,6 +67,19 @@ export class EnvConfig {
       .split(',')
       .map((s) => s.trim())
       .filter(Boolean);
+
+    this.corsOriginRegex = (config.get<string>('CORS_ORIGIN_REGEX') ?? '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .map((pattern) => {
+        try {
+          return new RegExp(pattern);
+        } catch {
+          return null;
+        }
+      })
+      .filter((rx): rx is RegExp => rx !== null);
 
     const redisUrlRaw = config.get<string>('REDIS_URL')?.trim();
     this.redisUrl = redisUrlRaw && redisUrlRaw.length > 0 ? redisUrlRaw : null;
