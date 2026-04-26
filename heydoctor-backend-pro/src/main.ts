@@ -12,6 +12,18 @@ import type { Request, Response } from 'express';
 
 const bootstrapLogger = new Logger('Bootstrap');
 
+/**
+ * Default Vercel preview pattern. Matches both production aliases
+ * (`heydoctor-frontend.vercel.app`) and per-deployment previews
+ * (`heydoctor-frontend-pp8e1923p-heydoctors-projects.vercel.app`,
+ * `heydoctor-frontend-git-feature-x-heydoctors-projects.vercel.app`, ...).
+ *
+ * Without this pattern every preview URL would fail CORS preflight, since
+ * the Vercel project assigns a fresh hostname per commit.
+ */
+const VERCEL_PREVIEW_PATTERN =
+  /^https:\/\/heydoctor-frontend(?:-[a-z0-9-]+)?(?:-heydoctors-projects)?\.vercel\.app$/i;
+
 /** Orígenes permitidos cuando CORS_ORIGIN no está definido (p. ej. Railway sin variable). */
 function resolveCorsOrigins(envConfig: EnvConfig): string[] {
   if (envConfig.corsOrigin.length > 0) {
@@ -21,9 +33,48 @@ function resolveCorsOrigins(envConfig: EnvConfig): string[] {
     'http://localhost:3000',
     'https://heydoctor-frontend.vercel.app',
     'https://heydoctor.vercel.app',
+    'https://app.heydoctor.health',
     envConfig.frontendUrl,
   ];
   return [...new Set(fallbacks.filter(Boolean))];
+}
+
+/**
+ * Builds a {@link import('cors').CorsOptions} `origin` callback that admits:
+ *   - same-origin / non-browser requests (no Origin header).
+ *   - exact matches in the allow-list (CORS_ORIGIN env or fallbacks).
+ *   - operator-supplied regex patterns (CORS_ORIGIN_REGEX env, csv).
+ *   - Vercel preview URLs of the heydoctor-frontend project.
+ *
+ * Anything else is rejected so credentials never leak to a third-party origin.
+ */
+function buildCorsOriginCallback(
+  allowList: string[],
+  regexList: RegExp[],
+  logger: Logger,
+): (
+  origin: string | undefined,
+  cb: (err: Error | null, allow?: boolean) => void,
+) => void {
+  const exact = new Set(allowList);
+  const patterns: RegExp[] = [...regexList, VERCEL_PREVIEW_PATTERN];
+
+  return (origin, cb) => {
+    if (!origin) {
+      cb(null, true);
+      return;
+    }
+    if (exact.has(origin)) {
+      cb(null, true);
+      return;
+    }
+    if (patterns.some((rx) => rx.test(origin))) {
+      cb(null, true);
+      return;
+    }
+    logger.warn(`CORS rejected origin: ${origin}`);
+    cb(new Error(`Origin not allowed by CORS: ${origin}`));
+  };
 }
 
 async function bootstrap() {
@@ -75,12 +126,16 @@ async function bootstrap() {
 
   // Orígenes con credenciales: si CORS_ORIGIN está vacío, incluir Vercel + FRONTEND_URL.
   const corsOrigins = resolveCorsOrigins(envConfig);
+  const corsRegex = envConfig.corsOriginRegex;
   bootstrapLogger.log(
-    `CORS allowed origins (${corsOrigins.length}): ${corsOrigins.join(', ')}`,
+    `CORS allowed origins (${corsOrigins.length}): ${corsOrigins.join(', ')}` +
+      (corsRegex.length > 0
+        ? ` | regex: ${corsRegex.map((r) => r.source).join(', ')}`
+        : ''),
   );
 
   app.enableCors({
-    origin: corsOrigins,
+    origin: buildCorsOriginCallback(corsOrigins, corsRegex, bootstrapLogger),
     credentials: true,
     methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
     allowedHeaders: [
