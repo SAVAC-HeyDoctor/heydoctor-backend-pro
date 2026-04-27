@@ -6,18 +6,31 @@ import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import { RequirePlan } from '../subscriptions/decorators/require-plan.decorator';
 import { FeatureGuard } from '../subscriptions/guards/feature.guard';
 import { SubscriptionPlan } from '../subscriptions/subscription.entity';
-import type { ClinicalSummaryResult } from './ai.types';
+import type { ClinicalSummaryResult, ConsultationAssistResult } from './ai.types';
 import { AiService } from './ai.service';
+import { ConsultationAssistDto } from './dto/consultation-assist.dto';
 import { ConsultationSummaryQueryDto } from './dto/consultation-summary-query.dto';
 
 @Throttle({ default: { limit: 10, ttl: 60_000 } })
 @Controller('ai')
 @UseGuards(JwtAuthGuard, FeatureGuard)
-@RequirePlan(SubscriptionPlan.PRO)
 export class AiController {
   constructor(private readonly aiService: AiService) {}
 
+  /**
+   * Asistencia clínica libre (motivo / síntomas / notas). Sin requisito PRO
+   * para que el panel funcione sin bloqueo de suscripción.
+   */
+  @Post('consultation-assist')
+  consultationAssist(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: ConsultationAssistDto,
+  ): Promise<ConsultationAssistResult> {
+    return this.aiService.generateConsultationAssist(dto, user);
+  }
+
   @Post('consultation-summary')
+  @RequirePlan(SubscriptionPlan.PRO)
   consultationSummary(
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: ConsultationSummaryQueryDto,

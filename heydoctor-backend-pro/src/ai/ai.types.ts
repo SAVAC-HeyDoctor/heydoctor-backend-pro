@@ -4,3 +4,11 @@ export type ClinicalSummaryResult = {
   suggestedDiagnosis: string[];
   improvedNotes: string;
 };
+
+/** Asistencia clínica libre (motivo / síntomas / notas), sin persistir. */
+export type ConsultationAssistResult = {
+  assistiveOnlyNotice: string;
+  possibleDiagnoses: string[];
+  recommendations: string[];
+  generalEducation: string[];
+};
