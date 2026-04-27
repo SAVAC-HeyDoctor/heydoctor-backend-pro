@@ -33,6 +33,7 @@ import { LegalModule } from './legal/legal.module';
 import { MetricsModule } from './metrics/metrics.module';
 import { PaykuModule } from './payku/payku.module';
 import { PatientsModule } from './patients/patients.module';
+import { PublicModule } from './public/public.module';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { UsersModule } from './users/users.module';
 import { DoctorApplicationsModule } from './doctor-applications/doctor-applications.module';
@@ -108,6 +109,7 @@ const dbUrl = process.env.DATABASE_PUBLIC_URL || process.env.DATABASE_URL;
     DoctorProfilesModule,
     GdprModule,
     WebrtcModule,
+    PublicModule,
   ],
   controllers: [AppController, HealthController, HealthApiController],
   providers: [
