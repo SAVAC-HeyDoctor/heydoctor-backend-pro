@@ -6,7 +6,10 @@ import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import { RequirePlan } from '../subscriptions/decorators/require-plan.decorator';
 import { FeatureGuard } from '../subscriptions/guards/feature.guard';
 import { SubscriptionPlan } from '../subscriptions/subscription.entity';
-import type { ClinicalSummaryResult, ConsultationAssistResult } from './ai.types';
+import type {
+  ClinicalSummaryResult,
+  ConsultationAssistResult,
+} from './ai.types';
 import { AiService } from './ai.service';
 import { ConsultationAssistDto } from './dto/consultation-assist.dto';
 import { ConsultationSummaryQueryDto } from './dto/consultation-summary-query.dto';

@@ -13,7 +13,10 @@ import { AuthorizationService } from '../authorization/authorization.service';
 import { Consultation } from '../consultations/consultation.entity';
 import type { GenerateAiDto } from './dto/generate-ai.dto';
 import type { ConsultationAssistDto } from './dto/consultation-assist.dto';
-import type { ClinicalSummaryResult, ConsultationAssistResult } from './ai.types';
+import type {
+  ClinicalSummaryResult,
+  ConsultationAssistResult,
+} from './ai.types';
 
 @Injectable()
 export class AiService {
