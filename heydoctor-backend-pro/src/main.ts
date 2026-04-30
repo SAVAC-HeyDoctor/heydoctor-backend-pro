@@ -13,16 +13,11 @@ import type { Request, Response } from 'express';
 const bootstrapLogger = new Logger('Bootstrap');
 
 /**
- * Default Vercel preview pattern. Matches both production aliases
- * (`heydoctor-frontend.vercel.app`) and per-deployment previews
- * (`heydoctor-frontend-pp8e1923p-heydoctors-projects.vercel.app`,
- * `heydoctor-frontend-git-feature-x-heydoctors-projects.vercel.app`, ...).
- *
- * Without this pattern every preview URL would fail CORS preflight, since
- * the Vercel project assigns a fresh hostname per commit.
+ * Previews y alias Vercel del proyecto `heydoctor-frontend` (slug variable por team).
+ * Ej.: `…-heydoctors-projects.vercel.app`, `…-savac-hey-doctor.vercel.app`, etc.
  */
 const VERCEL_PREVIEW_PATTERN =
-  /^https:\/\/heydoctor-frontend(?:-[a-z0-9-]+)?(?:-heydoctors-projects)?\.vercel\.app$/i;
+  /^https:\/\/heydoctor-frontend[a-z0-9.-]*\.vercel\.app$/i;
 
 /** Orígenes permitidos cuando CORS_ORIGIN no está definido (p. ej. Railway sin variable). */
 function resolveCorsOrigins(envConfig: EnvConfig): string[] {

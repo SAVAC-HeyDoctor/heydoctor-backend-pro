@@ -1,17 +1,18 @@
 import { randomBytes } from 'crypto';
 import type { CookieOptions, Response } from 'express';
-import { resolveCookieDomain } from '../../auth/auth-cookies';
+import {
+  resolveCookieDomain,
+  sessionCookieSameSitePolicy,
+} from '../../auth/auth-cookies';
 import { CSRF_COOKIE } from './csrf.constants';
 
 const CSRF_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 export function csrfCookieOptions(): CookieOptions {
-  const isProd = process.env.NODE_ENV === 'production';
   const domain = resolveCookieDomain();
   return {
     httpOnly: false,
-    secure: isProd,
-    sameSite: isProd ? 'none' : 'lax',
+    ...sessionCookieSameSitePolicy(),
     path: '/',
     maxAge: CSRF_MAX_AGE_MS,
     ...(domain ? { domain } : {}),
