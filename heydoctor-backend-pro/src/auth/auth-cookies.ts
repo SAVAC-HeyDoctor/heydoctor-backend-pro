@@ -10,47 +10,55 @@ export const ACCESS_TOKEN_MAX_AGE_MS = 15 * 60 * 1000;
 
 export const REFRESH_TOKEN_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
-const isProduction = process.env.NODE_ENV === 'production';
-
-const isRailway =
-  !!process.env.RAILWAY_ENVIRONMENT ||
-  !!process.env.RAILWAY_PUBLIC_DOMAIN;
-
 /**
- * Cross-site (Vercel → Railway): obligatorio `SameSite=None` + `Secure`.
- * Sin `Domain` (hosts distintos).
+ * Lee entorno en cada llamada (no al importar el módulo). Así en Railway/prod
+ * `NODE_ENV` / `RAILWAY_*` ya están definidos y no caemos en Lax por evaluación temprana.
  */
-export const useCrossSiteCookies = isProduction || isRailway;
+function computeCrossSite(): boolean {
+  return (
+    process.env.NODE_ENV === 'production' ||
+    !!process.env.RAILWAY_ENVIRONMENT ||
+    !!process.env.RAILWAY_PUBLIC_DOMAIN
+  );
+}
 
-/** Compat: mismo criterio que `useCrossSiteCookies`. */
+/** Cross-site (Vercel → Railway): `SameSite=None` + `Secure`. Sin `Domain`. */
+export function useCrossSiteCookies(): boolean {
+  return computeCrossSite();
+}
+
+/** @deprecated usar {@link useCrossSiteCookies} */
 export function useCrossSiteSessionCookies(): boolean {
-  return useCrossSiteCookies;
+  return useCrossSiteCookies();
 }
 
 /**
- * Opciones base para `access_token` y `refresh_token` (HttpOnly).
- * En local sin HTTPS: Lax + sin Secure para que el login siga funcionando.
+ * Opciones HttpOnly para `access_token` y `refresh_token`.
+ * Siempre invocar al setear cookies (no cachear en constante de módulo).
  */
-export const cookieOptions: CookieOptions = useCrossSiteCookies
-  ? {
+export function getSessionCookieOptions(): CookieOptions {
+  if (computeCrossSite()) {
+    return {
       httpOnly: true,
       secure: true,
       sameSite: 'none',
       path: '/',
-    }
-  : {
-      httpOnly: true,
-      secure: false,
-      sameSite: 'lax',
-      path: '/',
     };
+  }
+  return {
+    httpOnly: true,
+    secure: false,
+    sameSite: 'lax',
+    path: '/',
+  };
+}
 
-/** `secure` + `sameSite` compartidos (p. ej. cookie CSRF legible por JS). */
+/** `secure` + `sameSite` para cookie CSRF (no HttpOnly). */
 export function sessionCookieSameSitePolicy(): Pick<
   CookieOptions,
   'secure' | 'sameSite'
 > {
-  if (useCrossSiteCookies) {
+  if (computeCrossSite()) {
     return { secure: true, sameSite: 'none' };
   }
   return { secure: false, sameSite: 'lax' };
@@ -67,7 +75,7 @@ export function authCookieBase(
   path: string = SESSION_COOKIE_PATH,
 ): CookieOptions {
   return {
-    ...cookieOptions,
+    ...getSessionCookieOptions(),
     path,
   };
 }

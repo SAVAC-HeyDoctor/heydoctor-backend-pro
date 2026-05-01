@@ -38,13 +38,14 @@ import {
   REFRESH_TOKEN_MAX_AGE_MS,
   SESSION_COOKIE_PATH,
   authCookieBase,
-  cookieOptions,
+  getSessionCookieOptions,
 } from './auth-cookies';
 import { clearCsrfCookie, setCsrfCookie } from '../common/csrf/csrf-cookie';
 
 function setAccessCookie(res: Response, token: string): void {
   res.cookie(ACCESS_TOKEN_COOKIE, token, {
-    ...authCookieBase(SESSION_COOKIE_PATH),
+    ...getSessionCookieOptions(),
+    path: SESSION_COOKIE_PATH,
     maxAge: ACCESS_TOKEN_MAX_AGE_MS,
   });
 }
@@ -55,7 +56,8 @@ function clearAccessCookie(res: Response): void {
 
 function setRefreshCookie(res: Response, token: string): void {
   res.cookie(REFRESH_TOKEN_COOKIE, token, {
-    ...authCookieBase(SESSION_COOKIE_PATH),
+    ...getSessionCookieOptions(),
+    path: SESSION_COOKIE_PATH,
     maxAge: REFRESH_TOKEN_MAX_AGE_MS,
   });
 }
@@ -194,7 +196,7 @@ export class AuthController {
       result.user.id,
       ctx,
     );
-    console.log('Setting cookies:', cookieOptions);
+    console.log('Setting cookies:', getSessionCookieOptions());
     setRefreshCookie(res, refreshToken);
     setAccessCookie(res, result.access_token);
     const csrfToken = setCsrfCookie(res);
