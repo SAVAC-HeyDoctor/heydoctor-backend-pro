@@ -1,8 +1,6 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class CreateWebrtcMetricSamples1746500000000
-  implements MigrationInterface
-{
+export class CreateWebrtcMetricSamples1746500000000 implements MigrationInterface {
   name = 'CreateWebrtcMetricSamples1746500000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
@@ -31,8 +29,6 @@ export class CreateWebrtcMetricSamples1746500000000
     await queryRunner.query(
       `DROP INDEX IF EXISTS "IDX_webrtc_metric_samples_consultation_recorded"`,
     );
-    await queryRunner.query(
-      `DROP TABLE IF EXISTS "webrtc_metric_samples"`,
-    );
+    await queryRunner.query(`DROP TABLE IF EXISTS "webrtc_metric_samples"`);
   }
 }

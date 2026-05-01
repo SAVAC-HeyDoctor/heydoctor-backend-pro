@@ -82,7 +82,9 @@ async function bootstrap() {
   }
 
   bootstrapLogger.log(
-    `CORS origins: ${corsOriginList().map((o) => (o instanceof RegExp ? o.source : o)).join(', ')}`,
+    `CORS origins: ${corsOriginList()
+      .map((o) => (o instanceof RegExp ? o.source : o))
+      .join(', ')}`,
   );
 
   app.enableCors({

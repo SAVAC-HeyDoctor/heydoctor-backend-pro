@@ -161,7 +161,9 @@ function csrfTokenFromSetCookie(
         .post('/api/auth/login')
         .send({ email: emailAdminA, password })
         .expect(200);
-      cookieAdminA = cookieHeaderFromSetCookie(loginAdminA.headers['set-cookie']);
+      cookieAdminA = cookieHeaderFromSetCookie(
+        loginAdminA.headers['set-cookie'],
+      );
       csrfAdminA = csrfTokenFromSetCookie(loginAdminA.headers['set-cookie']);
 
       await request(server)
