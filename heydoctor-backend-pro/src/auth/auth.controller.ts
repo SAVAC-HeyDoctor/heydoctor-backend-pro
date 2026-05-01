@@ -38,6 +38,7 @@ import {
   REFRESH_TOKEN_MAX_AGE_MS,
   SESSION_COOKIE_PATH,
   authCookieBase,
+  cookieOptions,
 } from './auth-cookies';
 import { clearCsrfCookie, setCsrfCookie } from '../common/csrf/csrf-cookie';
 
@@ -193,6 +194,7 @@ export class AuthController {
       result.user.id,
       ctx,
     );
+    console.log('Setting cookies:', cookieOptions);
     setRefreshCookie(res, refreshToken);
     setAccessCookie(res, result.access_token);
     const csrfToken = setCsrfCookie(res);

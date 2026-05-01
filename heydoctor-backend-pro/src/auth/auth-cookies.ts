@@ -13,45 +13,49 @@ export const REFRESH_TOKEN_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const isProduction = process.env.NODE_ENV === 'production';
 
 const isRailway =
-  !!process.env.RAILWAY_ENVIRONMENT?.trim() ||
-  !!process.env.RAILWAY_PUBLIC_DOMAIN?.trim();
+  !!process.env.RAILWAY_ENVIRONMENT ||
+  !!process.env.RAILWAY_PUBLIC_DOMAIN;
 
 /**
- * Peticiones cross-origin (p. ej. frontend Vercel → API Railway): el navegador
- * solo envía cookies con `SameSite=None` y `Secure=true`. Con `Lax`, tras el
- * login las peticiones a `/api/auth/me` llegan sin `access_token` → 401.
- *
- * `AUTH_CROSS_SITE_COOKIES=false` fuerza modo local (Lax + sin Secure).
- * `AUTH_CROSS_SITE_COOKIES=true` fuerza cross-site aunque no sea prod/Railway.
- *
- * No usar atributo `Domain` en cookies para este escenario (hosts distintos).
+ * Cross-site (Vercel → Railway): obligatorio `SameSite=None` + `Secure`.
+ * Sin `Domain` (hosts distintos).
  */
+export const useCrossSiteCookies = isProduction || isRailway;
+
+/** Compat: mismo criterio que `useCrossSiteCookies`. */
 export function useCrossSiteSessionCookies(): boolean {
-  const raw = process.env.AUTH_CROSS_SITE_COOKIES?.trim().toLowerCase();
-  if (raw === 'false' || raw === '0' || raw === 'no') {
-    return false;
-  }
-  if (raw === 'true' || raw === '1' || raw === 'yes') {
-    return true;
-  }
-  return isProduction || isRailway;
+  return useCrossSiteCookies;
 }
 
-/** `secure` + `sameSite` compartidos entre cookies HttpOnly y CSRF. */
+/**
+ * Opciones base para `access_token` y `refresh_token` (HttpOnly).
+ * En local sin HTTPS: Lax + sin Secure para que el login siga funcionando.
+ */
+export const cookieOptions: CookieOptions = useCrossSiteCookies
+  ? {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'none',
+      path: '/',
+    }
+  : {
+      httpOnly: true,
+      secure: false,
+      sameSite: 'lax',
+      path: '/',
+    };
+
+/** `secure` + `sameSite` compartidos (p. ej. cookie CSRF legible por JS). */
 export function sessionCookieSameSitePolicy(): Pick<
   CookieOptions,
   'secure' | 'sameSite'
 > {
-  if (useCrossSiteSessionCookies()) {
+  if (useCrossSiteCookies) {
     return { secure: true, sameSite: 'none' };
   }
   return { secure: false, sameSite: 'lax' };
 }
 
-/**
- * Una sola ruta para access y refresh: el navegador las adjunta en todas las
- * peticiones al mismo host del API (p. ej. `/api/auth/me`, `/api/auth/refresh`).
- */
 export const SESSION_COOKIE_PATH = '/';
 
 export type AuthCookieBaseOptions = Pick<
@@ -63,8 +67,7 @@ export function authCookieBase(
   path: string = SESSION_COOKIE_PATH,
 ): CookieOptions {
   return {
-    httpOnly: true,
-    ...sessionCookieSameSitePolicy(),
+    ...cookieOptions,
     path,
   };
 }

@@ -49,12 +49,12 @@ npm run start:dev
 | `REDIS_URL`    | **Recomendado en producción** si hay varias réplicas: Throttler distribuido; sin Redis el límite es por instancia (memoria) |
 | `DATABASE_SSL_CA` | Opcional en producción: PEM del CA si el proveedor Postgres lo requiere |
 | `ENABLE_PUBLIC_REGISTRATION` | `true` para permitir `POST /api/auth/register` en producción (por defecto deshabilitado) |
-| `CORS_ORIGIN`  | Opcional: lista separada por comas de orígenes permitidos (además de fallbacks en `main.ts`, p. ej. `*.vercel.app`) |
-| `AUTH_CROSS_SITE_COOKIES` | `false` fuerza cookies `SameSite=Lax` (local). Por defecto: `SameSite=None` + `Secure` en `production` o Railway (`RAILWAY_*`). **No** uses `Domain` en cookies para front (Vercel) y API (Railway) en hosts distintos. |
+| `CORS_ORIGIN`  | Ignorado para la lista principal: `main.ts` fija orígenes (`*.vercel.app`, `heydoctor.health`, `app.`/`www.`) + localhost fuera de `production`. |
+| — | Cookies sesión: **sin** atributo `Domain`. En `production` o Railway: `SameSite=None`, `Secure`, `path=/` para `access_token` y `refresh_token`. |
 
 ## Cookies de sesión (JWT)
 
-- `access_token` y `refresh_token`: **HttpOnly**, **path** `/`; en producción / Railway: **SameSite=None** y **Secure** (cross-origin). En local: **Lax** sin Secure (salvo forzar con `AUTH_CROSS_SITE_COOKIES=true`).
+- `access_token` y `refresh_token`: **HttpOnly**, **path** `/`; en **producción** (`NODE_ENV`) o **Railway** (`RAILWAY_ENVIRONMENT` o `RAILWAY_PUBLIC_DOMAIN`): **SameSite=None** y **Secure**. En local (sin esas condiciones): **Lax** sin Secure.
 - `csrf_token`: **no HttpOnly** (double-submit); en mutaciones el cliente debe enviar el mismo valor en la cabecera `X-CSRF-Token`. Exento: `POST /api/auth/login`, `register`, `refresh` y webhook Payku.
 
 ## CI/CD y protección de `main`
