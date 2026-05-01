@@ -22,7 +22,7 @@ function computeCrossSite(): boolean {
   );
 }
 
-/** Cross-site (Vercel → Railway): `SameSite=None` + `Secure`. Sin `Domain`. */
+/** Cross-site (Vercel app. → Railway pro-api.): `SameSite=None` + `Secure` + opcional `Domain` compartido. */
 export function useCrossSiteCookies(): boolean {
   return computeCrossSite();
 }
@@ -33,16 +33,64 @@ export function useCrossSiteSessionCookies(): boolean {
 }
 
 /**
+ * Dominio registrable para cookies (p. ej. `.heydoctor.health`) y compartir sesión entre
+ * `app.heydoctor.health` y `pro-api.heydoctor.health` (middleware SSR + fetch credencialed).
+ *
+ * - `AUTH_COOKIE_DOMAIN=.heydoctor.health` (recomendado en Railway).
+ * - Si no está definido y el host público del API es un subdominio de producción, se infiere `.registrable.tld`.
+ * - En local / sin cross-site: `undefined` (cookie host-only).
+ */
+export function getAuthCookieDomain(): string | undefined {
+  const explicit = process.env.AUTH_COOKIE_DOMAIN?.trim();
+  if (explicit && /^(none|false|0)$/i.test(explicit)) {
+    return undefined;
+  }
+  if (explicit) {
+    return explicit.startsWith('.') ? explicit : `.${explicit}`;
+  }
+  if (!computeCrossSite()) {
+    return undefined;
+  }
+
+  const backend =
+    process.env.BACKEND_PUBLIC_URL?.trim() ||
+    (process.env.RAILWAY_PUBLIC_DOMAIN
+      ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN.replace(/^https?:\/\//i, '')}`
+      : undefined);
+  if (!backend) {
+    return undefined;
+  }
+  try {
+    const url = backend.includes('://') ? backend : `https://${backend}`;
+    const { hostname } = new URL(url);
+    if (hostname === 'localhost' || hostname.endsWith('.localhost')) {
+      return undefined;
+    }
+    // `pro-api.heydoctor.health` → `.heydoctor.health`
+    const parts = hostname.split('.').filter(Boolean);
+    if (parts.length >= 2) {
+      const registrable = parts.slice(-2).join('.');
+      return `.${registrable}`;
+    }
+  } catch {
+    return undefined;
+  }
+  return undefined;
+}
+
+/**
  * Opciones HttpOnly para `access_token` y `refresh_token`.
  * Siempre invocar al setear cookies (no cachear en constante de módulo).
  */
 export function getSessionCookieOptions(): CookieOptions {
+  const domain = getAuthCookieDomain();
   if (computeCrossSite()) {
     return {
       httpOnly: true,
       secure: true,
       sameSite: 'none',
       path: '/',
+      ...(domain ? { domain } : {}),
     };
   }
   return {

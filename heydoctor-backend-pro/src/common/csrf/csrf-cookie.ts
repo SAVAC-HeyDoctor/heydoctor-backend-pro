@@ -1,16 +1,21 @@
 import { randomBytes } from 'crypto';
 import type { CookieOptions, Response } from 'express';
-import { sessionCookieSameSitePolicy } from '../../auth/auth-cookies';
+import {
+  getAuthCookieDomain,
+  sessionCookieSameSitePolicy,
+} from '../../auth/auth-cookies';
 import { CSRF_COOKIE } from './csrf.constants';
 
 const CSRF_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 export function csrfCookieOptions(): CookieOptions {
+  const domain = getAuthCookieDomain();
   return {
     httpOnly: false,
     ...sessionCookieSameSitePolicy(),
     path: '/',
     maxAge: CSRF_MAX_AGE_MS,
+    ...(domain ? { domain } : {}),
   };
 }
 
@@ -25,8 +30,10 @@ export function setCsrfCookie(res: Response, token?: string): string {
 }
 
 export function clearCsrfCookie(res: Response): void {
+  const domain = getAuthCookieDomain();
   res.clearCookie(CSRF_COOKIE, {
     ...sessionCookieSameSitePolicy(),
     path: '/',
+    ...(domain ? { domain } : {}),
   });
 }

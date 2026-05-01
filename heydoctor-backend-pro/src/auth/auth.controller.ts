@@ -196,7 +196,6 @@ export class AuthController {
       result.user.id,
       ctx,
     );
-    console.log('Setting cookies:', getSessionCookieOptions());
     setRefreshCookie(res, refreshToken);
     setAccessCookie(res, result.access_token);
     const csrfToken = setCsrfCookie(res);
