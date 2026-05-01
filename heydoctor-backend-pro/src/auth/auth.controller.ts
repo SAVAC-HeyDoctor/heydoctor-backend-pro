@@ -38,8 +38,6 @@ import {
   REFRESH_TOKEN_MAX_AGE_MS,
   SESSION_COOKIE_PATH,
   authCookieBase,
-  authSessionCookieOptionsSnapshot,
-  useCrossSiteSessionCookies,
 } from './auth-cookies';
 import { clearCsrfCookie, setCsrfCookie } from '../common/csrf/csrf-cookie';
 
@@ -195,12 +193,6 @@ export class AuthController {
       result.user.id,
       ctx,
     );
-    const cookieOptions = authSessionCookieOptionsSnapshot(SESSION_COOKIE_PATH);
-    console.log('Setting cookies with options:', {
-      useCrossSiteSessionCookies: useCrossSiteSessionCookies(),
-      access: { ...cookieOptions, maxAge: ACCESS_TOKEN_MAX_AGE_MS },
-      refresh: { ...cookieOptions, maxAge: REFRESH_TOKEN_MAX_AGE_MS },
-    });
     setRefreshCookie(res, refreshToken);
     setAccessCookie(res, result.access_token);
     const csrfToken = setCsrfCookie(res);

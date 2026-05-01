@@ -68,8 +68,3 @@ export function authCookieBase(
     path,
   };
 }
-
-/** Para logs de diagnóstico (login): objeto serializable sin secretos. */
-export function authSessionCookieOptionsSnapshot(path: string): CookieOptions {
-  return authCookieBase(path);
-}
