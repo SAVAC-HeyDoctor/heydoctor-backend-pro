@@ -13,11 +13,10 @@ import type { Request, Response } from 'express';
 const bootstrapLogger = new Logger('Bootstrap');
 
 /**
- * Previews y alias Vercel del proyecto `heydoctor-frontend` (slug variable por team).
- * Ej.: `…-heydoctors-projects.vercel.app`, `…-savac-hey-doctor.vercel.app`, etc.
+ * Cualquier preview/despliegue en Vercel (*.vercel.app) con credenciales.
+ * Producción propia: `https://heydoctor.health` (y fallbacks en resolveCorsOrigins).
  */
-const VERCEL_PREVIEW_PATTERN =
-  /^https:\/\/heydoctor-frontend[a-z0-9.-]*\.vercel\.app$/i;
+const VERCEL_APP_PATTERN = /^https:\/\/.*\.vercel\.app$/i;
 
 /** Orígenes permitidos cuando CORS_ORIGIN no está definido (p. ej. Railway sin variable). */
 function resolveCorsOrigins(envConfig: EnvConfig): string[] {
@@ -28,7 +27,9 @@ function resolveCorsOrigins(envConfig: EnvConfig): string[] {
     'http://localhost:3000',
     'https://heydoctor-frontend.vercel.app',
     'https://heydoctor.vercel.app',
+    'https://heydoctor.health',
     'https://app.heydoctor.health',
+    'https://www.heydoctor.health',
     envConfig.frontendUrl,
   ];
   return [...new Set(fallbacks.filter(Boolean))];
@@ -52,7 +53,7 @@ function buildCorsOriginCallback(
   cb: (err: Error | null, allow?: boolean) => void,
 ) => void {
   const exact = new Set(allowList);
-  const patterns: RegExp[] = [...regexList, VERCEL_PREVIEW_PATTERN];
+  const patterns: RegExp[] = [...regexList, VERCEL_APP_PATTERN];
 
   return (origin, cb) => {
     if (!origin) {

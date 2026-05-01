@@ -36,33 +36,33 @@ import {
   ACCESS_TOKEN_MAX_AGE_MS,
   REFRESH_TOKEN_COOKIE,
   REFRESH_TOKEN_MAX_AGE_MS,
+  SESSION_COOKIE_PATH,
   authCookieBase,
+  authSessionCookieOptionsSnapshot,
+  useCrossSiteSessionCookies,
 } from './auth-cookies';
 import { clearCsrfCookie, setCsrfCookie } from '../common/csrf/csrf-cookie';
 
-const AUTH_COOKIE_PATH = '/api/auth';
-const ACCESS_COOKIE_PATH = '/';
-
 function setAccessCookie(res: Response, token: string): void {
   res.cookie(ACCESS_TOKEN_COOKIE, token, {
-    ...authCookieBase(ACCESS_COOKIE_PATH),
+    ...authCookieBase(SESSION_COOKIE_PATH),
     maxAge: ACCESS_TOKEN_MAX_AGE_MS,
   });
 }
 
 function clearAccessCookie(res: Response): void {
-  res.clearCookie(ACCESS_TOKEN_COOKIE, authCookieBase(ACCESS_COOKIE_PATH));
+  res.clearCookie(ACCESS_TOKEN_COOKIE, authCookieBase(SESSION_COOKIE_PATH));
 }
 
 function setRefreshCookie(res: Response, token: string): void {
   res.cookie(REFRESH_TOKEN_COOKIE, token, {
-    ...authCookieBase(AUTH_COOKIE_PATH),
+    ...authCookieBase(SESSION_COOKIE_PATH),
     maxAge: REFRESH_TOKEN_MAX_AGE_MS,
   });
 }
 
 function clearRefreshCookie(res: Response): void {
-  res.clearCookie(REFRESH_TOKEN_COOKIE, authCookieBase(AUTH_COOKIE_PATH));
+  res.clearCookie(REFRESH_TOKEN_COOKIE, authCookieBase(SESSION_COOKIE_PATH));
 }
 
 function readCookie(req: Request, name: string): string | undefined {
@@ -195,6 +195,12 @@ export class AuthController {
       result.user.id,
       ctx,
     );
+    const cookieOptions = authSessionCookieOptionsSnapshot(SESSION_COOKIE_PATH);
+    console.log('Setting cookies with options:', {
+      useCrossSiteSessionCookies: useCrossSiteSessionCookies(),
+      access: { ...cookieOptions, maxAge: ACCESS_TOKEN_MAX_AGE_MS },
+      refresh: { ...cookieOptions, maxAge: REFRESH_TOKEN_MAX_AGE_MS },
+    });
     setRefreshCookie(res, refreshToken);
     setAccessCookie(res, result.access_token);
     const csrfToken = setCsrfCookie(res);

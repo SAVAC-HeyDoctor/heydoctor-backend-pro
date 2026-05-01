@@ -10,14 +10,21 @@ export const ACCESS_TOKEN_MAX_AGE_MS = 15 * 60 * 1000;
 
 export const REFRESH_TOKEN_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
+const isProduction = process.env.NODE_ENV === 'production';
+
+const isRailway =
+  !!process.env.RAILWAY_ENVIRONMENT?.trim() ||
+  !!process.env.RAILWAY_PUBLIC_DOMAIN?.trim();
+
 /**
- * Cookies en peticiones cross-site (p. ej. Vercel → API en Railway) necesitan
- * `SameSite=None` + `Secure`. Con `SameSite=Lax`, el navegador no adjunta
- * `access_token` en `fetch` al dominio del API tras el login (síntoma: 201 en
- * login y 401 en `/api/auth/me`).
+ * Peticiones cross-origin (p. ej. frontend Vercel → API Railway): el navegador
+ * solo envía cookies con `SameSite=None` y `Secure=true`. Con `Lax`, tras el
+ * login las peticiones a `/api/auth/me` llegan sin `access_token` → 401.
  *
- * Por defecto: producción (`NODE_ENV=production`) o deploy en Railway
- * (`RAILWAY_*`). Para forzar modo local explícito: `AUTH_CROSS_SITE_COOKIES=false`.
+ * `AUTH_CROSS_SITE_COOKIES=false` fuerza modo local (Lax + sin Secure).
+ * `AUTH_CROSS_SITE_COOKIES=true` fuerza cross-site aunque no sea prod/Railway.
+ *
+ * No usar atributo `Domain` en cookies para este escenario (hosts distintos).
  */
 export function useCrossSiteSessionCookies(): boolean {
   const raw = process.env.AUTH_CROSS_SITE_COOKIES?.trim().toLowerCase();
@@ -27,16 +34,7 @@ export function useCrossSiteSessionCookies(): boolean {
   if (raw === 'true' || raw === '1' || raw === 'yes') {
     return true;
   }
-  if (process.env.NODE_ENV === 'production') {
-    return true;
-  }
-  if (process.env.RAILWAY_ENVIRONMENT?.trim()) {
-    return true;
-  }
-  if (process.env.RAILWAY_PUBLIC_DOMAIN?.trim()) {
-    return true;
-  }
-  return false;
+  return isProduction || isRailway;
 }
 
 /** `secure` + `sameSite` compartidos entre cookies HttpOnly y CSRF. */
@@ -51,29 +49,27 @@ export function sessionCookieSameSitePolicy(): Pick<
 }
 
 /**
- * Dominio compartido front/back (ej. `.heydoctor.health`).
- * Opcional; si no se define, el host-only del API aplica.
- *
- * En escenario Vercel + Railway (hosts distintos), no definas `COOKIE_DOMAIN` salvo
- * que API y front compartan un dominio padre real; un valor incorrecto impide que el
- * navegador almacene la cookie.
+ * Una sola ruta para access y refresh: el navegador las adjunta en todas las
+ * peticiones al mismo host del API (p. ej. `/api/auth/me`, `/api/auth/refresh`).
  */
-export function resolveCookieDomain(): string | undefined {
-  const raw = process.env.COOKIE_DOMAIN?.trim();
-  return raw && raw.length > 0 ? raw : undefined;
-}
+export const SESSION_COOKIE_PATH = '/';
 
 export type AuthCookieBaseOptions = Pick<
   CookieOptions,
-  'httpOnly' | 'secure' | 'sameSite' | 'path' | 'domain'
+  'httpOnly' | 'secure' | 'sameSite' | 'path'
 >;
 
-export function authCookieBase(path: string): CookieOptions {
-  const domain = resolveCookieDomain();
+export function authCookieBase(
+  path: string = SESSION_COOKIE_PATH,
+): CookieOptions {
   return {
     httpOnly: true,
     ...sessionCookieSameSitePolicy(),
     path,
-    ...(domain ? { domain } : {}),
   };
+}
+
+/** Para logs de diagnóstico (login): objeto serializable sin secretos. */
+export function authSessionCookieOptionsSnapshot(path: string): CookieOptions {
+  return authCookieBase(path);
 }
