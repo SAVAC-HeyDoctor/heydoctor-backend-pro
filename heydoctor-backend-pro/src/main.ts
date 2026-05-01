@@ -13,42 +13,28 @@ import type { Request, Response } from 'express';
 const bootstrapLogger = new Logger('Bootstrap');
 
 /**
- * Orígenes permitidos con credenciales (sin `*`).
- * Producción: `*.vercel.app` + dominios HeyDoctor; desarrollo: + localhost.
+ * Producción: solo app HeyDoctor + previews Vercel (`credentials: true`, sin `*`).
+ * Desarrollo: mismos + marketing + localhost.
  */
 const PRODUCTION_CORS_ORIGINS: (string | RegExp)[] = [
-  /^https:\/\/.*\.vercel\.app$/i,
-  'https://heydoctor.health',
   'https://app.heydoctor.health',
-  'https://www.heydoctor.health',
+  /^https:\/\/.*\.vercel\.app$/i,
 ];
 
 function corsOriginList(): (string | RegExp)[] {
+  if (process.env.NODE_ENV === 'production') {
+    return PRODUCTION_CORS_ORIGINS;
+  }
+
   const envOrigins = (process.env.CORS_ORIGIN ?? '')
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean);
 
-  if (process.env.NODE_ENV === 'production') {
-    const seen = new Set<string>();
-    const out: (string | RegExp)[] = [];
-    for (const item of [...PRODUCTION_CORS_ORIGINS, ...envOrigins]) {
-      if (item instanceof RegExp) {
-        const key = `rx:${item.source}`;
-        if (!seen.has(key)) {
-          seen.add(key);
-          out.push(item);
-        }
-      } else if (!seen.has(item)) {
-        seen.add(item);
-        out.push(item);
-      }
-    }
-    return out;
-  }
-
   return [
     ...PRODUCTION_CORS_ORIGINS,
+    'https://heydoctor.health',
+    'https://www.heydoctor.health',
     ...envOrigins,
     'http://localhost:3000',
     'http://127.0.0.1:3000',
