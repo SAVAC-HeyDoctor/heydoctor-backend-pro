@@ -182,12 +182,21 @@ export class AuthService {
   /**
    * Rota refresh en transacción con bloqueo pesimístico de la fila: evita carreras
    * entre instancias o requests concurrentes que invalidaban tokens entre sí.
+   *
+   * Logging detallado para facilitar el debug de errores 401 en producción.
    */
   async validateAndRotateRefreshToken(
     rawToken: string,
     ctx: RequestContext,
   ): Promise<{ accessToken: string; newRefreshToken: string }> {
     const tokenHash = hashToken(rawToken);
+
+    this.logger.log('refresh_token_attempt', {
+      event: 'refresh_token_attempt',
+      tokenHashPrefix: tokenHash.slice(0, 8),
+      ip: ctx.ip,
+      userAgent: ctx.userAgent?.slice(0, 128) ?? null,
+    });
 
     return this.refreshTokenRepository.manager.transaction(async (manager) => {
       const repo = manager.getRepository(RefreshToken);
@@ -197,12 +206,38 @@ export class AuthService {
       });
 
       if (!stored) {
+        this.logger.warn('refresh_token_not_found', {
+          event: 'refresh_token_not_found',
+          tokenHashPrefix: tokenHash.slice(0, 8),
+          ip: ctx.ip,
+        });
         throw new UnauthorizedException('Invalid refresh token');
       }
 
+      this.logger.log('refresh_token_found', {
+        event: 'refresh_token_found',
+        tokenId: stored.id,
+        userId: stored.userId,
+        expiresAt: stored.expiresAt.toISOString(),
+        revokedAt: stored.revokedAt ? stored.revokedAt.toISOString() : null,
+        now: new Date().toISOString(),
+      });
+
       if (stored.revokedAt) {
         const msSinceRevoke = Date.now() - new Date(stored.revokedAt).getTime();
-        if (msSinceRevoke < 15_000) {
+        this.logger.warn('refresh_token_already_revoked', {
+          event: 'refresh_token_already_revoked',
+          tokenId: stored.id,
+          userId: stored.userId,
+          revokedAt: stored.revokedAt.toISOString(),
+          msSinceRevoke,
+          ip: ctx.ip,
+        });
+        // Grace window: si el token fue rotado hace menos de 30 s, es probable
+        // que sea un reintento legítimo del cliente (error de red, doble-click).
+        // Devolvemos el mismo error para que el cliente sepa que debe re-intentar
+        // con el nuevo token que ya recibió, o hacer login si no lo tiene.
+        if (msSinceRevoke < 30_000) {
           throw new UnauthorizedException('Refresh token already rotated');
         }
         await this.logSecurityEvent(
@@ -212,6 +247,7 @@ export class AuthService {
           {
             tokenId: stored.id,
             originalRevokedAt: stored.revokedAt.toISOString(),
+            msSinceRevoke,
             severity: 'critical',
           },
         );
@@ -219,6 +255,14 @@ export class AuthService {
       }
 
       if (stored.expiresAt < new Date()) {
+        this.logger.warn('refresh_token_expired', {
+          event: 'refresh_token_expired',
+          tokenId: stored.id,
+          userId: stored.userId,
+          expiresAt: stored.expiresAt.toISOString(),
+          now: new Date().toISOString(),
+          ip: ctx.ip,
+        });
         throw new UnauthorizedException('Refresh token expired');
       }
 
@@ -227,8 +271,33 @@ export class AuthService {
       await repo.save(stored);
 
       const user = await this.usersService.findById(stored.userId);
-      if (!user || user.isActive === false) {
+      if (!user) {
+        this.logger.error('refresh_token_user_not_found', {
+          event: 'refresh_token_user_not_found',
+          userId: stored.userId,
+          tokenId: stored.id,
+        });
         throw new UnauthorizedException('User not found');
+      }
+
+      if (user.isActive === false) {
+        this.logger.warn('refresh_token_user_inactive', {
+          event: 'refresh_token_user_inactive',
+          userId: user.id,
+          tokenId: stored.id,
+        });
+        throw new UnauthorizedException('User account is inactive');
+      }
+
+      if (!user.clinicId) {
+        this.logger.error('refresh_token_user_no_clinic', {
+          event: 'refresh_token_user_no_clinic',
+          userId: user.id,
+          tokenId: stored.id,
+        });
+        throw new UnauthorizedException(
+          'User has no clinic assigned; cannot refresh session',
+        );
       }
 
       const payload: JwtPayload = {
@@ -242,6 +311,13 @@ export class AuthService {
 
       await this.logSecurityEvent('AUTH_REFRESH_SUCCESS', user.id, ctx, {
         previousTokenId: stored.id,
+      });
+
+      this.logger.log('refresh_token_rotated', {
+        event: 'refresh_token_rotated',
+        userId: user.id,
+        previousTokenId: stored.id,
+        ip: ctx.ip,
       });
 
       return { accessToken, newRefreshToken };
@@ -290,15 +366,27 @@ export class AuthService {
       await repo.save(toRevoke);
     }
 
-    // Garbage-collect expired+revoked tokens older than 1 day
-    await repo
-      .createQueryBuilder()
-      .delete()
-      .where('expires_at < :cutoff', {
-        cutoff: new Date(Date.now() - 24 * 60 * 60 * 1000),
-      })
-      .andWhere('revoked_at IS NOT NULL')
-      .execute();
+    // Garbage-collect expired+revoked tokens older than 1 day.
+    // Usamos el manager del repo para que la query quede dentro de la
+    // transacción activa (si la hay) y no genere un deadlock.
+    try {
+      await repo.manager
+        .createQueryBuilder()
+        .delete()
+        .from(RefreshToken)
+        .where('expires_at < :cutoff', {
+          cutoff: new Date(Date.now() - 24 * 60 * 60 * 1000),
+        })
+        .andWhere('revoked_at IS NOT NULL')
+        .execute();
+    } catch (gcErr) {
+      // GC no es crítico; loguear y continuar para no bloquear el flujo de auth.
+      const error = gcErr instanceof Error ? gcErr : new Error(String(gcErr));
+      this.logger.warn('refresh_token_gc_failed', {
+        event: 'refresh_token_gc_failed',
+        error: error.message,
+      });
+    }
   }
 
   // ── Security audit logging ────────────────────────────────────
