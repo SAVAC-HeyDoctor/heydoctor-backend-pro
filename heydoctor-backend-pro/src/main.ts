@@ -50,7 +50,9 @@ async function bootstrap() {
 
   const app = await NestFactory.create(AppModule, { rawBody: true });
 
+  /** Railway/proxy: `X-Forwarded-Proto` → `req.secure` / cookies coherentes con HTTPS. */
   const server = app.getHttpAdapter().getInstance();
+  server.set('trust proxy', 1);
 
   // Healthcheck ultra rápido para Railway (Express; no controllers / guards / ORM en la petición)
   server.get('/_health', (_req: Request, res: Response) => {
@@ -58,7 +60,6 @@ async function bootstrap() {
   });
 
   app.use(cookieParser());
-  app.getHttpAdapter().getInstance().set('trust proxy', 1);
   app.useWebSocketAdapter(new IoAdapter(app));
 
   /**
