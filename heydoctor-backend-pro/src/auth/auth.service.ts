@@ -194,8 +194,7 @@ export class AuthService {
 
     // ── Reuse detection: revoked token used again → full revocation ──
     if (stored.revokedAt) {
-      const msSinceRevoke =
-        Date.now() - new Date(stored.revokedAt).getTime();
+      const msSinceRevoke = Date.now() - new Date(stored.revokedAt).getTime();
       /**
        * Dos POST /refresh con el mismo cookie (p. ej. pestañas o carrera al liberar el lock
        * del cliente antes de aplicar Set-Cookie): el segundo ve la fila ya revocada por rotación.
