@@ -7,6 +7,17 @@ import { apiFetch, getApiBase, jsonHeaders } from './api-client';
 let refreshInFlight: Promise<boolean> | null = null;
 let sessionRedirectScheduled = false;
 
+/**
+ * El `finally` de un `async` corre antes de que la promesa se resuelva hacia los `await` externos.
+ * Si aquí ponemos `refreshInFlight = null`, otro 401 puede lanzar un segundo POST /auth/refresh
+ * con el mismo refresh ya revocado → 401 → logout. Liberar el lock en un macrotask lo evita.
+ */
+function releaseRefreshLockDeferred(): void {
+  setTimeout(() => {
+    refreshInFlight = null;
+  }, 0);
+}
+
 function isAuthPath(url: string): boolean {
   return (
     url.includes('/api/auth/login') ||
@@ -27,7 +38,7 @@ async function refreshSessionOnce(): Promise<boolean> {
     return refreshInFlight;
   }
   const base = getApiBase();
-  refreshInFlight = (async () => {
+  const attempt = async (): Promise<boolean> => {
     try {
       const res = await apiFetch(`${base}/api/auth/refresh`, {
         method: 'POST',
@@ -37,8 +48,17 @@ async function refreshSessionOnce(): Promise<boolean> {
       return res.ok;
     } catch {
       return false;
+    }
+  };
+
+  refreshInFlight = (async () => {
+    try {
+      if (await attempt()) return true;
+      /** Tras "already rotated" u otra carrera, el otro refresh puede haber fijado ya las cookies. */
+      await new Promise((r) => setTimeout(r, 120));
+      return await attempt();
     } finally {
-      refreshInFlight = null;
+      releaseRefreshLockDeferred();
     }
   })();
   return refreshInFlight;

@@ -194,6 +194,16 @@ export class AuthService {
 
     // ── Reuse detection: revoked token used again → full revocation ──
     if (stored.revokedAt) {
+      const msSinceRevoke =
+        Date.now() - new Date(stored.revokedAt).getTime();
+      /**
+       * Dos POST /refresh con el mismo cookie (p. ej. pestañas o carrera al liberar el lock
+       * del cliente antes de aplicar Set-Cookie): el segundo ve la fila ya revocada por rotación.
+       * No revocar todas las sesiones; el cliente debe repetir con el refresh ya rotado en cookie.
+       */
+      if (msSinceRevoke < 15_000) {
+        throw new UnauthorizedException('Refresh token already rotated');
+      }
       await this.revokeAllUserTokens(stored.userId);
       await this.logSecurityEvent('TOKEN_REUSE_DETECTED', stored.userId, ctx, {
         tokenId: stored.id,
