@@ -225,19 +225,26 @@ export class AuthService {
 
       if (stored.revokedAt) {
         const msSinceRevoke = Date.now() - new Date(stored.revokedAt).getTime();
+        // Grace window: 5 minutos para tolerar reintentos del cliente (errores
+        // de red, doble-click, demoras en guardar la cookie del nuevo token).
+        const GRACE_WINDOW_MS = 300_000;
+        const withinGraceWindow = msSinceRevoke < GRACE_WINDOW_MS;
         this.logger.warn('refresh_token_already_revoked', {
           event: 'refresh_token_already_revoked',
           tokenId: stored.id,
           userId: stored.userId,
+          tokenHashPrefix: tokenHash.slice(0, 8),
           revokedAt: stored.revokedAt.toISOString(),
           msSinceRevoke,
+          withinGraceWindow,
+          graceWindowMs: GRACE_WINDOW_MS,
           ip: ctx.ip,
         });
-        // Grace window: si el token fue rotado hace menos de 30 s, es probable
-        // que sea un reintento legítimo del cliente (error de red, doble-click).
-        // Devolvemos el mismo error para que el cliente sepa que debe re-intentar
-        // con el nuevo token que ya recibió, o hacer login si no lo tiene.
-        if (msSinceRevoke < 30_000) {
+        // Dentro del grace window: reintento legítimo del cliente (error de red,
+        // doble-click, cookie aún no persistida). Lanzamos un error diferenciado
+        // para que el cliente sepa que debe reintentar con el nuevo token que ya
+        // recibió, o hacer login si no lo tiene. NO se registra como reuso malicioso.
+        if (withinGraceWindow) {
           throw new UnauthorizedException('Refresh token already rotated');
         }
         await this.logSecurityEvent(
@@ -246,8 +253,10 @@ export class AuthService {
           ctx,
           {
             tokenId: stored.id,
+            tokenHashPrefix: tokenHash.slice(0, 8),
             originalRevokedAt: stored.revokedAt.toISOString(),
             msSinceRevoke,
+            graceWindowMs: GRACE_WINDOW_MS,
             severity: 'critical',
           },
         );
