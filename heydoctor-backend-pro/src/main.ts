@@ -13,13 +13,11 @@ import type { Request, Response } from 'express';
 const bootstrapLogger = new Logger('Bootstrap');
 
 /**
- * Producción: solo app HeyDoctor + previews Vercel (`credentials: true`, sin `*`).
- * Desarrollo: mismos + marketing + localhost.
+ * Producción: `app.heydoctor.health` + previews Vercel (`credentials: true`, sin `*`).
+ * Desarrollo: añade marketing, `CORS_ORIGIN` y localhost.
  */
 const PRODUCTION_CORS_ORIGINS: (string | RegExp)[] = [
   'https://app.heydoctor.health',
-  'https://heydoctor.health',
-  'https://www.heydoctor.health',
   /^https:\/\/.*\.vercel\.app$/i,
 ];
 

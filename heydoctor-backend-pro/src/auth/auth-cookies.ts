@@ -13,11 +13,17 @@ export const REFRESH_TOKEN_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 /** Dominio fijo producción: cookies visibles en app + pro-api (subdominios HeyDoctor). */
 export const HEYDOCTOR_AUTH_COOKIE_DOMAIN = '.heydoctor.health';
 
+function isRailwayDeploy(): boolean {
+  return (
+    !!process.env.RAILWAY_ENVIRONMENT ||
+    !!process.env.RAILWAY_ENVIRONMENT_NAME ||
+    !!process.env.RAILWAY_PUBLIC_DOMAIN
+  );
+}
+
 /**
- * Lee entorno en cada llamada (no al importar el módulo).
- * `SameSite=None` + `Secure` + `Domain=.heydoctor.health` solo cuando cross-site aplica;
- * si Railway no marca `NODE_ENV=production`, seguimos activando cookies de API si el
- * host público es HeyDoctor (`BACKEND_PUBLIC_URL`) o si se fuerza con env.
+ * Cookies cross-site (Vercel `app.*` → API Railway): `SameSite=None`, `Secure`, `Domain`.
+ * En Railway esto debe estar activo salvo `AUTH_CROSS_SITE_COOKIES=false` explícito.
  */
 function computeCrossSite(): boolean {
   if (process.env.AUTH_CROSS_SITE_COOKIES === 'false') {
@@ -30,12 +36,11 @@ function computeCrossSite(): boolean {
   if (/heydoctor\.health/i.test(backendPublic)) {
     return true;
   }
-  return (
-    process.env.NODE_ENV === 'production' ||
-    !!process.env.RAILWAY_ENVIRONMENT ||
-    !!process.env.RAILWAY_ENVIRONMENT_NAME ||
-    !!process.env.RAILWAY_PUBLIC_DOMAIN
-  );
+  /** Railway: siempre tratar API como cross-site para no emitir Lax sin Domain (401 en refresh). */
+  if (isRailwayDeploy()) {
+    return true;
+  }
+  return process.env.NODE_ENV === 'production';
 }
 
 /** Cross-site (Vercel app. → Railway pro-api.): `SameSite=None` + `Secure` + `Domain`. */
@@ -49,9 +54,8 @@ export function useCrossSiteSessionCookies(): boolean {
 }
 
 /**
- * `Domain` para cookies de sesión y CSRF en producción.
- * Por defecto `.heydoctor.health` (sin inferencia desde URLs).
- * `AUTH_COOKIE_DOMAIN=none` desactiva Domain (solo pruebas / entornos raros).
+ * `Domain` para cookies de sesión y CSRF cuando aplica cross-site.
+ * `AUTH_COOKIE_DOMAIN=none` desactiva Domain (solo pruebas); en Railway no usar salvo debug local remoto.
  */
 export function getAuthCookieDomain(): string | undefined {
   if (!computeCrossSite()) {
@@ -69,21 +73,32 @@ export function getAuthCookieDomain(): string | undefined {
 
 /**
  * Opciones HttpOnly para `access_token` y `refresh_token`.
- * Siempre invocar al setear cookies (no cachear en constante de módulo).
- */
-/**
- * Opciones para `access_token` / `refresh_token` (HttpOnly).
- * Producción cross-subdomain: Domain=.heydoctor.health, SameSite=None, Secure, Path=/.
+ * En cross-site (Railway + HeyDoctor): siempre `None` + `Secure` + `path: /` y, salvo excepción, `Domain=.heydoctor.health`.
+ * Invocar al setear cookies (no cachear en constante de módulo).
  */
 export function getSessionCookieOptions(): CookieOptions {
   if (computeCrossSite()) {
-    const domain = getAuthCookieDomain();
+    const explicit = process.env.AUTH_COOKIE_DOMAIN?.trim();
+    const hostOptOut = explicit && /^(none|false|0)$/i.test(explicit);
+    if (hostOptOut) {
+      return {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'none',
+        path: '/',
+      };
+    }
+    const domain = explicit
+      ? explicit.startsWith('.')
+        ? explicit
+        : `.${explicit}`
+      : HEYDOCTOR_AUTH_COOKIE_DOMAIN;
     return {
       httpOnly: true,
       secure: true,
       sameSite: 'none',
       path: '/',
-      ...(domain ? { domain } : {}),
+      domain,
     };
   }
   return {
