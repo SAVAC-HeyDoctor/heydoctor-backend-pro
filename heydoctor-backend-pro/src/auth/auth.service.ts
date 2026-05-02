@@ -149,8 +149,9 @@ export class AuthService {
   async createRefreshToken(
     userId: string,
     ctx: RequestContext,
+    repoOrManager: Repository<RefreshToken> = this.refreshTokenRepository,
   ): Promise<string> {
-    await this.enforceSessionLimit(userId);
+    await this.enforceSessionLimit(userId, repoOrManager);
 
     const raw = generateRawToken();
     const tokenHash = hashToken(raw);
@@ -165,7 +166,7 @@ export class AuthService {
       );
     }
 
-    const entity = this.refreshTokenRepository.create({
+    const entity = repoOrManager.create({
       tokenHash,
       userId,
       expiresAt,
@@ -173,73 +174,78 @@ export class AuthService {
       userAgent: ctx.userAgent ? ctx.userAgent.slice(0, 512) : null,
     });
     assignClinic(entity, user.clinicId);
-    await this.refreshTokenRepository.save(entity);
+    await repoOrManager.save(entity);
 
     return raw;
   }
 
+  /**
+   * Rota refresh en transacción con bloqueo pesimístico de la fila: evita carreras
+   * entre instancias o requests concurrentes que invalidaban tokens entre sí.
+   */
   async validateAndRotateRefreshToken(
     rawToken: string,
     ctx: RequestContext,
   ): Promise<{ accessToken: string; newRefreshToken: string }> {
     const tokenHash = hashToken(rawToken);
 
-    const stored = await this.refreshTokenRepository.findOne({
-      where: { tokenHash },
-    });
-
-    if (!stored) {
-      throw new UnauthorizedException('Invalid refresh token');
-    }
-
-    // ── Reuse detection: revoked token used again → full revocation ──
-    if (stored.revokedAt) {
-      const msSinceRevoke = Date.now() - new Date(stored.revokedAt).getTime();
-      /**
-       * Dos POST /refresh con el mismo cookie (p. ej. pestañas o carrera al liberar el lock
-       * del cliente antes de aplicar Set-Cookie): el segundo ve la fila ya revocada por rotación.
-       * No revocar todas las sesiones; el cliente debe repetir con el refresh ya rotado en cookie.
-       */
-      if (msSinceRevoke < 15_000) {
-        throw new UnauthorizedException('Refresh token already rotated');
-      }
-      /** No revocar todas las sesiones desde `/auth/refresh`: evita bucles refresh→logout en clientes legítimos. */
-      await this.logSecurityEvent('TOKEN_REUSE_DETECTED', stored.userId, ctx, {
-        tokenId: stored.id,
-        originalRevokedAt: stored.revokedAt.toISOString(),
-        severity: 'critical',
+    return this.refreshTokenRepository.manager.transaction(async (manager) => {
+      const repo = manager.getRepository(RefreshToken);
+      const stored = await repo.findOne({
+        where: { tokenHash },
+        lock: { mode: 'pessimistic_write' },
       });
-      throw new UnauthorizedException('Refresh token reuse detected');
-    }
 
-    if (stored.expiresAt < new Date()) {
-      throw new UnauthorizedException('Refresh token expired');
-    }
+      if (!stored) {
+        throw new UnauthorizedException('Invalid refresh token');
+      }
 
-    // Revoke current token (rotation)
-    stored.revokedAt = new Date();
-    stored.lastUsedAt = new Date();
-    await this.refreshTokenRepository.save(stored);
+      if (stored.revokedAt) {
+        const msSinceRevoke = Date.now() - new Date(stored.revokedAt).getTime();
+        if (msSinceRevoke < 15_000) {
+          throw new UnauthorizedException('Refresh token already rotated');
+        }
+        await this.logSecurityEvent(
+          'TOKEN_REUSE_DETECTED',
+          stored.userId,
+          ctx,
+          {
+            tokenId: stored.id,
+            originalRevokedAt: stored.revokedAt.toISOString(),
+            severity: 'critical',
+          },
+        );
+        throw new UnauthorizedException('Refresh token reuse detected');
+      }
 
-    const user = await this.usersService.findById(stored.userId);
-    if (!user || user.isActive === false) {
-      throw new UnauthorizedException('User not found');
-    }
+      if (stored.expiresAt < new Date()) {
+        throw new UnauthorizedException('Refresh token expired');
+      }
 
-    const payload: JwtPayload = {
-      sub: user.id,
-      email: user.email,
-      role: user.role,
-      clinicId: user.clinicId ?? null,
-    };
-    const accessToken = await this.jwtService.signAsync(payload);
-    const newRefreshToken = await this.createRefreshToken(user.id, ctx);
+      stored.revokedAt = new Date();
+      stored.lastUsedAt = new Date();
+      await repo.save(stored);
 
-    await this.logSecurityEvent('AUTH_REFRESH_SUCCESS', user.id, ctx, {
-      previousTokenId: stored.id,
+      const user = await this.usersService.findById(stored.userId);
+      if (!user || user.isActive === false) {
+        throw new UnauthorizedException('User not found');
+      }
+
+      const payload: JwtPayload = {
+        sub: user.id,
+        email: user.email,
+        role: user.role,
+        clinicId: user.clinicId ?? null,
+      };
+      const accessToken = await this.jwtService.signAsync(payload);
+      const newRefreshToken = await this.createRefreshToken(user.id, ctx, repo);
+
+      await this.logSecurityEvent('AUTH_REFRESH_SUCCESS', user.id, ctx, {
+        previousTokenId: stored.id,
+      });
+
+      return { accessToken, newRefreshToken };
     });
-
-    return { accessToken, newRefreshToken };
   }
 
   async revokeRefreshToken(rawToken: string): Promise<void> {
@@ -262,8 +268,11 @@ export class AuthService {
 
   // ── Session limit enforcement ─────────────────────────────────
 
-  private async enforceSessionLimit(userId: string): Promise<void> {
-    const active = await this.refreshTokenRepository.find({
+  private async enforceSessionLimit(
+    userId: string,
+    repo: Repository<RefreshToken> = this.refreshTokenRepository,
+  ): Promise<void> {
+    const active = await repo.find({
       where: {
         userId,
         revokedAt: IsNull(),
@@ -278,11 +287,11 @@ export class AuthService {
       for (const token of toRevoke) {
         token.revokedAt = now;
       }
-      await this.refreshTokenRepository.save(toRevoke);
+      await repo.save(toRevoke);
     }
 
     // Garbage-collect expired+revoked tokens older than 1 day
-    await this.refreshTokenRepository
+    await repo
       .createQueryBuilder()
       .delete()
       .where('expires_at < :cutoff', {
