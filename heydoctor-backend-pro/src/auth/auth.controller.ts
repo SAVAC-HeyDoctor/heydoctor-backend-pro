@@ -204,19 +204,67 @@ export class AuthController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const rawToken = readCookie(req, REFRESH_TOKEN_COOKIE);
+    const requestId = getCurrentRequestId();
+
+    // Intentar leer el refresh token desde la cookie HttpOnly (flujo normal)
+    // o desde el header Authorization: Bearer <token> (fallback para clientes
+    // que no pueden enviar cookies cross-site, p. ej. apps móviles o Postman).
+    const cookieToken = readCookie(req, REFRESH_TOKEN_COOKIE);
+    const authHeader = req.headers.authorization;
+    const bearerToken =
+      typeof authHeader === 'string' && authHeader.startsWith('Bearer ')
+        ? authHeader.slice(7).trim()
+        : undefined;
+    const rawToken = cookieToken ?? bearerToken;
+
+    this.logger.log('auth_refresh_request', {
+      event: 'auth_refresh_request',
+      requestId,
+      hasCookieToken: Boolean(cookieToken),
+      hasBearerToken: Boolean(bearerToken),
+      cookieNames: req.cookies ? Object.keys(req.cookies) : [],
+      path: req.path,
+      origin: req.headers.origin ?? null,
+    });
+
     if (!rawToken) {
+      this.logger.warn('auth_refresh_no_token', {
+        event: 'auth_refresh_no_token',
+        requestId,
+        cookieNames: req.cookies ? Object.keys(req.cookies) : [],
+        hasAuthHeader: Boolean(authHeader),
+        ip: req.ip ?? null,
+      });
       throw new UnauthorizedException('No refresh token');
     }
 
     const ctx = extractContext(req);
-    const { accessToken, newRefreshToken } =
-      await this.authService.validateAndRotateRefreshToken(rawToken, ctx);
+    try {
+      const { accessToken, newRefreshToken } =
+        await this.authService.validateAndRotateRefreshToken(rawToken, ctx);
 
-    setRefreshCookie(res, newRefreshToken);
-    setAccessCookie(res, accessToken);
-    const csrfToken = setCsrfCookie(res);
-    return { ok: true as const, csrfToken };
+      setRefreshCookie(res, newRefreshToken);
+      setAccessCookie(res, accessToken);
+      const csrfToken = setCsrfCookie(res);
+
+      this.logger.log('auth_refresh_success', {
+        event: 'auth_refresh_success',
+        requestId,
+        source: cookieToken ? 'cookie' : 'bearer',
+      });
+
+      return { ok: true as const, csrfToken };
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      this.logger.warn('auth_refresh_failed', {
+        event: 'auth_refresh_failed',
+        requestId,
+        error: error.message,
+        source: cookieToken ? 'cookie' : 'bearer',
+        ip: ctx.ip,
+      });
+      throw err;
+    }
   }
 
   @Public()
