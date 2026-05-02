@@ -18,6 +18,8 @@ const bootstrapLogger = new Logger('Bootstrap');
  */
 const PRODUCTION_CORS_ORIGINS: (string | RegExp)[] = [
   'https://app.heydoctor.health',
+  'https://heydoctor.health',
+  'https://www.heydoctor.health',
   /^https:\/\/.*\.vercel\.app$/i,
 ];
 

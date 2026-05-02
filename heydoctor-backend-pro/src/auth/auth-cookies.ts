@@ -14,13 +14,26 @@ export const REFRESH_TOKEN_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 export const HEYDOCTOR_AUTH_COOKIE_DOMAIN = '.heydoctor.health';
 
 /**
- * Lee entorno en cada llamada (no al importar el módulo). Así en Railway/prod
- * `NODE_ENV` / `RAILWAY_*` ya están definidos y no caemos en Lax por evaluación temprana.
+ * Lee entorno en cada llamada (no al importar el módulo).
+ * `SameSite=None` + `Secure` + `Domain=.heydoctor.health` solo cuando cross-site aplica;
+ * si Railway no marca `NODE_ENV=production`, seguimos activando cookies de API si el
+ * host público es HeyDoctor (`BACKEND_PUBLIC_URL`) o si se fuerza con env.
  */
 function computeCrossSite(): boolean {
+  if (process.env.AUTH_CROSS_SITE_COOKIES === 'false') {
+    return false;
+  }
+  if (process.env.AUTH_CROSS_SITE_COOKIES === 'true') {
+    return true;
+  }
+  const backendPublic = process.env.BACKEND_PUBLIC_URL ?? '';
+  if (/heydoctor\.health/i.test(backendPublic)) {
+    return true;
+  }
   return (
     process.env.NODE_ENV === 'production' ||
     !!process.env.RAILWAY_ENVIRONMENT ||
+    !!process.env.RAILWAY_ENVIRONMENT_NAME ||
     !!process.env.RAILWAY_PUBLIC_DOMAIN
   );
 }
@@ -57,6 +70,10 @@ export function getAuthCookieDomain(): string | undefined {
 /**
  * Opciones HttpOnly para `access_token` y `refresh_token`.
  * Siempre invocar al setear cookies (no cachear en constante de módulo).
+ */
+/**
+ * Opciones para `access_token` / `refresh_token` (HttpOnly).
+ * Producción cross-subdomain: Domain=.heydoctor.health, SameSite=None, Secure, Path=/.
  */
 export function getSessionCookieOptions(): CookieOptions {
   if (computeCrossSite()) {

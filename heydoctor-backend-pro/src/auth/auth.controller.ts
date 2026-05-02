@@ -103,10 +103,6 @@ export class AuthController {
   ) {}
 
   /**
-   * Diagnóstico deploy/routing: si este log NO aparece en Railway ante GET /api/auth/me,
-   * la request no está llegando al controller (proxy, otra instancia o ruta distinta).
-   */
-  /**
    * SPA cross-origin (p. ej. Vercel → API): el JS no puede leer `csrf_token` del dominio del API.
    * Devuelve el valor actual o crea cookie + token para enviarlo en `X-CSRF-Token` en POST/PATCH/DELETE.
    */
@@ -196,8 +192,6 @@ export class AuthController {
       result.user.id,
       ctx,
     );
-    const cookieOptions = getSessionCookieOptions();
-    console.log('Set-Cookie options:', cookieOptions);
     setRefreshCookie(res, refreshToken);
     setAccessCookie(res, result.access_token);
     const csrfToken = setCsrfCookie(res);
