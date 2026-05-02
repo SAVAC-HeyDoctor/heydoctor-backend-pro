@@ -203,7 +203,7 @@ export class AuthService {
       if (msSinceRevoke < 15_000) {
         throw new UnauthorizedException('Refresh token already rotated');
       }
-      await this.revokeAllUserTokens(stored.userId);
+      /** No revocar todas las sesiones desde `/auth/refresh`: evita bucles refresh→logout en clientes legítimos. */
       await this.logSecurityEvent('TOKEN_REUSE_DETECTED', stored.userId, ctx, {
         tokenId: stored.id,
         originalRevokedAt: stored.revokedAt.toISOString(),
