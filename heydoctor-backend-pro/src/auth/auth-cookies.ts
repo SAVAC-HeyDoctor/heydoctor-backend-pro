@@ -10,6 +10,22 @@ export const ACCESS_TOKEN_MAX_AGE_MS = 15 * 60 * 1000;
 
 export const REFRESH_TOKEN_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
+/** Chrome/third-party: `SameSite=None` exige `Secure`; sin `domain` (host-only del API). */
+export const CROSS_SITE_SESSION_COOKIE_OPTIONS: CookieOptions = {
+  httpOnly: true,
+  secure: true,
+  sameSite: 'none',
+  path: '/',
+};
+
+/** Solo `http localhost` contra API HTTP local; NO usar en Vercel→Railway. */
+const LOCAL_DEV_SESSION_COOKIE_OPTIONS: CookieOptions = {
+  httpOnly: true,
+  secure: false,
+  sameSite: 'lax',
+  path: '/',
+};
+
 function isRailwayDeploy(): boolean {
   return (
     !!process.env.RAILWAY_ENVIRONMENT ||
@@ -19,31 +35,28 @@ function isRailwayDeploy(): boolean {
 }
 
 /**
- * Cookies cross-site (Vercel `app.*` → API Railway): `SameSite=None` + `Secure`.
- * Sin `Domain`: el navegador asocia la cookie al host del Set-Cookie (API), evita
- * valores como `.heydoctor.health` que no aplican si el API vive en otro hostname.
+ * Rutas públicas/API desplegadas: siempre atributos cross-site válidos para credenciales
+ * desde otro origin (p. ej. app Vercel → API Railway).
+ *
+ * Solo en desarrollo local (sin Railway/public URL HeyDoctor) se usa `lax` si no fuerzas cross-site.
  */
-function computeCrossSite(): boolean {
+function useStrictCrossSiteCookieAttributes(): boolean {
+  if (
+    process.env.NODE_ENV === 'production' ||
+    isRailwayDeploy() ||
+    /heydoctor\.health/i.test(process.env.BACKEND_PUBLIC_URL ?? '')
+  ) {
+    return true;
+  }
   if (process.env.AUTH_CROSS_SITE_COOKIES === 'false') {
     return false;
   }
-  if (process.env.AUTH_CROSS_SITE_COOKIES === 'true') {
-    return true;
-  }
-  const backendPublic = process.env.BACKEND_PUBLIC_URL ?? '';
-  if (/heydoctor\.health/i.test(backendPublic)) {
-    return true;
-  }
-  /** Railway: tratar API como cross-site (None + Secure) para cookies con credenciales. */
-  if (isRailwayDeploy()) {
-    return true;
-  }
-  return process.env.NODE_ENV === 'production';
+  return process.env.AUTH_CROSS_SITE_COOKIES === 'true';
 }
 
-/** Cross-site (p. ej. Vercel → Railway Nest): `SameSite=None`, `Secure`, sin `Domain`. */
+/** Cross-site (p. ej. Vercel → Railway Nest): `SameSite=None` + `Secure`, sin `Domain`. */
 export function useCrossSiteCookies(): boolean {
-  return computeCrossSite();
+  return useStrictCrossSiteCookieAttributes();
 }
 
 /** @deprecated usar {@link useCrossSiteCookies} */
@@ -51,44 +64,31 @@ export function useCrossSiteSessionCookies(): boolean {
   return useCrossSiteCookies();
 }
 
-/**
- * Reservado: no establecer `Domain` en cookies de sesión/CSRF.
- * (Las cookies quedan host-only respecto al origen que emite Set-Cookie.)
- */
+/** Sin `Domain`: host-only para el origin que envía Set-Cookie. */
 export function getAuthCookieDomain(): string | undefined {
   return undefined;
 }
 
 /**
- * Opciones HttpOnly para `access_token` y `refresh_token`.
- * Cross-site: sin `domain` para que el cliente envíe la cookie solo al API que la fijó.
+ * `access_token` y `refresh_token`: en deploy, siempre `{ httpOnly, secure, sameSite:none, path }`.
  */
 export function getSessionCookieOptions(): CookieOptions {
-  if (computeCrossSite()) {
-    return {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'none',
-      path: '/',
-    };
-  }
-  return {
-    httpOnly: true,
-    secure: false,
-    sameSite: 'lax',
-    path: '/',
-  };
+  return useStrictCrossSiteCookieAttributes()
+    ? { ...CROSS_SITE_SESSION_COOKIE_OPTIONS }
+    : { ...LOCAL_DEV_SESSION_COOKIE_OPTIONS };
 }
 
-/** `secure` + `sameSite` para cookie CSRF (no HttpOnly). */
+/**
+ * Cookie CSRF (legible desde JS solo en mismo-site; cross-site el valor va en JSON + cabecera).
+ * Mismos `secure` / `sameSite` que sesión cuando aplica cross-site.
+ */
 export function sessionCookieSameSitePolicy(): Pick<
   CookieOptions,
   'secure' | 'sameSite'
 > {
-  if (computeCrossSite()) {
-    return { secure: true, sameSite: 'none' };
-  }
-  return { secure: false, sameSite: 'lax' };
+  return useStrictCrossSiteCookieAttributes()
+    ? { secure: true, sameSite: 'none' }
+    : { secure: false, sameSite: 'lax' };
 }
 
 export const SESSION_COOKIE_PATH = '/';
