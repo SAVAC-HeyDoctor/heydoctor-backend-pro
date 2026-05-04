@@ -151,8 +151,8 @@ export class AuthController {
   }
 
   /**
-   * En `production`, solo si `ENABLE_PUBLIC_REGISTRATION=true`.
-   * Respuesta: `{ user, csrfToken }`; tokens vía Set-Cookie HttpOnly; `csrfToken` para cabecera `X-CSRF-Token` en cross-origin.
+   * Respuesta: `{ user, access_token, csrfToken }`; también Set-Cookie HttpOnly;
+   * `access_token` en JSON permite fallback Bearer en el SPA si las cookies están bloqueadas.
    */
   @Public()
   @Post('register')
@@ -175,7 +175,11 @@ export class AuthController {
     setRefreshCookie(res, refreshToken);
     setAccessCookie(res, result.access_token);
     const csrfToken = setCsrfCookie(res);
-    return { user: result.user, csrfToken };
+    return {
+      user: result.user,
+      access_token: result.access_token,
+      csrfToken,
+    };
   }
 
   @Public()
@@ -198,7 +202,11 @@ export class AuthController {
     setRefreshCookie(res, refreshToken);
     setAccessCookie(res, result.access_token);
     const csrfToken = setCsrfCookie(res);
-    return { user: result.user, csrfToken };
+    return {
+      user: result.user,
+      access_token: result.access_token,
+      csrfToken,
+    };
   }
 
   @Public()
@@ -256,7 +264,11 @@ export class AuthController {
         source: cookieToken ? 'cookie' : 'bearer',
       });
 
-      return { ok: true as const, csrfToken };
+      return {
+        ok: true as const,
+        access_token: accessToken,
+        csrfToken,
+      };
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
       this.logger.warn('auth_refresh_failed', {

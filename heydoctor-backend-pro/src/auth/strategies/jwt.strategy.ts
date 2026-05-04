@@ -34,6 +34,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     @Inject(CACHE_MANAGER) private readonly cache: Cache,
   ) {
     super({
+      /** Cookie primero (rotación/coherencia multitab); Bearer si falta cookie o misma política Safari/Chrome. */
       jwtFromRequest: ExtractJwt.fromExtractors([
         (req: Request): string | null => {
           const cookieVal: unknown = req?.cookies?.[ACCESS_TOKEN_COOKIE];
