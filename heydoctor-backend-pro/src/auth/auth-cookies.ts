@@ -10,53 +10,32 @@ export const ACCESS_TOKEN_MAX_AGE_MS = 15 * 60 * 1000;
 
 export const REFRESH_TOKEN_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
-/** Chrome/third-party: `SameSite=None` exige `Secure`; sin `domain` (host-only del API). */
-export const CROSS_SITE_SESSION_COOKIE_OPTIONS: CookieOptions = {
+/**
+ * Producción / Railway / API HeyDoctor: cookies cross-site válidas (Chrome exige Secure + None).
+ * Requiere `app.set('trust proxy', 1)` para que Express vea HTTPS vía `X-Forwarded-Proto`.
+ */
+const isProd =
+  process.env.NODE_ENV === 'production' ||
+  Boolean(process.env.RAILWAY_ENVIRONMENT) ||
+  (process.env.BACKEND_PUBLIC_URL ?? '').includes('heydoctor.health');
+
+const PROD_SESSION_COOKIE_OPTIONS: CookieOptions = {
   httpOnly: true,
   secure: true,
   sameSite: 'none',
   path: '/',
 };
 
-/** Solo `http localhost` contra API HTTP local; NO usar en Vercel→Railway. */
-const LOCAL_DEV_SESSION_COOKIE_OPTIONS: CookieOptions = {
+const DEV_SESSION_COOKIE_OPTIONS: CookieOptions = {
   httpOnly: true,
   secure: false,
   sameSite: 'lax',
   path: '/',
 };
 
-function isRailwayDeploy(): boolean {
-  return (
-    !!process.env.RAILWAY_ENVIRONMENT ||
-    !!process.env.RAILWAY_ENVIRONMENT_NAME ||
-    !!process.env.RAILWAY_PUBLIC_DOMAIN
-  );
-}
-
-/**
- * Rutas públicas/API desplegadas: siempre atributos cross-site válidos para credenciales
- * desde otro origin (p. ej. app Vercel → API Railway).
- *
- * Solo en desarrollo local (sin Railway/public URL HeyDoctor) se usa `lax` si no fuerzas cross-site.
- */
-function useStrictCrossSiteCookieAttributes(): boolean {
-  if (
-    process.env.NODE_ENV === 'production' ||
-    isRailwayDeploy() ||
-    /heydoctor\.health/i.test(process.env.BACKEND_PUBLIC_URL ?? '')
-  ) {
-    return true;
-  }
-  if (process.env.AUTH_CROSS_SITE_COOKIES === 'false') {
-    return false;
-  }
-  return process.env.AUTH_CROSS_SITE_COOKIES === 'true';
-}
-
-/** Cross-site (p. ej. Vercel → Railway Nest): `SameSite=None` + `Secure`, sin `Domain`. */
+/** Cross-site (p. ej. Vercel → Railway): `SameSite=None` + `Secure`, sin `Domain`. */
 export function useCrossSiteCookies(): boolean {
-  return useStrictCrossSiteCookieAttributes();
+  return isProd;
 }
 
 /** @deprecated usar {@link useCrossSiteCookies} */
@@ -69,27 +48,29 @@ export function getAuthCookieDomain(): string | undefined {
   return undefined;
 }
 
-/**
- * `access_token` y `refresh_token`: en deploy, siempre `{ httpOnly, secure, sameSite:none, path }`.
- */
+/** `access_token` y `refresh_token`. */
 export function getSessionCookieOptions(): CookieOptions {
-  return useStrictCrossSiteCookieAttributes()
-    ? { ...CROSS_SITE_SESSION_COOKIE_OPTIONS }
-    : { ...LOCAL_DEV_SESSION_COOKIE_OPTIONS };
+  const base = isProd ? PROD_SESSION_COOKIE_OPTIONS : DEV_SESSION_COOKIE_OPTIONS;
+  return { ...base };
 }
 
 /**
- * Cookie CSRF (legible desde JS solo en mismo-site; cross-site el valor va en JSON + cabecera).
- * Mismos `secure` / `sameSite` que sesión cuando aplica cross-site.
+ * Cookie CSRF (no HttpOnly; token también en JSON + cabecera en cross-origin).
+ * Misma política Secure / SameSite que la sesión.
  */
 export function sessionCookieSameSitePolicy(): Pick<
   CookieOptions,
   'secure' | 'sameSite'
 > {
-  return useStrictCrossSiteCookieAttributes()
+  return isProd
     ? { secure: true, sameSite: 'none' }
     : { secure: false, sameSite: 'lax' };
 }
+
+/** Chrome/third-party: constante útil si se comparan valores en otro módulo. */
+export const CROSS_SITE_SESSION_COOKIE_OPTIONS: CookieOptions = {
+  ...PROD_SESSION_COOKIE_OPTIONS,
+};
 
 export const SESSION_COOKIE_PATH = '/';
 
