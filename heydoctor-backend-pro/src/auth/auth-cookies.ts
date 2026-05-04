@@ -10,9 +10,6 @@ export const ACCESS_TOKEN_MAX_AGE_MS = 15 * 60 * 1000;
 
 export const REFRESH_TOKEN_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
-/** Dominio fijo producción: cookies visibles en app + pro-api (subdominios HeyDoctor). */
-export const HEYDOCTOR_AUTH_COOKIE_DOMAIN = '.heydoctor.health';
-
 function isRailwayDeploy(): boolean {
   return (
     !!process.env.RAILWAY_ENVIRONMENT ||
@@ -22,8 +19,9 @@ function isRailwayDeploy(): boolean {
 }
 
 /**
- * Cookies cross-site (Vercel `app.*` → API Railway): `SameSite=None`, `Secure`, `Domain`.
- * En Railway esto debe estar activo salvo `AUTH_CROSS_SITE_COOKIES=false` explícito.
+ * Cookies cross-site (Vercel `app.*` → API Railway): `SameSite=None` + `Secure`.
+ * Sin `Domain`: el navegador asocia la cookie al host del Set-Cookie (API), evita
+ * valores como `.heydoctor.health` que no aplican si el API vive en otro hostname.
  */
 function computeCrossSite(): boolean {
   if (process.env.AUTH_CROSS_SITE_COOKIES === 'false') {
@@ -36,14 +34,14 @@ function computeCrossSite(): boolean {
   if (/heydoctor\.health/i.test(backendPublic)) {
     return true;
   }
-  /** Railway: siempre tratar API como cross-site para no emitir Lax sin Domain (401 en refresh). */
+  /** Railway: tratar API como cross-site (None + Secure) para cookies con credenciales. */
   if (isRailwayDeploy()) {
     return true;
   }
   return process.env.NODE_ENV === 'production';
 }
 
-/** Cross-site (Vercel app. → Railway pro-api.): `SameSite=None` + `Secure` + `Domain`. */
+/** Cross-site (p. ej. Vercel → Railway Nest): `SameSite=None`, `Secure`, sin `Domain`. */
 export function useCrossSiteCookies(): boolean {
   return computeCrossSite();
 }
@@ -54,51 +52,24 @@ export function useCrossSiteSessionCookies(): boolean {
 }
 
 /**
- * `Domain` para cookies de sesión y CSRF cuando aplica cross-site.
- * `AUTH_COOKIE_DOMAIN=none` desactiva Domain (solo pruebas); en Railway no usar salvo debug local remoto.
+ * Reservado: no establecer `Domain` en cookies de sesión/CSRF.
+ * (Las cookies quedan host-only respecto al origen que emite Set-Cookie.)
  */
 export function getAuthCookieDomain(): string | undefined {
-  if (!computeCrossSite()) {
-    return undefined;
-  }
-  const explicit = process.env.AUTH_COOKIE_DOMAIN?.trim();
-  if (explicit && /^(none|false|0)$/i.test(explicit)) {
-    return undefined;
-  }
-  if (explicit) {
-    return explicit.startsWith('.') ? explicit : `.${explicit}`;
-  }
-  return HEYDOCTOR_AUTH_COOKIE_DOMAIN;
+  return undefined;
 }
 
 /**
  * Opciones HttpOnly para `access_token` y `refresh_token`.
- * En cross-site (Railway + HeyDoctor): siempre `None` + `Secure` + `path: /` y, salvo excepción, `Domain=.heydoctor.health`.
- * Invocar al setear cookies (no cachear en constante de módulo).
+ * Cross-site: sin `domain` para que el cliente envíe la cookie solo al API que la fijó.
  */
 export function getSessionCookieOptions(): CookieOptions {
   if (computeCrossSite()) {
-    const explicit = process.env.AUTH_COOKIE_DOMAIN?.trim();
-    const hostOptOut = explicit && /^(none|false|0)$/i.test(explicit);
-    if (hostOptOut) {
-      return {
-        httpOnly: true,
-        secure: true,
-        sameSite: 'none',
-        path: '/',
-      };
-    }
-    const domain = explicit
-      ? explicit.startsWith('.')
-        ? explicit
-        : `.${explicit}`
-      : HEYDOCTOR_AUTH_COOKIE_DOMAIN;
     return {
       httpOnly: true,
       secure: true,
       sameSite: 'none',
       path: '/',
-      domain,
     };
   }
   return {
