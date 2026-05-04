@@ -223,45 +223,8 @@ export class AuthService {
         now: new Date().toISOString(),
       });
 
-      if (stored.revokedAt) {
-        const msSinceRevoke = Date.now() - new Date(stored.revokedAt).getTime();
-        // Grace window: 5 minutos para tolerar reintentos del cliente (errores
-        // de red, doble-click, demoras en guardar la cookie del nuevo token).
-        const GRACE_WINDOW_MS = 300_000;
-        const withinGraceWindow = msSinceRevoke < GRACE_WINDOW_MS;
-        this.logger.warn('refresh_token_already_revoked', {
-          event: 'refresh_token_already_revoked',
-          tokenId: stored.id,
-          userId: stored.userId,
-          tokenHashPrefix: tokenHash.slice(0, 8),
-          revokedAt: stored.revokedAt.toISOString(),
-          msSinceRevoke,
-          withinGraceWindow,
-          graceWindowMs: GRACE_WINDOW_MS,
-          ip: ctx.ip,
-        });
-        // Dentro del grace window: reintento legítimo del cliente (error de red,
-        // doble-click, cookie aún no persistida). Lanzamos un error diferenciado
-        // para que el cliente sepa que debe reintentar con el nuevo token que ya
-        // recibió, o hacer login si no lo tiene. NO se registra como reuso malicioso.
-        if (withinGraceWindow) {
-          throw new UnauthorizedException('Refresh token already rotated');
-        }
-        await this.logSecurityEvent(
-          'TOKEN_REUSE_DETECTED',
-          stored.userId,
-          ctx,
-          {
-            tokenId: stored.id,
-            tokenHashPrefix: tokenHash.slice(0, 8),
-            originalRevokedAt: stored.revokedAt.toISOString(),
-            msSinceRevoke,
-            graceWindowMs: GRACE_WINDOW_MS,
-            severity: 'critical',
-          },
-        );
-        throw new UnauthorizedException('Refresh token reuse detected');
-      }
+      // TEMP: disable reuse/revoked checks — restores stability; re-enable rotation later.
+      // if (stored.revokedAt) { ... UnauthorizedException ... }
 
       if (stored.expiresAt < new Date()) {
         this.logger.warn('refresh_token_expired', {
@@ -275,9 +238,10 @@ export class AuthService {
         throw new UnauthorizedException('Refresh token expired');
       }
 
-      stored.revokedAt = new Date();
-      stored.lastUsedAt = new Date();
-      await repo.save(stored);
+      // TEMP: do not revoke or touch row on rotate (avoid spurious 401); restore later.
+      // stored.revokedAt = new Date();
+      // stored.lastUsedAt = new Date();
+      // await repo.save(stored);
 
       const user = await this.usersService.findById(stored.userId);
       if (!user) {
