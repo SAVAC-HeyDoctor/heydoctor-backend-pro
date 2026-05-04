@@ -1,5 +1,6 @@
 import { Logger, RequestMethod, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { IoAdapter } from '@nestjs/platform-socket.io';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import cookieParser from 'cookie-parser';
@@ -48,13 +49,14 @@ async function bootstrap() {
     );
   }
 
-  const app = await NestFactory.create(AppModule, { rawBody: true });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    rawBody: true,
+  });
 
-  /** Railway/proxy: `X-Forwarded-Proto` → `req.secure` / cookies coherentes con HTTPS. */
+  /** Railway/proxy: `X-Forwarded-Proto` → `req.secure`; cookies `Secure` no se descartan. */
+  app.set('trust proxy', 1);
+
   const server = app.getHttpAdapter().getInstance();
-  server.set('trust proxy', 1);
-
-  // Healthcheck ultra rápido para Railway (Express; no controllers / guards / ORM en la petición)
   server.get('/_health', (_req: Request, res: Response) => {
     res.status(200).send('ok');
   });
