@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import { AuditService } from '../audit/audit.service';
@@ -31,6 +32,60 @@ function sanitizeReason(reason?: string): string | undefined {
   return clean.length > 0 ? clean : undefined;
 }
 
+function subscriptionEventSourceFromChangeSource(
+  source: SubscriptionChangeSource,
+): SubscriptionEventSource {
+  switch (source) {
+    case SubscriptionChangeSource.ADMIN_PANEL:
+      return SubscriptionEventSource.ADMIN;
+    case SubscriptionChangeSource.WEBHOOK:
+    case SubscriptionChangeSource.PAYKU:
+      return SubscriptionEventSource.WEBHOOK;
+    default:
+      return SubscriptionEventSource.SYSTEM;
+  }
+}
+
+function parseProMonthlyPrice(cfg: ConfigService): number {
+  const v = cfg.get<string>('SUBSCRIPTION_PRO_MONTHLY_PRICE');
+  const n = Number(v ?? '0');
+  return Number.isFinite(n) && n >= 0 ? n : 0;
+}
+
+/** Un ciclo mensual recurrente desde `from` (mismo día UTC +1 mes aprox.). */
+function utcAddOneBillingMonth(from: Date): Date {
+  return new Date(
+    Date.UTC(
+      from.getUTCFullYear(),
+      from.getUTCMonth() + 1,
+      from.getUTCDate(),
+      from.getUTCHours(),
+      from.getUTCMinutes(),
+      from.getUTCSeconds(),
+      from.getUTCMilliseconds(),
+    ),
+  );
+}
+
+/** Campos recurrentes cuando pasa a PRO o se resetean en FREE — no afecta planGrantedForTier. */
+function applySubscriptionBillingCycle(
+  row: Subscription,
+  plan: SubscriptionPlan,
+  cfg: ConfigService,
+): void {
+  if (plan === SubscriptionPlan.PRO) {
+    const amt = parseProMonthlyPrice(cfg);
+    row.price = amt.toFixed(2);
+    const start = new Date();
+    row.currentPeriodStart = start;
+    row.currentPeriodEnd = utcAddOneBillingMonth(start);
+    return;
+  }
+  row.price = '0.00';
+  row.currentPeriodStart = null;
+  row.currentPeriodEnd = null;
+}
+
 @Injectable()
 export class SubscriptionsService {
   private readonly logger = new Logger(SubscriptionsService.name);
@@ -41,6 +96,7 @@ export class SubscriptionsService {
     private readonly auditService: AuditService,
     private readonly usersService: UsersService,
     private readonly subscriptionEventsService: SubscriptionEventsService,
+    private readonly configService: ConfigService,
   ) {}
 
   /**
@@ -135,6 +191,8 @@ export class SubscriptionsService {
     }
 
     existing.plan = plan;
+    applySubscriptionBillingCycle(existing, plan, this.configService);
+
     const saved = await this.subscriptionsRepository.save(existing);
     const auditReason = sanitizeReason(reason);
     const auditReasonText = sanitizeReason(reasonText);
@@ -182,6 +240,33 @@ export class SubscriptionsService {
       } catch (err) {
         this.logger.error(
           'subscription_event_ADMIN_UPDATED_failed',
+          err instanceof Error ? err : new Error(String(err)),
+        );
+      }
+    }
+
+    if (
+      previousPlan !== plan &&
+      source !== SubscriptionChangeSource.ADMIN_PANEL
+    ) {
+      const upgraded = PLAN_RANK[plan] > PLAN_RANK[previousPlan];
+      try {
+        await this.subscriptionEventsService.append({
+          userId,
+          clinicId: saved.clinicId,
+          eventType: upgraded
+            ? SubscriptionEventType.PLAN_UPGRADED
+            : SubscriptionEventType.PLAN_DOWNGRADED,
+          previousPlan,
+          newPlan: plan,
+          previousStatus: existing.status,
+          newStatus: saved.status,
+          source: subscriptionEventSourceFromChangeSource(source),
+          metadata: auditReason ? { reason: auditReason } : {},
+        });
+      } catch (err) {
+        this.logger.error(
+          'subscription_event_PLAN_RANK_change_failed',
           err instanceof Error ? err : new Error(String(err)),
         );
       }

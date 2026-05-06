@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { DataSource, In, MoreThanOrEqual } from 'typeorm';
 import { User } from '../users/user.entity';
 import {
@@ -84,9 +85,77 @@ export type CohortsResponseDto = {
   cohorts: CohortRowDto[];
 };
 
+/** Subscripciones PRO activas con periodo válido vigente (`price`, `currentPeriodEnd`). */
+export type SubscriptionMrrRealResponseDto = {
+  mrr: number;
+  payerCount: number;
+  /** ISO date (UTC día) utilizado como corte temporal. */
+  asOfDate: string;
+};
+
+export type SubscriptionMrrSeriesPointDto = {
+  monthStart: string;
+  mrr: number;
+  payingProUsers: number;
+};
+
+export type SubscriptionMrrSeriesResponseDto = {
+  monthsLookback: number;
+  proMonthlyPrice: number;
+  series: SubscriptionMrrSeriesPointDto[];
+};
+
+export type RealChurnMonthlyPointDto = {
+  monthStart: string;
+  churnEvents: number;
+  payingProUsersAtMonthStart: number;
+  churnRate: number;
+};
+
+export type SubscriptionChurnRealResponseDto = {
+  monthsLookback: number;
+  series: RealChurnMonthlyPointDto[];
+  lastClosedMonthStart: string;
+  lastClosedMonthChurnRateVsPayingBase: number;
+};
+
+export type ArpuResponseDto = {
+  mrr: number;
+  payerCount: number;
+  arpu: number;
+  asOfDate: string;
+};
+
+export type ArrResponseDto = {
+  arr: number;
+  mrr: number;
+};
+
+export type LtvResponseDto = {
+  arpu: number;
+  /** Churn del último mes calendario UTC cerrado (`churn-real`); 0 si no aplica. */
+  lastClosedMonthlyChurnRate: number;
+  ltvMonths: number;
+  ltvAnnualizedFallback: boolean;
+};
+
+const METRICS_SUBSCRIPTION_EVENT_REPLAY_TYPES: SubscriptionEventType[] = [
+  SubscriptionEventType.ADMIN_UPDATED,
+  SubscriptionEventType.PLAN_UPGRADED,
+  SubscriptionEventType.PLAN_DOWNGRADED,
+  SubscriptionEventType.SUBSCRIPTION_CREATED,
+  SubscriptionEventType.SUBSCRIPTION_ACTIVATED,
+  SubscriptionEventType.SUBSCRIPTION_DEACTIVATED,
+  SubscriptionEventType.SUBSCRIPTION_EXPIRED,
+  SubscriptionEventType.PAYMENT_SUCCEEDED,
+];
+
 @Injectable()
 export class SubscriptionsAnalyticsService {
-  constructor(private readonly dataSource: DataSource) {}
+  constructor(
+    private readonly dataSource: DataSource,
+    private readonly configService: ConfigService,
+  ) {}
 
   async getSummary(): Promise<SubscriptionsSummaryDto> {
     const userRepo = this.dataSource.getRepository(User);
@@ -289,6 +358,244 @@ export class SubscriptionsAnalyticsService {
     };
   }
 
+  async getSubscriptionMrrReal(
+    now: Date = new Date(),
+  ): Promise<SubscriptionMrrRealResponseDto> {
+    const subRepo = this.dataSource.getRepository(Subscription);
+    const asOfDate = new Date(now);
+    const row = await subRepo
+      .createQueryBuilder('s')
+      .select(
+        `COALESCE(SUM(CAST(NULLIF(TRIM(s.price), '') AS DECIMAL)), 0)`,
+        'mrr',
+      )
+      .addSelect('COUNT(*)', 'cnt')
+      .where('s.plan = :pro', { pro: SubscriptionPlan.PRO })
+      .andWhere('s.status = :active', { active: SubscriptionStatus.ACTIVE })
+      .andWhere('s.currentPeriodEnd IS NOT NULL')
+      .andWhere('s.currentPeriodEnd >= :now', { now })
+      .getRawOne<{ mrr: string | null; cnt: string | null }>();
+
+    return {
+      mrr: Number(row?.mrr ?? 0),
+      payerCount: Number(row?.cnt ?? 0),
+      asOfDate: asOfDate.toISOString().slice(0, 10),
+    };
+  }
+
+  async getSubscriptionMrrSeries(
+    monthsLookback: number,
+  ): Promise<SubscriptionMrrSeriesResponseDto> {
+    const n = Math.min(Math.max(monthsLookback, 1), 36);
+    const proMonthlyPrice = readProMonthlyPrice(this.configService);
+    const now = new Date();
+
+    const firstMonthStart = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (n - 1), 1),
+    );
+
+    const eventRepo = this.dataSource.getRepository(SubscriptionEvent);
+    const replayEventsAll = await eventRepo.find({
+      where: { eventType: In(METRICS_SUBSCRIPTION_EVENT_REPLAY_TYPES) },
+      select: [
+        'userId',
+        'eventType',
+        'previousPlan',
+        'newPlan',
+        'previousStatus',
+        'newStatus',
+        'createdAt',
+      ],
+      order: { createdAt: 'ASC' },
+    });
+
+    const preload: SubscriptionEvent[] = [];
+    const rest: SubscriptionEvent[] = [];
+    const firstTs = firstMonthStart.getTime();
+    for (const ev of replayEventsAll) {
+      if (ev.createdAt.getTime() < firstTs) preload.push(ev);
+      else rest.push(ev);
+    }
+
+    const replayState = new Map<string, ReplayUserState>();
+
+    const applyReplay = (ev: SubscriptionEvent): void => {
+      const uid = ev.userId;
+      const prev = replayState.get(uid);
+      replayState.set(uid, applyReplayEvent(prev, ev));
+    };
+
+    for (const ev of preload) applyReplay(ev);
+
+    const monthStarts: Date[] = [];
+    for (let i = 0; i < n; i++) {
+      monthStarts.push(addUtcMonths(firstMonthStart, i));
+    }
+    let iEv = 0;
+    const series: SubscriptionMrrSeriesPointDto[] = [];
+
+    for (let mi = 0; mi < n; mi++) {
+      const monthStart = monthStarts[mi];
+      const monthEnd = endOfUtcMonth(monthStart);
+      while (
+        iEv < rest.length &&
+        rest[iEv].createdAt.getTime() <= monthEnd.getTime()
+      ) {
+        applyReplay(rest[iEv]);
+        iEv++;
+      }
+      series.push(
+        mrrSeriesPointFromStates(replayState, monthStart, proMonthlyPrice),
+      );
+    }
+
+    return { monthsLookback: n, proMonthlyPrice, series };
+  }
+
+  async getSubscriptionChurnReal(
+    monthsLookback: number,
+    nowInput: Date = new Date(),
+  ): Promise<SubscriptionChurnRealResponseDto> {
+    const n = Math.min(Math.max(monthsLookback, 1), 36);
+    const now = nowInput;
+
+    const firstMonthStart = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (n - 1), 1),
+    );
+
+    const eventRepo = this.dataSource.getRepository(SubscriptionEvent);
+    const replayEventsAll = await eventRepo.find({
+      where: { eventType: In(METRICS_SUBSCRIPTION_EVENT_REPLAY_TYPES) },
+      select: [
+        'userId',
+        'eventType',
+        'previousPlan',
+        'newPlan',
+        'previousStatus',
+        'newStatus',
+        'createdAt',
+      ],
+      order: { createdAt: 'ASC' },
+    });
+
+    const churnTypes = [
+      SubscriptionEventType.SUBSCRIPTION_DEACTIVATED,
+      SubscriptionEventType.SUBSCRIPTION_EXPIRED,
+    ];
+
+    const churnAgg = await eventRepo
+      .createQueryBuilder('e')
+      .select(`date_trunc('month', e.createdAt)`, 'monthStart')
+      .addSelect('COUNT(*)', 'cnt')
+      .where('e.eventType IN (:...types)', {
+        types: churnTypes,
+      })
+      .andWhere('e.createdAt >= :from', { from: firstMonthStart })
+      .groupBy(`date_trunc('month', e.createdAt)`)
+      .orderBy(`date_trunc('month', e.createdAt)`, 'ASC')
+      .getRawMany<{ monthStart: Date; cnt: string }>();
+
+    const churnCountByMonth = new Map<string, number>();
+    for (const row of churnAgg) {
+      const key = new Date(row.monthStart).toISOString().slice(0, 10);
+      churnCountByMonth.set(key, Number(row.cnt ?? 0));
+    }
+
+    const preload: SubscriptionEvent[] = [];
+    const rest: SubscriptionEvent[] = [];
+    const firstTs = firstMonthStart.getTime();
+    for (const ev of replayEventsAll) {
+      if (ev.createdAt.getTime() < firstTs) preload.push(ev);
+      else rest.push(ev);
+    }
+
+    const replayState = new Map<string, ReplayUserState>();
+    const applyReplay = (ev: SubscriptionEvent): void => {
+      const uid = ev.userId;
+      const prev = replayState.get(uid);
+      replayState.set(uid, applyReplayEvent(prev, ev));
+    };
+
+    for (const ev of preload) applyReplay(ev);
+
+    let iEv = 0;
+    const series: RealChurnMonthlyPointDto[] = [];
+
+    for (let mi = 0; mi < n; mi++) {
+      const monthStart = addUtcMonths(firstMonthStart, mi);
+      const key = monthStart.toISOString().slice(0, 10);
+      while (
+        iEv < rest.length &&
+        rest[iEv].createdAt.getTime() < monthStart.getTime()
+      ) {
+        applyReplay(rest[iEv]);
+        iEv++;
+      }
+      const payingProUsersAtMonthStart = countPayingProAccounts(replayState);
+      const churnEvents = churnCountByMonth.get(key) ?? 0;
+      const churnRate =
+        payingProUsersAtMonthStart > 0
+          ? churnEvents / payingProUsersAtMonthStart
+          : 0;
+      series.push({
+        monthStart: key,
+        churnEvents,
+        payingProUsersAtMonthStart,
+        churnRate,
+      });
+    }
+
+    const lastClosed = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1),
+    );
+    const lastClosedKey = lastClosed.toISOString().slice(0, 10);
+    const closedRow = series.find((s) => s.monthStart === lastClosedKey);
+    const lastClosedMonthChurnRateVsPayingBase = closedRow?.churnRate ?? 0;
+
+    return {
+      monthsLookback: n,
+      series,
+      lastClosedMonthStart: lastClosedKey,
+      lastClosedMonthChurnRateVsPayingBase,
+    };
+  }
+
+  async getArpu(now: Date = new Date()): Promise<ArpuResponseDto> {
+    const { mrr, payerCount, asOfDate } =
+      await this.getSubscriptionMrrReal(now);
+    return {
+      mrr,
+      payerCount,
+      arpu: payerCount > 0 ? mrr / payerCount : 0,
+      asOfDate,
+    };
+  }
+
+  async getArr(now: Date = new Date()): Promise<ArrResponseDto> {
+    const { mrr } = await this.getSubscriptionMrrReal(now);
+    return { arr: mrr * 12, mrr };
+  }
+
+  async getLtv(now: Date = new Date()): Promise<LtvResponseDto> {
+    const arpuDto = await this.getArpu(now);
+    const churnReal = await this.getSubscriptionChurnReal(24, now);
+    const rate = churnReal.lastClosedMonthChurnRateVsPayingBase;
+    if (rate > 0) {
+      return {
+        arpu: arpuDto.arpu,
+        lastClosedMonthlyChurnRate: rate,
+        ltvMonths: arpuDto.arpu / rate,
+        ltvAnnualizedFallback: false,
+      };
+    }
+    return {
+      arpu: arpuDto.arpu,
+      lastClosedMonthlyChurnRate: 0,
+      ltvMonths: arpuDto.arpu * 12,
+      ltvAnnualizedFallback: true,
+    };
+  }
+
   async getCohorts(params: {
     cohortMonthsLookback: number;
     horizonMonths: number;
@@ -388,6 +695,90 @@ export class SubscriptionsAnalyticsService {
       cohorts,
     };
   }
+}
+
+type ReplayUserState = {
+  plan: SubscriptionPlan;
+  status: SubscriptionStatus;
+};
+
+function readProMonthlyPrice(cfg: ConfigService): number {
+  const v = cfg.get<string>('SUBSCRIPTION_PRO_MONTHLY_PRICE');
+  const n = Number(v ?? '0');
+  return Number.isFinite(n) && n >= 0 ? n : 0;
+}
+
+function applyReplayEvent(
+  prev: ReplayUserState | undefined,
+  ev: SubscriptionEvent,
+): ReplayUserState {
+  const cur = prev ?? {
+    plan: SubscriptionPlan.FREE,
+    status: SubscriptionStatus.INACTIVE,
+  };
+
+  switch (ev.eventType) {
+    case SubscriptionEventType.ADMIN_UPDATED:
+    case SubscriptionEventType.PAYMENT_SUCCEEDED:
+      return {
+        plan: ev.newPlan ?? cur.plan,
+        status: ev.newStatus ?? cur.status,
+      };
+    case SubscriptionEventType.SUBSCRIPTION_CREATED:
+      return {
+        plan: ev.newPlan ?? SubscriptionPlan.FREE,
+        status: ev.newStatus ?? SubscriptionStatus.ACTIVE,
+      };
+    case SubscriptionEventType.SUBSCRIPTION_ACTIVATED:
+      return {
+        plan: ev.newPlan ?? cur.plan,
+        status: SubscriptionStatus.ACTIVE,
+      };
+    case SubscriptionEventType.SUBSCRIPTION_DEACTIVATED:
+    case SubscriptionEventType.SUBSCRIPTION_EXPIRED:
+      return {
+        plan: ev.newPlan ?? cur.plan,
+        status: SubscriptionStatus.INACTIVE,
+      };
+    case SubscriptionEventType.PLAN_UPGRADED:
+      return {
+        plan: ev.newPlan ?? SubscriptionPlan.PRO,
+        status: ev.newStatus ?? cur.status,
+      };
+    case SubscriptionEventType.PLAN_DOWNGRADED:
+      return {
+        plan: ev.newPlan ?? SubscriptionPlan.FREE,
+        status: ev.newStatus ?? cur.status,
+      };
+    default:
+      return cur;
+  }
+}
+
+function countPayingProAccounts(states: Map<string, ReplayUserState>): number {
+  let k = 0;
+  for (const [, st] of states) {
+    if (
+      st.plan === SubscriptionPlan.PRO &&
+      st.status === SubscriptionStatus.ACTIVE
+    ) {
+      k += 1;
+    }
+  }
+  return k;
+}
+
+function mrrSeriesPointFromStates(
+  states: Map<string, ReplayUserState>,
+  monthStart: Date,
+  monthlyPrice: number,
+): SubscriptionMrrSeriesPointDto {
+  const payingProUsers = countPayingProAccounts(states);
+  return {
+    monthStart: monthStart.toISOString().slice(0, 10),
+    mrr: payingProUsers * monthlyPrice,
+    payingProUsers,
+  };
 }
 
 function addUtcMonths(start: Date, offset: number): Date {

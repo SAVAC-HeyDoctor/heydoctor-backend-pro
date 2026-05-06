@@ -68,6 +68,29 @@ export class Subscription {
   })
   status: SubscriptionStatus;
 
+  /** Precio mensual recurrente (misma divisa que negocio; no es contabilidad fiscal). */
+  @Column({
+    type: 'decimal',
+    precision: 12,
+    scale: 2,
+    default: '0',
+  })
+  price: string;
+
+  @Column({
+    name: 'current_period_start',
+    type: 'timestamptz',
+    nullable: true,
+  })
+  currentPeriodStart: Date | null;
+
+  @Column({
+    name: 'current_period_end',
+    type: 'timestamptz',
+    nullable: true,
+  })
+  currentPeriodEnd: Date | null;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 }

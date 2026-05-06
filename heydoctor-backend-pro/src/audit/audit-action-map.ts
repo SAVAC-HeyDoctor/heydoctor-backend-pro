@@ -78,6 +78,30 @@ const ROUTE_MAP: Record<string, AuditActionDescriptor> = {
     action: 'SUBSCRIPTION_CHURN_ADMIN',
     resource: 'subscription',
   },
+  'GET /api/admin/subscriptions/mrr-real': {
+    action: 'SUBSCRIPTION_MRR_REAL_ADMIN',
+    resource: 'subscription',
+  },
+  'GET /api/admin/subscriptions/mrr-series': {
+    action: 'SUBSCRIPTION_MRR_SERIES_REAL_ADMIN',
+    resource: 'subscription',
+  },
+  'GET /api/admin/subscriptions/churn-real': {
+    action: 'SUBSCRIPTION_CHURN_REAL_ADMIN',
+    resource: 'subscription',
+  },
+  'GET /api/admin/subscriptions/arpu': {
+    action: 'SUBSCRIPTION_ARPU_ADMIN',
+    resource: 'subscription',
+  },
+  'GET /api/admin/subscriptions/ltv': {
+    action: 'SUBSCRIPTION_LTV_ADMIN',
+    resource: 'subscription',
+  },
+  'GET /api/admin/subscriptions/arr': {
+    action: 'SUBSCRIPTION_ARR_ADMIN',
+    resource: 'subscription',
+  },
   'PATCH /api/admin/subscriptions/:id/status': {
     action: 'SUBSCRIPTION_STATUS_ADMIN',
     resource: 'subscription',

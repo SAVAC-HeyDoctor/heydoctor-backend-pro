@@ -69,6 +69,45 @@ export class AdminSubscriptionsController {
     return this.subscriptionsAnalytics.getChurn(months);
   }
 
+  /** MRR desde filas `subscriptions` (PRO + activo + periodo vigente, suma `price`). */
+  @Get('mrr-real')
+  getMrrReal(): ReturnType<
+    SubscriptionsAnalyticsService['getSubscriptionMrrReal']
+  > {
+    return this.subscriptionsAnalytics.getSubscriptionMrrReal();
+  }
+
+  /** Serie MRR mensual (UTC) desde replay de eventos + tarifa configurada PRO. */
+  @Get('mrr-series')
+  getMrrSeries(
+    @Query('months', new DefaultValuePipe(12), ParseIntPipe) months: number,
+  ): ReturnType<SubscriptionsAnalyticsService['getSubscriptionMrrSeries']> {
+    return this.subscriptionsAnalytics.getSubscriptionMrrSeries(months);
+  }
+
+  /** Churn mensual vs base de PRO activos pagadores al inicio de cada mes UTC. */
+  @Get('churn-real')
+  getChurnReal(
+    @Query('months', new DefaultValuePipe(12), ParseIntPipe) months: number,
+  ): ReturnType<SubscriptionsAnalyticsService['getSubscriptionChurnReal']> {
+    return this.subscriptionsAnalytics.getSubscriptionChurnReal(months);
+  }
+
+  @Get('arpu')
+  getArpu(): ReturnType<SubscriptionsAnalyticsService['getArpu']> {
+    return this.subscriptionsAnalytics.getArpu();
+  }
+
+  @Get('ltv')
+  getLtv(): ReturnType<SubscriptionsAnalyticsService['getLtv']> {
+    return this.subscriptionsAnalytics.getLtv();
+  }
+
+  @Get('arr')
+  getArr(): ReturnType<SubscriptionsAnalyticsService['getArr']> {
+    return this.subscriptionsAnalytics.getArr();
+  }
+
   @Patch(':userId/status')
   patchStatus(
     @Param('userId', new ParseUUIDPipe({ version: '4' })) userId: string,
