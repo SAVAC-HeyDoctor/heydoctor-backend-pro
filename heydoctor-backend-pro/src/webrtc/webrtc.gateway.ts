@@ -109,11 +109,27 @@ export class WebrtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
   ): Promise<{ ok: true; consultationId: string }> {
     const user = this.requireUser(client);
     const consultationId = this.requireConsultationId(body?.consultationId);
-    await this.consultationsService.verifySignalingAccess(consultationId, user);
-    await client.join(consultationId);
-    this.logger.debug(`User ${user.sub} joined room ${consultationId}`);
-    client.to(consultationId).emit('peer-joined', { userId: user.sub });
-    return { ok: true, consultationId };
+    this.logger.log(
+      `join-consultation.start user=${user.sub} consultation=${consultationId}`,
+    );
+    try {
+      await this.consultationsService.verifySignalingAccess(
+        consultationId,
+        user,
+      );
+      await client.join(consultationId);
+      this.logger.log(
+        `join-consultation.joined user=${user.sub} consultation=${consultationId}`,
+      );
+      client.to(consultationId).emit('peer-joined', { userId: user.sub });
+      return { ok: true, consultationId };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.warn(
+        `join-consultation.failed user=${user.sub} consultation=${consultationId}: ${msg}`,
+      );
+      throw err;
+    }
   }
 
   @SubscribeMessage('offer')
