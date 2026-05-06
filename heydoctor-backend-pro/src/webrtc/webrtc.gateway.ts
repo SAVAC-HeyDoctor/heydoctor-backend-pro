@@ -1,4 +1,4 @@
-import { Logger, UseGuards } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { SkipThrottle } from '@nestjs/throttler';
 import {
@@ -16,8 +16,6 @@ import type { JwtPayload } from '../auth/types/jwt-payload.interface';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import { ACCESS_TOKEN_COOKIE } from '../auth/auth-cookies';
 import { ConsultationsService } from '../consultations/consultations.service';
-import { RequirePlan } from '../subscriptions/decorators/require-plan.decorator';
-import { FeatureGuard } from '../subscriptions/guards/feature.guard';
 import { SubscriptionPlan } from '../subscriptions/subscription.entity';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { UsersService } from '../users/users.service';
@@ -45,8 +43,11 @@ type IceCandidatePayload = SignalingPayload & {
     credentials: true,
   },
 })
-@UseGuards(FeatureGuard)
-@RequirePlan(SubscriptionPlan.PRO)
+/**
+ * No usar FeatureGuard / RequirePlan a nivel de gateway: en WS el guard puede
+ * ejecutarse antes de que `handleConnection` asigne `client.data.user` → Forbidden sin ACK.
+ * Plan PRO: validado en `handleConnection` (y aquí `requireUser` tras conectar).
+ */
 export class WebrtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server!: Server;
@@ -108,6 +109,13 @@ export class WebrtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @MessageBody() body: SignalingPayload,
   ): Promise<{ ok: true; consultationId: string }> {
     const user = this.requireUser(client);
+    const planOk = await this.subscriptionsService.hasRequiredPlan(
+      user.sub,
+      SubscriptionPlan.PRO,
+    );
+    if (!planOk) {
+      throw new WsException('PRO plan required for video calls');
+    }
     const consultationId = this.requireConsultationId(body?.consultationId);
     this.logger.log(
       `join-consultation.start user=${user.sub} consultation=${consultationId}`,
