@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import { AuditService } from '../audit/audit.service';
@@ -11,6 +11,11 @@ import {
   SubscriptionStatus,
   planGrantedForTier,
 } from './subscription.entity';
+import {
+  SubscriptionEventSource,
+  SubscriptionEventType,
+} from './subscription-event.entity';
+import { SubscriptionEventsService } from './subscription-events.service';
 import { assignClinic } from '../common/entity-clinic.util';
 import { UsersService } from '../users/users.service';
 import { normalizeReasonCode } from './reason-normalizer';
@@ -28,11 +33,14 @@ function sanitizeReason(reason?: string): string | undefined {
 
 @Injectable()
 export class SubscriptionsService {
+  private readonly logger = new Logger(SubscriptionsService.name);
+
   constructor(
     @InjectRepository(Subscription)
     private readonly subscriptionsRepository: Repository<Subscription>,
     private readonly auditService: AuditService,
     private readonly usersService: UsersService,
+    private readonly subscriptionEventsService: SubscriptionEventsService,
   ) {}
 
   /**
@@ -59,7 +67,24 @@ export class SubscriptionsService {
     });
     assignClinic(created, user.clinicId);
     try {
-      return await this.subscriptionsRepository.save(created);
+      const saved = await this.subscriptionsRepository.save(created);
+      try {
+        await this.subscriptionEventsService.append({
+          userId,
+          clinicId: user.clinicId,
+          eventType: SubscriptionEventType.SUBSCRIPTION_CREATED,
+          newPlan: SubscriptionPlan.FREE,
+          newStatus: SubscriptionStatus.ACTIVE,
+          source: SubscriptionEventSource.SYSTEM,
+          metadata: { reason: 'first_subscription_row' },
+        });
+      } catch (err) {
+        this.logger.error(
+          'subscription_event_SUBSCRIPTION_CREATED_failed',
+          err instanceof Error ? err : new Error(String(err)),
+        );
+      }
+      return saved;
     } catch (e) {
       if (
         e instanceof QueryFailedError &&
@@ -72,6 +97,10 @@ export class SubscriptionsService {
       }
       throw e;
     }
+  }
+
+  async findExistingByUserId(userId: string): Promise<Subscription | null> {
+    return this.subscriptionsRepository.findOne({ where: { userId } });
   }
 
   async hasRequiredPlan(
@@ -131,6 +160,32 @@ export class SubscriptionsService {
         ...(auditReasonText ? { reasonText: auditReasonText } : {}),
       },
     });
+
+    if (source === SubscriptionChangeSource.ADMIN_PANEL) {
+      try {
+        await this.subscriptionEventsService.append({
+          userId,
+          clinicId: saved.clinicId,
+          eventType: SubscriptionEventType.ADMIN_UPDATED,
+          previousPlan,
+          newPlan: plan,
+          previousStatus: existing.status,
+          newStatus: saved.status,
+          source: SubscriptionEventSource.ADMIN,
+          metadata: {
+            changedBy: authUser.sub,
+            ...(auditReason ? { reason: auditReason } : {}),
+            ...(effectiveReasonCode ? { reasonCode: effectiveReasonCode } : {}),
+            ...(auditReasonText ? { reasonText: auditReasonText } : {}),
+          },
+        });
+      } catch (err) {
+        this.logger.error(
+          'subscription_event_ADMIN_UPDATED_failed',
+          err instanceof Error ? err : new Error(String(err)),
+        );
+      }
+    }
 
     return saved;
   }

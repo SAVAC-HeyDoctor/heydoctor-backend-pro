@@ -24,6 +24,11 @@ import {
   SubscriptionPlan,
 } from '../subscriptions/subscription.entity';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
+import {
+  SubscriptionEventSource,
+  SubscriptionEventType,
+} from '../subscriptions/subscription-event.entity';
+import { SubscriptionEventsService } from '../subscriptions/subscription-events.service';
 import { UserRole } from '../users/user-role.enum';
 import {
   PaykuPayment,
@@ -64,6 +69,7 @@ export class PaykuService {
     private readonly config: ConfigService,
     private readonly authorizationService: AuthorizationService,
     private readonly subscriptionsService: SubscriptionsService,
+    private readonly subscriptionEventsService: SubscriptionEventsService,
     private readonly auditService: AuditService,
     @Inject(APP_LOGGER)
     private readonly logger: LoggerService,
@@ -387,6 +393,24 @@ export class PaykuService {
         return { action: 'payment_not_found', paymentId };
       }
 
+      try {
+        await this.subscriptionEventsService.append({
+          userId: payment.userId,
+          clinicId: payment.clinicId,
+          eventType: SubscriptionEventType.WEBHOOK_RECEIVED,
+          source: SubscriptionEventSource.WEBHOOK,
+          metadata: {
+            paymentId,
+            incomingPaymentStatus: incomingStatus,
+          },
+        });
+      } catch (err) {
+        this.logger.error(
+          'subscription_event_WEBHOOK_RECEIVED_failed',
+          err instanceof Error ? err : new Error(String(err)),
+        );
+      }
+
       const statusBefore = payment.status;
 
       if (isFinalStatus(payment.status)) {
@@ -534,6 +558,9 @@ export class PaykuService {
           },
         });
 
+        const subBefore = await this.subscriptionsService.findExistingByUserId(
+          payment.userId,
+        );
         try {
           const webhookActor: AuthenticatedUser = {
             ...SYSTEM_USER,
@@ -546,6 +573,36 @@ export class PaykuService {
             SubscriptionChangeSource.WEBHOOK,
             'payku payment',
           );
+          const subAfter = await this.subscriptionsService.findExistingByUserId(
+            payment.userId,
+          );
+          if (subAfter) {
+            try {
+              await this.subscriptionEventsService.append({
+                userId: payment.userId,
+                clinicId: payment.clinicId,
+                eventType: SubscriptionEventType.PAYMENT_SUCCEEDED,
+                previousPlan: subBefore?.plan ?? null,
+                newPlan: subAfter.plan,
+                previousStatus: subBefore?.status ?? null,
+                newStatus: subAfter.status,
+                source: SubscriptionEventSource.WEBHOOK,
+                metadata: {
+                  paymentId,
+                  consultationId: payment.consultationId,
+                  amount: payment.amount,
+                  transactionId: payment.transactionId,
+                },
+              });
+            } catch (eventErr) {
+              this.logger.error(
+                'subscription_event_PAYMENT_SUCCEEDED_failed',
+                eventErr instanceof Error
+                  ? eventErr
+                  : new Error(String(eventErr)),
+              );
+            }
+          }
         } catch (err) {
           this.logger.error(
             `Failed to upgrade user ${payment.userId} after payment ${paymentId}`,
@@ -599,6 +656,27 @@ export class PaykuService {
           meta,
         );
         notifyAlert(meta);
+        const subSnap = await this.subscriptionsService.findExistingByUserId(
+          payment.userId,
+        );
+        try {
+          await this.subscriptionEventsService.append({
+            userId: payment.userId,
+            clinicId: payment.clinicId,
+            eventType: SubscriptionEventType.PAYMENT_FAILED,
+            previousPlan: subSnap?.plan ?? null,
+            newPlan: subSnap?.plan ?? null,
+            previousStatus: subSnap?.status ?? null,
+            newStatus: subSnap?.status ?? null,
+            source: SubscriptionEventSource.WEBHOOK,
+            metadata: meta,
+          });
+        } catch (err) {
+          this.logger.error(
+            'subscription_event_PAYMENT_FAILED_failed',
+            err instanceof Error ? err : new Error(String(err)),
+          );
+        }
       }
 
       return { action: 'processed', paymentId };
