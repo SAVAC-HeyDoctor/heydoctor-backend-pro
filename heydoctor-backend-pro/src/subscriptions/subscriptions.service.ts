@@ -9,6 +9,7 @@ import {
   Subscription,
   SubscriptionPlan,
   SubscriptionStatus,
+  planGrantedForTier,
 } from './subscription.entity';
 import { assignClinic } from '../common/entity-clinic.util';
 import { UsersService } from '../users/users.service';
@@ -78,10 +79,8 @@ export class SubscriptionsService {
     requiredPlan: SubscriptionPlan,
   ): Promise<boolean> {
     const subscription = await this.getOrCreateForUser(userId);
-    if (subscription.status !== SubscriptionStatus.ACTIVE) {
-      return false;
-    }
-    return PLAN_RANK[subscription.plan] >= PLAN_RANK[requiredPlan];
+    const effective = planGrantedForTier(subscription);
+    return PLAN_RANK[effective] >= PLAN_RANK[requiredPlan];
   }
 
   async listAll(): Promise<Subscription[]> {

@@ -14,6 +14,8 @@ import { AuditOutcome } from '../audit/audit-outcome.enum';
 import {
   Subscription,
   SubscriptionPlan,
+  SubscriptionStatus,
+  planGrantedForTier,
 } from '../subscriptions/subscription.entity';
 import { User } from '../users/user.entity';
 import { UserRole } from '../users/user-role.enum';
@@ -60,6 +62,8 @@ export type MeResponse = {
   role: UserRole;
   clinicId: string;
   plan: SubscriptionPlan;
+  /** Estado en DB; `null` si no hay fila `subscriptions` (soporte / depuración). */
+  subscriptionStatus: SubscriptionStatus | null;
 };
 
 @Injectable()
@@ -431,7 +435,8 @@ export class AuthService {
       email: user.email,
       role: user.role,
       clinicId: user.clinicId,
-      plan: subscription?.plan ?? SubscriptionPlan.FREE,
+      plan: planGrantedForTier(subscription),
+      subscriptionStatus: subscription?.status ?? null,
     };
   }
 

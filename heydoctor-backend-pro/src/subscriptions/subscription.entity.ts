@@ -71,3 +71,13 @@ export class Subscription {
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 }
+
+/** Plan con el que cuentan guards y UI: suscripciones inactive no otorgan PRO. */
+export function planGrantedForTier(
+  row: Subscription | null | undefined,
+): SubscriptionPlan {
+  if (!row || row.status !== SubscriptionStatus.ACTIVE) {
+    return SubscriptionPlan.FREE;
+  }
+  return row.plan;
+}
