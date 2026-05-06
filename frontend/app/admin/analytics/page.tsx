@@ -52,6 +52,57 @@ type CohortHorizon = {
   retentionRate: number;
 };
 
+type MrrSeriesRealPoint = {
+  monthStart: string;
+  mrr: number;
+  payingProUsers: number;
+};
+
+type MrrSeriesRealResponse = {
+  monthsLookback: number;
+  proMonthlyPrice: number;
+  series: MrrSeriesRealPoint[];
+};
+
+type ChurnRealPoint = {
+  monthStart: string;
+  churnEvents: number;
+  payingProUsersAtMonthStart: number;
+  churnRate: number;
+};
+
+type ChurnRealResponse = {
+  monthsLookback: number;
+  series: ChurnRealPoint[];
+  lastClosedMonthStart: string;
+  lastClosedMonthChurnRateVsPayingBase: number;
+};
+
+type MrrRealResponse = {
+  mrr: number;
+  payerCount: number;
+  asOfDate: string;
+};
+
+type ArpuResponse = {
+  mrr: number;
+  payerCount: number;
+  arpu: number;
+  asOfDate: string;
+};
+
+type ArrResponse = {
+  arr: number;
+  mrr: number;
+};
+
+type LtvResponse = {
+  arpu: number;
+  lastClosedMonthlyChurnRate: number;
+  ltvMonths: number;
+  ltvAnnualizedFallback: boolean;
+};
+
 type CohortRow = {
   cohortMonth: string;
   signups: number;
@@ -85,6 +136,13 @@ export default function AdminAnalyticsPage() {
     useState<SubscriptionsMetricsResponse | null>(null);
   const [mrr, setMrr] = useState<MrrResponse | null>(null);
   const [churn, setChurn] = useState<ChurnResponse | null>(null);
+  const [mrrReal, setMrrReal] = useState<MrrRealResponse | null>(null);
+  const [mrrSeriesReal, setMrrSeriesReal] =
+    useState<MrrSeriesRealResponse | null>(null);
+  const [churnReal, setChurnReal] = useState<ChurnRealResponse | null>(null);
+  const [arpu, setArpu] = useState<ArpuResponse | null>(null);
+  const [arr, setArr] = useState<ArrResponse | null>(null);
+  const [ltv, setLtv] = useState<LtvResponse | null>(null);
   const [cohorts, setCohorts] = useState<CohortsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -92,16 +150,43 @@ export default function AdminAnalyticsPage() {
   const load = useCallback(async () => {
     setError(null);
     setLoading(true);
-    const [s, m, mr, ch, co] = await Promise.all([
-      fetchJson<SubscriptionsSummaryResponse>('/api/admin/subscriptions/summary'),
-      fetchJson<SubscriptionsMetricsResponse>('/api/admin/subscriptions/metrics'),
-      fetchJson<MrrResponse>('/api/admin/subscriptions/mrr?months=12'),
-      fetchJson<ChurnResponse>('/api/admin/subscriptions/churn?months=12'),
-      fetchJson<CohortsResponse>(
-        '/api/admin/subscriptions/cohorts?months=12&horizon=6',
-      ),
-    ]);
-    const failed = [s, m, mr, ch, co].find((r) => !r.ok);
+    const [s, m, mr, ch, co, mrReal, mrSer, chr, arpuR, arrR, ltvR] =
+      await Promise.all([
+        fetchJson<SubscriptionsSummaryResponse>(
+          '/api/admin/subscriptions/summary',
+        ),
+        fetchJson<SubscriptionsMetricsResponse>(
+          '/api/admin/subscriptions/metrics',
+        ),
+        fetchJson<MrrResponse>('/api/admin/subscriptions/mrr?months=12'),
+        fetchJson<ChurnResponse>('/api/admin/subscriptions/churn?months=12'),
+        fetchJson<CohortsResponse>(
+          '/api/admin/subscriptions/cohorts?months=12&horizon=6',
+        ),
+        fetchJson<MrrRealResponse>('/api/admin/subscriptions/mrr-real'),
+        fetchJson<MrrSeriesRealResponse>(
+          '/api/admin/subscriptions/mrr-series?months=12',
+        ),
+        fetchJson<ChurnRealResponse>(
+          '/api/admin/subscriptions/churn-real?months=12',
+        ),
+        fetchJson<ArpuResponse>('/api/admin/subscriptions/arpu'),
+        fetchJson<ArrResponse>('/api/admin/subscriptions/arr'),
+        fetchJson<LtvResponse>('/api/admin/subscriptions/ltv'),
+      ]);
+    const failed = [
+      s,
+      m,
+      mr,
+      ch,
+      co,
+      mrReal,
+      mrSer,
+      chr,
+      arpuR,
+      arrR,
+      ltvR,
+    ].find((r) => !r.ok);
     if (failed) {
       setError(
         failed.status === 403
@@ -113,6 +198,12 @@ export default function AdminAnalyticsPage() {
       setMrr(null);
       setChurn(null);
       setCohorts(null);
+      setMrrReal(null);
+      setMrrSeriesReal(null);
+      setChurnReal(null);
+      setArpu(null);
+      setArr(null);
+      setLtv(null);
       setLoading(false);
       return;
     }
@@ -121,6 +212,12 @@ export default function AdminAnalyticsPage() {
     setMrr(mr.body);
     setChurn(ch.body);
     setCohorts(co.body);
+    setMrrReal(mrReal.body);
+    setMrrSeriesReal(mrSer.body);
+    setChurnReal(chr.body);
+    setArpu(arpuR.body);
+    setArr(arrR.body);
+    setLtv(ltvR.body);
     setLoading(false);
   }, []);
 
@@ -162,6 +259,39 @@ export default function AdminAnalyticsPage() {
     ? `${(churn.lastClosedMonthChurnRateVsProBase * 100).toFixed(2)}%`
     : '—';
 
+  const churnRealPctFmt = churnReal
+    ? `${(churnReal.lastClosedMonthChurnRateVsPayingBase * 100).toFixed(2)}%`
+    : '—';
+
+  const mrrRealChartData = useMemo(
+    () =>
+      mrrSeriesReal?.series.map((p) => ({
+        month: p.monthStart.slice(0, 7),
+        mrrReplay: p.mrr,
+      })) ?? [],
+    [mrrSeriesReal],
+  );
+
+  const churnRealChartData = useMemo(
+    () =>
+      churnReal?.series.map((p) => ({
+        month: p.monthStart.slice(0, 7),
+        churnRatePct: p.churnRate * 100,
+      })) ?? [],
+    [churnReal],
+  );
+
+  const mrrReplayGrowth = useMemo(() => {
+    if (!mrrSeriesReal || mrrSeriesReal.series.length < 2) return null;
+    const cur = mrrSeriesReal.series[mrrSeriesReal.series.length - 1]?.mrr ?? 0;
+    const prev =
+      mrrSeriesReal.series[mrrSeriesReal.series.length - 2]?.mrr ?? 0;
+    if (!prev && !cur) return null;
+    if (!prev) return { pct: null as number | null, delta: cur };
+    const pct = ((cur - prev) / prev) * 100;
+    return { pct, delta: cur - prev };
+  }, [mrrSeriesReal]);
+
   return (
     <main className="mx-auto max-w-6xl px-4 py-10">
       <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
@@ -170,7 +300,7 @@ export default function AdminAnalyticsPage() {
             Analytics · Suscripciones
           </h1>
           <p className="text-sm text-slate-600">
-            MRR desde pagos confirmados · cohortes · churn por eventos
+            MRR recurrente (DB + replay) · churn real · ARPU / LTV / ARR · cohortes
           </p>
         </div>
         <nav className="flex flex-wrap gap-3 text-sm">
@@ -209,12 +339,12 @@ export default function AdminAnalyticsPage() {
         </div>
       )}
 
-      {!loading && !error && summary && metrics && (
+      {!loading && !error && summary && metrics && mrrReal && mrrSeriesReal && churnReal && arpu && arr && ltv && (
         <>
           <section className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
               <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                MRR mes UTC actual
+                MRR según PAYMENT_SUCCEEDED (legacy)
               </p>
               <p className="mt-1 text-2xl font-semibold tabular-nums text-slate-900">
                 {mrr?.currentMonthAmount ?? metrics.monthlyRevenue}
@@ -228,7 +358,7 @@ export default function AdminAnalyticsPage() {
             </div>
             <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
               <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                Churn (event · mes cerrado)
+                Churn legacy (snapshot PRO)
               </p>
               <p className="mt-1 text-2xl font-semibold tabular-nums text-slate-900">
                 {churnPctFmt}
@@ -263,6 +393,140 @@ export default function AdminAnalyticsPage() {
             </div>
           </section>
 
+          <p className="mb-4 text-xs font-semibold uppercase tracking-wide text-indigo-800">
+            Suscripción recurrente (Stripe-style · DB / replay · UTC)
+          </p>
+          <section className="mb-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+            <div className="rounded-lg border border-indigo-100 bg-indigo-50/40 p-4 shadow-sm">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-600">
+                MRR real (DB vigente)
+              </p>
+              <p className="mt-1 text-2xl font-semibold tabular-nums text-slate-900">
+                {mrrReal.mrr.toFixed(2)}
+              </p>
+              <p className="mt-1 text-xs text-slate-600">
+                {mrrReal.payerCount} pagadores · corte{' '}
+                {mrrReal.asOfDate}
+              </p>
+            </div>
+            <div className="rounded-lg border border-indigo-100 bg-indigo-50/40 p-4 shadow-sm">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-600">
+                ARR · MRR×12
+              </p>
+              <p className="mt-1 text-2xl font-semibold tabular-nums text-slate-900">
+                {arr.arr.toFixed(2)}
+              </p>
+              <p className="mt-1 text-xs text-slate-600">
+                MRR fuente DB · {arr.mrr.toFixed(2)}
+              </p>
+            </div>
+            <div className="rounded-lg border border-indigo-100 bg-indigo-50/40 p-4 shadow-sm">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-600">
+                ARPU
+              </p>
+              <p className="mt-1 text-2xl font-semibold tabular-nums text-slate-900">
+                {arpu.arpu.toFixed(2)}
+              </p>
+              <p className="mt-1 text-xs text-slate-600">
+                {arpu.payerCount} pagadores recurrentes · {arpu.asOfDate}
+              </p>
+            </div>
+            <div className="rounded-lg border border-indigo-100 bg-indigo-50/40 p-4 shadow-sm">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-600">
+                LTV
+              </p>
+              <p className="mt-1 text-2xl font-semibold tabular-nums text-slate-900">
+                {ltv.ltvMonths.toFixed(2)}
+              </p>
+              <p className="mt-1 text-xs text-slate-600">
+                ARPU&nbsp;/ churn mes cerrado
+                {ltv.ltvAnnualizedFallback ? ' · ARPU×12 (churn≈0)' : ''}
+              </p>
+            </div>
+            <div className="rounded-lg border border-indigo-100 bg-indigo-50/40 p-4 shadow-sm">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-600">
+                Churn real (mes cerrado)
+              </p>
+              <p className="mt-1 text-2xl font-semibold tabular-nums text-slate-900">
+                {churnRealPctFmt}
+              </p>
+              <p className="mt-1 text-xs text-slate-600">
+                Pagadores PRO al inicio de mes UTC · último cerrado{' '}
+                {churnReal.lastClosedMonthStart}
+              </p>
+            </div>
+            <div className="rounded-lg border border-indigo-100 bg-indigo-50/40 p-4 shadow-sm">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-600">
+                Tarifa replay PRO
+              </p>
+              <p className="mt-1 text-2xl font-semibold tabular-nums text-slate-900">
+                {mrrSeriesReal.proMonthlyPrice.toFixed(2)}
+              </p>
+              {mrrReplayGrowth?.pct != null && (
+                <p className="mt-1 text-xs text-slate-600">
+                  curva replay · vs mes ant.{' '}
+                  {mrrReplayGrowth.pct >= 0 ? '+' : ''}
+                  {mrrReplayGrowth.pct.toFixed(1)}%
+                </p>
+              )}
+            </div>
+          </section>
+
+          <section className="mb-10 grid gap-8 lg:grid-cols-2">
+            <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+              <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-700">
+                MRR mensual · replay eventos ({mrrSeriesReal.monthsLookback}{' '}
+                meses)
+              </h2>
+              <div style={{ height: 280 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={mrrRealChartData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                    <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                    <YAxis tick={{ fontSize: 11 }} />
+                    <Tooltip />
+                    <Legend />
+                    <Line
+                      type="monotone"
+                      dataKey="mrrReplay"
+                      stroke="#4f46e5"
+                      name="MRR replay"
+                      strokeWidth={2}
+                      dot={false}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+            <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+              <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-700">
+                Churn real · ratio mensual
+              </h2>
+              <div style={{ height: 280 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={churnRealChartData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                    <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                    <YAxis tick={{ fontSize: 11 }} />
+                    <Tooltip />
+                    <Legend />
+                    <Line
+                      type="monotone"
+                      dataKey="churnRatePct"
+                      stroke="#b45309"
+                      name="% churn"
+                      strokeWidth={2}
+                      dot={false}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </section>
+
+          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
+            Referencia legacy · suma PAYMENT_SUCCEEDED / churn vs PRO snapshot
+          </p>
           <section className="mb-10 grid gap-8 lg:grid-cols-2">
             <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
               <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-700">
