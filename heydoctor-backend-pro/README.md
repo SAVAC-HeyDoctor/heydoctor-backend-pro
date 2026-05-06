@@ -38,6 +38,10 @@ npm run start:dev
 - Pacientes (**JWT**, **por clínica**): `GET|POST /api/patients` — solo pacientes de la clínica del usuario; body `POST`: `{ "name", "email" }` (email único por clínica).
 - Consultas clínicas (**JWT**, **por clínica**): `POST|GET /api/consultations`, `GET|PATCH|DELETE /api/consultations/:id` — `clinic_id` y paciente validados vía `AuthorizationService`; estado `locked` bloquea PATCH/DELETE. `POST` body: `{ "patientId", "reason" }`.
 
+## WebRTC / teleconsulta (Socket.IO)
+
+Signaling en namespace **`/webrtc`**; métricas y STUN/TURN vía `WebrtcController`. Arquitectura, bug resuelto **`join-consultation` / ACK** y notas de infra: [**docs/webrtc-socketio-architecture.md**](docs/webrtc-socketio-architecture.md).
+
 ## Variables de entorno
 
 | Variable        | Descripción                          |
