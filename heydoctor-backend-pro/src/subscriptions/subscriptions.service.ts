@@ -189,4 +189,99 @@ export class SubscriptionsService {
 
     return saved;
   }
+
+  /**
+   * Cambia solo el estado (active/inactive). Emite eventos analíticos; no usa eventos para gating.
+   * `reason` puede indicar expiración (p. ej. "expired") para registrar SUBSCRIPTION_EXPIRED.
+   */
+  async updateSubscriptionStatus(
+    userId: string,
+    status: SubscriptionStatus,
+    authUser: AuthenticatedUser,
+    reason?: string,
+  ): Promise<Subscription> {
+    const existing = await this.getOrCreateForUser(userId);
+    const previousPlan = existing.plan;
+    const previousStatus = existing.status;
+
+    if (existing.status === status) {
+      return existing;
+    }
+
+    existing.status = status;
+    const saved = await this.subscriptionsRepository.save(existing);
+    const saneReason = sanitizeReason(reason);
+
+    void this.auditService.logSuccess({
+      action: 'SUBSCRIPTION_STATUS_CHANGED',
+      resource: 'subscription',
+      resourceId: saved.id,
+      userId,
+      clinicId: saved.clinicId,
+      httpStatus: 200,
+      metadata: {
+        from: previousStatus,
+        to: status,
+        changedBy: authUser.sub,
+        source: SubscriptionChangeSource.ADMIN_PANEL,
+        ...(saneReason ? { reason: saneReason } : {}),
+      },
+    });
+
+    const reasonLower = (saneReason ?? '').toLowerCase();
+    const isExpiredSemantics =
+      reasonLower.includes('expir') ||
+      reasonLower.includes('expire') ||
+      reasonLower.includes('caduc');
+
+    try {
+      if (
+        previousStatus === SubscriptionStatus.ACTIVE &&
+        status === SubscriptionStatus.INACTIVE
+      ) {
+        const eventType = isExpiredSemantics
+          ? SubscriptionEventType.SUBSCRIPTION_EXPIRED
+          : SubscriptionEventType.SUBSCRIPTION_DEACTIVATED;
+        await this.subscriptionEventsService.append({
+          userId,
+          clinicId: saved.clinicId,
+          eventType,
+          previousPlan,
+          newPlan: saved.plan,
+          previousStatus,
+          newStatus: saved.status,
+          source: SubscriptionEventSource.ADMIN,
+          metadata: {
+            changedBy: authUser.sub,
+            ...(saneReason ? { reason: saneReason } : {}),
+          },
+        });
+      } else if (
+        previousStatus === SubscriptionStatus.INACTIVE &&
+        status === SubscriptionStatus.ACTIVE
+      ) {
+        await this.subscriptionEventsService.append({
+          userId,
+          clinicId: saved.clinicId,
+          eventType: SubscriptionEventType.SUBSCRIPTION_ACTIVATED,
+          previousPlan,
+          newPlan: saved.plan,
+          previousStatus,
+          newStatus: saved.status,
+          source: SubscriptionEventSource.ADMIN,
+          metadata: {
+            changedBy: authUser.sub,
+            ...(saneReason ? { reason: saneReason } : {}),
+          },
+        });
+      }
+    } catch (err) {
+      this.logger.error(
+        'subscription_event_status_transition_failed',
+        err instanceof Error ? err : new Error(String(err)),
+      );
+    }
+
+    return saved;
+  }
 }
