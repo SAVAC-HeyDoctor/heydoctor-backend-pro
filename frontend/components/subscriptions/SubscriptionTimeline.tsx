@@ -18,10 +18,10 @@ const LABELS: Partial<Record<string, string>> = {
   PAYMENT_FAILED: 'Pago fallido',
   ADMIN_UPDATED: 'Plan actualizado por admin',
   SUBSCRIPTION_CREATED: 'Suscripción creada',
-  WEBHOOK_RECEIVED: 'Webhook Payku recibido',
-  SUBSCRIPTION_ACTIVATED: 'Suscripción activada',
+  SUBSCRIPTION_ACTIVATED: 'Suscripción reactivada',
   SUBSCRIPTION_DEACTIVATED: 'Suscripción desactivada',
   SUBSCRIPTION_EXPIRED: 'Suscripción expirada',
+  WEBHOOK_RECEIVED: 'Webhook Payku recibido',
   PLAN_UPGRADED: 'Plan mejorado',
   PLAN_DOWNGRADED: 'Plan reducido',
 };

@@ -105,7 +105,13 @@ export default function AdminSubscriptionsPage() {
         <h1 className="text-xl font-semibold text-slate-900">
           Suscripciones (admin)
         </h1>
-        <nav className="flex gap-3 text-sm">
+        <nav className="flex flex-wrap gap-3 text-sm">
+          <Link
+            href="/admin/analytics"
+            className="text-slate-600 underline hover:text-slate-900"
+          >
+            Analytics
+          </Link>
           <Link href="/panel" className="text-slate-600 underline hover:text-slate-900">
             Panel
           </Link>
