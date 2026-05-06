@@ -10,9 +10,15 @@ export default function PanelPage() {
     <main className="mx-auto max-w-2xl px-4 py-10">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-semibold text-slate-800">Panel</h1>
-        <nav className="flex gap-3 text-sm">
+        <nav className="flex flex-wrap gap-3 text-sm">
           <Link href="/" className="text-slate-600 underline hover:text-slate-900">
             Inicio
+          </Link>
+          <Link
+            href="/admin/subscriptions"
+            className="text-slate-600 underline hover:text-slate-900"
+          >
+            Suscripciones (admin)
           </Link>
           <button
             type="button"
