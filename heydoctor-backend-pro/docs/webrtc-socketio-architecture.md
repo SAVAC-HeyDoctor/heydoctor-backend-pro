@@ -84,11 +84,11 @@ if (context.getType() !== 'http') {
 
 ## Arquitectura final
 
-| Capa                 | Responsabilidad      |
-| -------------------- | -------------------- |
-| `handleConnection()` | Auth + plan          |
+| Capa                 | Responsabilidad       |
+| -------------------- | --------------------- |
+| `handleConnection()` | Auth + plan           |
 | `joinConsultation()` | Validación de negocio |
-| Guards de features   | Solo rutas HTTP      |
+| Guards de features   | Solo rutas HTTP       |
 
 ## Resultado esperado
 

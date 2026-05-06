@@ -44,17 +44,17 @@ Signaling en namespace **`/webrtc`**; métricas y STUN/TURN vía `WebrtcControll
 
 ## Variables de entorno
 
-| Variable        | Descripción                          |
-|----------------|--------------------------------------|
-| `DATABASE_URL` | URL PostgreSQL                       |
-| `JWT_SECRET`   | Secreto para firmar tokens           |
-| `PORT`         | Puerto HTTP (default 3001)           |
-| `NODE_ENV`     | `production` desactiva `synchronize`   |
-| `REDIS_URL`    | **Recomendado en producción** si hay varias réplicas: Throttler distribuido; sin Redis el límite es por instancia (memoria) |
-| `DATABASE_SSL_CA` | Opcional en producción: PEM del CA si el proveedor Postgres lo requiere |
-| `ENABLE_PUBLIC_REGISTRATION` | `true` para permitir `POST /api/auth/register` en producción (por defecto deshabilitado) |
-| `CORS_ORIGIN`  | Ignorado para la lista principal: `main.ts` fija orígenes (`*.vercel.app`, `heydoctor.health`, `app.`/`www.`) + localhost fuera de `production`. |
-| — | Cookies sesión: **sin** atributo `Domain`. En `production` o Railway: `SameSite=None`, `Secure`, `path=/` para `access_token` y `refresh_token`. |
+| Variable                     | Descripción                                                                                                                                      |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `DATABASE_URL`               | URL PostgreSQL                                                                                                                                   |
+| `JWT_SECRET`                 | Secreto para firmar tokens                                                                                                                       |
+| `PORT`                       | Puerto HTTP (default 3001)                                                                                                                       |
+| `NODE_ENV`                   | `production` desactiva `synchronize`                                                                                                             |
+| `REDIS_URL`                  | **Recomendado en producción** si hay varias réplicas: Throttler distribuido; sin Redis el límite es por instancia (memoria)                      |
+| `DATABASE_SSL_CA`            | Opcional en producción: PEM del CA si el proveedor Postgres lo requiere                                                                          |
+| `ENABLE_PUBLIC_REGISTRATION` | `true` para permitir `POST /api/auth/register` en producción (por defecto deshabilitado)                                                         |
+| `CORS_ORIGIN`                | Ignorado para la lista principal: `main.ts` fija orígenes (`*.vercel.app`, `heydoctor.health`, `app.`/`www.`) + localhost fuera de `production`. |
+| —                            | Cookies sesión: **sin** atributo `Domain`. En `production` o Railway: `SameSite=None`, `Secure`, `path=/` para `access_token` y `refresh_token`. |
 
 ## Cookies de sesión (JWT)
 
@@ -69,7 +69,7 @@ Para exigir que pase antes de fusionar:
 
 1. En GitHub: **Settings** → **Branches** → **Add branch protection rule** (o editar la regla de `main`).
 2. Activar **Require a pull request before merging** (recomendado).
-3. En **Require status checks to pass before merging**: activar el check y seleccionar el job del workflow (p. ej. **backend** o el nombre que muestre GitHub Actions en la pestaña *Actions* del repositorio).
+3. En **Require status checks to pass before merging**: activar el check y seleccionar el job del workflow (p. ej. **backend** o el nombre que muestre GitHub Actions en la pestaña _Actions_ del repositorio).
 4. Guardar la regla.
 
 > Los checks obligatorios no se pueden fijar desde el código; deben configurarse en la UI (o API) de GitHub con permisos de administrador del repo.

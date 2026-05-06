@@ -165,7 +165,9 @@ export class SubscriptionsAnalyticsService {
   async getMrr(monthsLookback: number): Promise<MrrResponseDto> {
     const n = Math.min(Math.max(monthsLookback, 1), 36);
     const now = new Date();
-    const from = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (n - 1), 1));
+    const from = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (n - 1), 1),
+    );
 
     const eventRepo = this.dataSource.getRepository(SubscriptionEvent);
 
@@ -215,7 +217,9 @@ export class SubscriptionsAnalyticsService {
     const summary = await this.getSummary();
 
     const now = new Date();
-    const from = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (n - 1), 1));
+    const from = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (n - 1), 1),
+    );
 
     const eventRepo = this.dataSource.getRepository(SubscriptionEvent);
 
@@ -356,9 +360,7 @@ export class SubscriptionsAnalyticsService {
       const horizons: CohortHorizonDto[] = [];
 
       for (let offset = 0; offset < horizonMonths; offset++) {
-        const periodEnd = endOfUtcMonth(
-          addUtcMonths(cohortStart, offset),
-        );
+        const periodEnd = endOfUtcMonth(addUtcMonths(cohortStart, offset));
         let retained = 0;
         for (const uid of userIds) {
           const fd = firstDeactivate.get(uid);
@@ -396,6 +398,14 @@ function addUtcMonths(start: Date, offset: number): Date {
 
 function endOfUtcMonth(monthStart: Date): Date {
   return new Date(
-    Date.UTC(monthStart.getUTCFullYear(), monthStart.getUTCMonth() + 1, 0, 23, 59, 59, 999),
+    Date.UTC(
+      monthStart.getUTCFullYear(),
+      monthStart.getUTCMonth() + 1,
+      0,
+      23,
+      59,
+      59,
+      999,
+    ),
   );
 }
