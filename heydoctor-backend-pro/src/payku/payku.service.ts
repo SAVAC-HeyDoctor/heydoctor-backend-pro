@@ -12,7 +12,6 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
-import { notifyAlert } from '../common/alerts/alert.hooks';
 import { assignClinic } from '../common/entity-clinic.util';
 import { APP_LOGGER } from '../common/logger/logger.tokens';
 import { AuditService } from '../audit/audit.service';
@@ -29,6 +28,7 @@ import {
   SubscriptionEventType,
 } from '../subscriptions/subscription-event.entity';
 import { SubscriptionEventsService } from '../subscriptions/subscription-events.service';
+import { SubscriptionAlertsService } from '../subscriptions/subscription-alerts.service';
 import { UserRole } from '../users/user-role.enum';
 import {
   PaykuPayment,
@@ -70,6 +70,7 @@ export class PaykuService {
     private readonly authorizationService: AuthorizationService,
     private readonly subscriptionsService: SubscriptionsService,
     private readonly subscriptionEventsService: SubscriptionEventsService,
+    private readonly subscriptionAlertsService: SubscriptionAlertsService,
     private readonly auditService: AuditService,
     @Inject(APP_LOGGER)
     private readonly logger: LoggerService,
@@ -655,7 +656,11 @@ export class PaykuService {
           new Error('Payku payment failed'),
           meta,
         );
-        notifyAlert(meta);
+        this.subscriptionAlertsService.notifyPaymentFailed({
+          userId: payment.userId,
+          clinicId: payment.clinicId,
+          metadata: meta,
+        });
         const subSnap = await this.subscriptionsService.findExistingByUserId(
           payment.userId,
         );

@@ -58,6 +58,14 @@ const ROUTE_MAP: Record<string, AuditActionDescriptor> = {
     action: 'SUBSCRIPTION_UPDATE_PLAN',
     resource: 'subscription',
   },
+  'GET /api/admin/subscriptions/summary': {
+    action: 'SUBSCRIPTION_SUMMARY_ADMIN',
+    resource: 'subscription',
+  },
+  'GET /api/admin/subscriptions/metrics': {
+    action: 'SUBSCRIPTION_METRICS_ADMIN',
+    resource: 'subscription',
+  },
   'GET /api/admin/subscriptions/:id/events': {
     action: 'SUBSCRIPTION_EVENTS_LIST',
     resource: 'subscription',
