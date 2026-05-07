@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { APP_INTERCEPTOR } from '@nestjs/core';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from '../auth/auth.module';
@@ -15,7 +15,7 @@ import { AuditService } from './audit.service';
     TypeOrmModule.forFeature([AuditLog, Clinic]),
     LoggerModule,
     AuthorizationModule,
-    AuthModule,
+    forwardRef(() => AuthModule),
   ],
   controllers: [AuditController],
   providers: [

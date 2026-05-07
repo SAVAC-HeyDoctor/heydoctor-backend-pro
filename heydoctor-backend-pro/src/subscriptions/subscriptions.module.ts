@@ -17,7 +17,7 @@ import { SubscriptionsService } from './subscriptions.service';
     TypeOrmModule.forFeature([Subscription]),
     SubscriptionEventsModule,
     forwardRef(() => AuthModule),
-    AuditModule,
+    forwardRef(() => AuditModule),
     UsersModule,
   ],
   controllers: [SubscriptionsController, AdminSubscriptionsController],
