@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from '../auth/auth.module';
 import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
@@ -18,7 +18,7 @@ import { GrowthAnalyticsService } from './growth-analytics.service';
   imports: [
     TypeOrmModule.forFeature([FeatureFlag, GrowthExperiment, ProductEvent]),
     SubscriptionsModule,
-    AuthModule,
+    forwardRef(() => AuthModule),
   ],
   controllers: [
     AdminFeatureFlagsController,

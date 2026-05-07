@@ -5,6 +5,7 @@ import { PassportModule } from '@nestjs/passport';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuditLog } from '../audit/audit-log.entity';
 import { ClinicModule } from '../clinic/clinic.module';
+import { GrowthModule } from '../growth/growth.module';
 import { Subscription } from '../subscriptions/subscription.entity';
 import { UsersModule } from '../users/users.module';
 import { AuthController } from './auth.controller';
@@ -20,6 +21,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     forwardRef(() => UsersModule),
     ClinicModule,
     TypeOrmModule.forFeature([Subscription, RefreshToken, AuditLog]),
+    forwardRef(() => GrowthModule),
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],

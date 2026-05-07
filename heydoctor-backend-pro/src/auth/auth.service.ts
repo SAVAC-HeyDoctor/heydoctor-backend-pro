@@ -1,4 +1,5 @@
 import {
+  forwardRef,
   Inject,
   Injectable,
   NotFoundException,
@@ -31,6 +32,8 @@ import { LoginDto } from './dto/login.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { RegisterDto } from './dto/register.dto';
 import { JwtPayload } from './types/jwt-payload.interface';
+import { GrowthFunnelEvents } from '../growth/growth-event-names';
+import { ProductEventsService } from '../growth/product-events.service';
 
 const REFRESH_TOKEN_DAYS = 7;
 const MAX_ACTIVE_SESSIONS = 5;
@@ -80,6 +83,8 @@ export class AuthService {
     private readonly refreshTokenRepository: Repository<RefreshToken>,
     @InjectRepository(AuditLog)
     private readonly auditLogRepository: Repository<AuditLog>,
+    @Inject(forwardRef(() => ProductEventsService))
+    private readonly productEvents: ProductEventsService,
   ) {}
 
   // ── Public Auth flows ─────────────────────────────────────────
@@ -100,6 +105,11 @@ export class AuthService {
       password: dto.password,
       role,
     });
+    void this.productEvents
+      .track(user.id, GrowthFunnelEvents.SIGNUP_COMPLETED, {
+        clinicId: dto.clinicId,
+      })
+      .catch(() => undefined);
     return this.buildAuthResponse(user);
   }
 

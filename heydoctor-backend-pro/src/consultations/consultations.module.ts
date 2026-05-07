@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AiModule } from '../ai/ai.module';
@@ -6,8 +6,9 @@ import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
 import { AuthorizationModule } from '../authorization/authorization.module';
 import { ConsentModule } from '../consents/consent.module';
-import { LoggerModule } from '../common/logger/logger.module';
 import { DoctorProfilesModule } from '../doctor-profiles/doctor-profiles.module';
+import { LoggerModule } from '../common/logger/logger.module';
+import { GrowthModule } from '../growth/growth.module';
 import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 import { Consultation } from './consultation.entity';
 import { ConsultationsController } from './consultations.controller';
@@ -25,6 +26,7 @@ import { ConsultationsService } from './consultations.service';
     AuditModule,
     AiModule,
     LoggerModule,
+    forwardRef(() => GrowthModule),
   ],
   controllers: [ConsultationsController],
   providers: [ConsultationsService],

@@ -15,6 +15,12 @@ export default function PanelPage() {
             Inicio
           </Link>
           <Link
+            href="/pricing"
+            className="text-slate-600 underline hover:text-slate-900"
+          >
+            Planes PRO
+          </Link>
+          <Link
             href="/admin/subscriptions"
             className="text-slate-600 underline hover:text-slate-900"
           >

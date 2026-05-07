@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ForbiddenException,
+  forwardRef,
   Inject,
   Injectable,
   NotFoundException,
@@ -15,6 +16,8 @@ import { AuditService } from '../audit/audit.service';
 import { assignClinic } from '../common/entity-clinic.util';
 import { APP_LOGGER } from '../common/logger/logger.tokens';
 import { getCurrentRequestId } from '../common/request-context.storage';
+import { GrowthFunnelEvents } from '../growth/growth-event-names';
+import { ProductEventsService } from '../growth/product-events.service';
 import { AuthorizationService } from '../authorization/authorization.service';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import type { PaginatedResult } from '../common/types/paginated-result.type';
@@ -67,6 +70,8 @@ export class ConsultationsService {
     private readonly configService: ConfigService,
     @Inject(APP_LOGGER)
     private readonly logger: LoggerService,
+    @Inject(forwardRef(() => ProductEventsService))
+    private readonly productEvents: ProductEventsService,
   ) {}
 
   /**
@@ -452,6 +457,12 @@ export class ConsultationsService {
       clinicId,
       httpStatus: 200,
     });
+
+    void this.productEvents
+      .track(authUser.sub, GrowthFunnelEvents.START_CALL, {
+        consultationId: id,
+      })
+      .catch(() => undefined);
 
     return { ok: true, consultationId: id };
   }

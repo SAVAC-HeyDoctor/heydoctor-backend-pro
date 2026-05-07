@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  forwardRef,
   Inject,
   Injectable,
   NotFoundException,
@@ -18,6 +19,8 @@ import { AuditService } from '../audit/audit.service';
 import { AuthorizationService } from '../authorization/authorization.service';
 import { Consultation } from '../consultations/consultation.entity';
 import { ConsultationStatus } from '../consultations/consultation-status.enum';
+import { GrowthFunnelEvents } from '../growth/growth-event-names';
+import { ProductEventsService } from '../growth/product-events.service';
 import {
   SubscriptionChangeSource,
   SubscriptionPlan,
@@ -74,6 +77,8 @@ export class PaykuService {
     private readonly auditService: AuditService,
     @Inject(APP_LOGGER)
     private readonly logger: LoggerService,
+    @Inject(forwardRef(() => ProductEventsService))
+    private readonly productEvents: ProductEventsService,
   ) {
     this.authConfig = {
       webhookSecret: this.config.get<string>('PAYKU_WEBHOOK_SECRET'),
@@ -248,6 +253,13 @@ export class PaykuService {
         amount,
       },
     });
+
+    void this.productEvents
+      .track(authUser.sub, GrowthFunnelEvents.START_CHECKOUT, {
+        consultationId,
+        paymentId: saved.id,
+      })
+      .catch(() => undefined);
 
     return { paymentId: saved.id, paymentUrl };
   }
@@ -538,6 +550,15 @@ export class PaykuService {
       });
 
       if (incomingStatus === PaykuPaymentStatus.PAID) {
+        void this.productEvents
+          .track(payment.userId, GrowthFunnelEvents.PAYMENT_SUCCESS, {
+            paymentId,
+            consultationId: payment.consultationId,
+            amount: payment.amount,
+            transactionId: payment.transactionId ?? null,
+          })
+          .catch(() => undefined);
+
         this.logger.log('payku_payment_confirmed', {
           event: 'payku_payment_confirmed',
           paymentId,

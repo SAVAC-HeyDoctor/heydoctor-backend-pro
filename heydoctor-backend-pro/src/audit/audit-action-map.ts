@@ -142,6 +142,14 @@ const ROUTE_MAP: Record<string, AuditActionDescriptor> = {
     action: 'ADMIN_GROWTH_ALERTS',
     resource: 'growth',
   },
+  'GET /api/admin/growth/funnel': {
+    action: 'ADMIN_GROWTH_FUNNEL',
+    resource: 'growth',
+  },
+  'GET /api/admin/growth/retention': {
+    action: 'ADMIN_GROWTH_RETENTION',
+    resource: 'growth',
+  },
   'GET /api/growth/context-public': {
     action: 'GROWTH_CONTEXT_PUBLIC',
     resource: 'growth',
@@ -152,6 +160,14 @@ const ROUTE_MAP: Record<string, AuditActionDescriptor> = {
   },
   'POST /api/growth/events': {
     action: 'GROWTH_PRODUCT_EVENT',
+    resource: 'growth',
+  },
+  'POST /api/growth/events-public': {
+    action: 'GROWTH_PRODUCT_EVENT_PUBLIC',
+    resource: 'growth',
+  },
+  'GET /api/growth/experiment-preview': {
+    action: 'GROWTH_EXPERIMENT_PREVIEW',
     resource: 'growth',
   },
   'GET /api/consultations': {
