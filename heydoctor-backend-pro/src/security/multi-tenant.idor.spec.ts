@@ -20,6 +20,7 @@ import { DoctorProfilesService } from '../doctor-profiles/doctor-profiles.servic
 import { DoctorProfile } from '../doctor-profiles/doctor-profile.entity';
 import { DoctorRating } from '../doctor-profiles/doctor-rating.entity';
 import { CreateRatingDto } from '../doctor-profiles/dto/create-rating.dto';
+import { ProductEventsService } from '../growth/product-events.service';
 import { Patient } from '../patients/patient.entity';
 import { PatientsService } from '../patients/patients.service';
 import { UserRole } from '../users/user-role.enum';
@@ -122,6 +123,10 @@ describe('Multi-tenant IDOR guards (unit)', () => {
           { provide: AuditService, useValue: { logSuccess: jest.fn() } },
           { provide: AiService, useValue: {} },
           { provide: ConfigService, useValue: {} },
+          {
+            provide: ProductEventsService,
+            useValue: { track: jest.fn() },
+          },
           {
             provide: APP_LOGGER,
             useValue: { log: jest.fn(), error: jest.fn() },
