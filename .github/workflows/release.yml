@@ -24,3 +24,4 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
+          name: HeyDoctor ${{ github.ref_name }}

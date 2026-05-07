@@ -7,6 +7,7 @@
     "sync:frontend": "bash scripts/sync-frontend.sh",
     "sync:frontend:safe": "bash scripts/sync-frontend-safe.sh",
     "sync:frontend:check": "cd frontend && npm run lint && npm run build",
+    "release:tag": "bash scripts/release-tag.sh",
     "build": "cd heydoctor-backend-pro && npm ci && npm run build",
     "start": "cd heydoctor-backend-pro && npm run start:prod",
     "start:prod": "cd heydoctor-backend-pro && npm run start:prod",

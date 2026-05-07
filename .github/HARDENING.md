@@ -25,21 +25,16 @@ Lo que **no** vive en Git (configurar en GitHub / Vercel / observabilidad):
 - `GH_TOKEN` — sync automático a `heydoctor-frontend`
 - `SLACK_WEBHOOK_URL` — alertas de CI (opcional)
 
-## Versionado
+## Versionado y releases (SemVer)
 
-Tras un release estable:
+Ver **[RELEASE.md](./RELEASE.md)** (flujo `PR → merge → tag → Release`, SemVer y script `npm run release:tag`).
 
-```bash
-git tag -a v1.0.0 -m "Release v1.0.0"
-git push origin v1.0.0
-```
-
-El workflow `release.yml` ya crea GitHub Release en tags `v*`.
+El workflow `release.yml` publica GitHub Release al hacer **`git push origin v*`** (ej. `v1.2.3`).
 
 ## Flujo recomendado
 
 ```text
-feature/… o fix/… → PR → CI verde → merge a main
+feature/… o fix/… → PR → CI verde → merge a main → tag → push tag
 ```
 
 Evitar `git push` directo a `main` cuando la rama esté protegida.
