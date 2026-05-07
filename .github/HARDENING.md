@@ -22,8 +22,27 @@ Lo que **no** vive en Git (configurar en GitHub / Vercel / observabilidad):
 
 ## Secretos (monorepo)
 
-- `GH_TOKEN` — sync automático a `heydoctor-frontend`
-- `SLACK_WEBHOOK_URL` — alertas de CI (opcional)
+### `GH_TOKEN` — sync automático a `heydoctor-frontend` *(requerido)*
+
+El workflow `sync-frontend.yml` hace push a `jairosc23/heydoctor-frontend`, un
+repositorio externo. `GITHUB_TOKEN` no tiene permisos sobre repos ajenos, por lo
+que se necesita un PAT propio.
+
+**Cómo configurarlo:**
+
+1. Ve a <https://github.com/settings/tokens> → **Generate new token (classic)**.
+2. Selecciona el scope **`repo`** (acceso completo a repositorios privados/públicos).
+3. Copia el token generado.
+4. En este repositorio: **Settings → Secrets and variables → Actions → New repository secret**.
+   - Nombre: `GH_TOKEN`
+   - Valor: el token copiado en el paso 3.
+5. Guarda. El workflow se activará automáticamente en el próximo push a `main`
+   que modifique archivos bajo `frontend/`.
+
+> Sin este secret el job emite una advertencia (`::warning::`) y termina con
+> éxito (exit 0) para no bloquear el resto del pipeline.
+
+### `SLACK_WEBHOOK_URL` — alertas de CI *(opcional)*
 
 ## Versionado y releases (SemVer)
 

@@ -1,5 +1,12 @@
 # Sincroniza `frontend/` → jairosc23/heydoctor-frontend al integrar en main.
-# Secret GH_TOKEN: PAT con push al repo público (no GITHUB_TOKEN del workflow).
+#
+# Requiere el secret GH_TOKEN: un PAT (Personal Access Token) con scope `repo`
+# configurado en Settings → Secrets and variables → Actions de este repositorio.
+# GITHUB_TOKEN no puede usarse aquí porque el destino es un repositorio externo.
+#
+# Si GH_TOKEN no está configurado el job se omite con una advertencia (exit 0)
+# para no bloquear el resto del pipeline.
+#
 # Vercel: el push suele disparar Preview/Production según el proyecto enlazado.
 # Branch protection: ver .github/HARDENING.md (checks Backend + Frontend).
 
@@ -23,21 +30,27 @@ jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
-      - name: Require GH_TOKEN
+      - name: Check GH_TOKEN availability
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
           if [[ -z "$GH_TOKEN" ]]; then
-            echo '::error::Configura el secret GH_TOKEN (PAT con permiso repo: push sobre jairosc23/heydoctor-frontend).'
-            exit 1
+            echo '::warning::GH_TOKEN no configurado — sync omitido.'
+            echo '  → Configura un PAT con scope "repo" en:'
+            echo '     Settings → Secrets and variables → Actions → New repository secret'
+            echo '     Nombre: GH_TOKEN'
+            echo '     Valor:  <tu PAT con permiso repo sobre jairosc23/heydoctor-frontend>'
+            echo 'SKIP_SYNC=true' >> "$GITHUB_ENV"
           fi
 
       - name: Checkout monorepo (full history)
+        if: env.SKIP_SYNC != 'true'
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Setup Node
+        if: env.SKIP_SYNC != 'true'
         uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -45,6 +58,7 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install & validate frontend
+        if: env.SKIP_SYNC != 'true'
         working-directory: frontend
         run: |
           npm ci
@@ -52,6 +66,7 @@ jobs:
           npm run build
 
       - name: Git identity & jairo-fe remote
+        if: env.SKIP_SYNC != 'true'
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
@@ -61,6 +76,7 @@ jobs:
           git remote add jairo-fe "https://x-access-token:${GH_TOKEN}@github.com/jairosc23/heydoctor-frontend.git"
 
       - name: Sync to public frontend (squash-merge)
+        if: env.SKIP_SYNC != 'true'
         env:
           SKIP_CHECK: '1'
         run: npm run sync:frontend:safe
