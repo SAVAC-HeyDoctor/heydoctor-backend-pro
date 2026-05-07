@@ -1,12 +1,12 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
-import { Test, TestingModule } from '@nestjs/testing';
+import { ConfigService } from '@nestjs/config';
+import { TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import { AuthorizationService } from '../authorization/authorization.service';
 import { AuditService } from '../audit/audit.service';
-import { ClinicService } from '../clinic/clinic.service';
 import { AiService } from '../ai/ai.service';
-import { ConfigService } from '@nestjs/config';
+import { ClinicService } from '../clinic/clinic.service';
 import { APP_LOGGER } from '../common/logger/logger.tokens';
 import { ConsentService } from '../consents/consent.service';
 import { Consultation } from '../consultations/consultation.entity';
@@ -23,6 +23,7 @@ import { CreateRatingDto } from '../doctor-profiles/dto/create-rating.dto';
 import { ProductEventsService } from '../growth/product-events.service';
 import { Patient } from '../patients/patient.entity';
 import { PatientsService } from '../patients/patients.service';
+import { createTestingModuleWithMocks } from '../test-utils/create-testing-module';
 import { UserRole } from '../users/user-role.enum';
 
 describe('Multi-tenant IDOR guards (unit)', () => {
@@ -49,18 +50,16 @@ describe('Multi-tenant IDOR guards (unit)', () => {
           .fn()
           .mockResolvedValue({ clinicId: 'clinic-a', user: {} }),
       };
-      const module: TestingModule = await Test.createTestingModule({
+      const module: TestingModule = await createTestingModuleWithMocks({
+        subjects: [DoctorApplicationsService],
         providers: [
           DoctorApplicationsService,
           { provide: getRepositoryToken(DoctorApplication), useValue: repo },
           { provide: AuthorizationService, useValue: authz },
-          { provide: AuditService, useValue: { logSuccess: jest.fn() } },
-          {
-            provide: ClinicService,
-            useValue: { getOldestClinicId: jest.fn() },
-          },
+          AuditService,
+          ClinicService,
         ],
-      }).compile();
+      });
       service = module.get(DoctorApplicationsService);
     });
 
@@ -110,7 +109,8 @@ describe('Multi-tenant IDOR guards (unit)', () => {
           .mockResolvedValue({ clinicId: 'clinic-a', user: {} }),
         assertUserInClinic: jest.fn().mockResolvedValue(undefined),
       };
-      const module: TestingModule = await Test.createTestingModule({
+      const module: TestingModule = await createTestingModuleWithMocks({
+        subjects: [ConsultationsService],
         providers: [
           ConsultationsService,
           {
@@ -118,21 +118,18 @@ describe('Multi-tenant IDOR guards (unit)', () => {
             useValue: consultationsRepo,
           },
           { provide: AuthorizationService, useValue: authz },
-          { provide: ConsentService, useValue: {} },
-          { provide: DoctorProfilesService, useValue: {} },
-          { provide: AuditService, useValue: { logSuccess: jest.fn() } },
-          { provide: AiService, useValue: {} },
-          { provide: ConfigService, useValue: {} },
-          {
-            provide: ProductEventsService,
-            useValue: { track: jest.fn() },
-          },
+          ConsentService,
+          DoctorProfilesService,
+          AuditService,
+          AiService,
+          ConfigService,
+          ProductEventsService,
           {
             provide: APP_LOGGER,
             useValue: { log: jest.fn(), error: jest.fn() },
           },
         ],
-      }).compile();
+      });
       service = module.get(ConsultationsService);
     });
 
@@ -173,18 +170,19 @@ describe('Multi-tenant IDOR guards (unit)', () => {
           .fn()
           .mockResolvedValue({ clinicId: 'clinic-a', user: {} }),
       };
-      const module: TestingModule = await Test.createTestingModule({
+      const module: TestingModule = await createTestingModuleWithMocks({
+        subjects: [PatientsService],
         providers: [
           PatientsService,
           { provide: getRepositoryToken(Patient), useValue: patientsRepo },
           { provide: AuthorizationService, useValue: authz },
-          { provide: AuditService, useValue: { logSuccess: jest.fn() } },
+          AuditService,
           {
             provide: APP_LOGGER,
             useValue: { log: jest.fn(), warn: jest.fn() },
           },
         ],
-      }).compile();
+      });
       service = module.get(PatientsService);
     });
 
@@ -251,7 +249,8 @@ describe('Multi-tenant IDOR guards (unit)', () => {
           .mockResolvedValue({ clinicId: 'clinic-a', user: {} }),
         assertUserInClinic: jest.fn().mockResolvedValue(undefined),
       };
-      const module: TestingModule = await Test.createTestingModule({
+      const module: TestingModule = await createTestingModuleWithMocks({
+        subjects: [DoctorProfilesService],
         providers: [
           DoctorProfilesService,
           { provide: getRepositoryToken(DoctorProfile), useValue: profileRepo },
@@ -262,7 +261,7 @@ describe('Multi-tenant IDOR guards (unit)', () => {
           },
           { provide: AuthorizationService, useValue: authz },
         ],
-      }).compile();
+      });
       service = module.get(DoctorProfilesService);
     });
 
