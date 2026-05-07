@@ -8,6 +8,8 @@ export const GrowthTrackEvent = {
   START_CHECKOUT: 'START_CHECKOUT',
   PAYMENT_SUCCESS: 'PAYMENT_SUCCESS',
   START_CALL: 'START_CALL',
+  /** Debe coincidir con GrowthFunnelEvents.FRONTEND_ERROR (events-public). */
+  FRONTEND_ERROR: 'FRONTEND_ERROR',
 } as const;
 
 export type GrowthContextResponse = {

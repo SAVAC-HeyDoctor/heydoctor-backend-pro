@@ -105,7 +105,7 @@ export class GrowthClientController {
    */
   @Public()
   @Post('start-checkout')
-  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   async startCheckout(
     @Req() req: Request,
     @Body() dto: StartGrowthCheckoutDto,

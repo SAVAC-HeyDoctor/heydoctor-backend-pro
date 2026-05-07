@@ -16,6 +16,7 @@ import { FeatureFlagsService } from './feature-flags.service';
 import { ExperimentsService } from './experiments.service';
 import { ProductEventsService } from './product-events.service';
 import { GrowthAnalyticsService } from './growth-analytics.service';
+import { GrowthBusinessAlertsScheduler } from './growth-business-alerts.scheduler';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { GrowthAnalyticsService } from './growth-analytics.service';
     ProductEventsService,
     GrowthAnalyticsService,
     GrowthCheckoutService,
+    GrowthBusinessAlertsScheduler,
   ],
   exports: [FeatureFlagsService, ExperimentsService, ProductEventsService],
 })

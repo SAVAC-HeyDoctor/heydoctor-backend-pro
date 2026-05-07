@@ -40,6 +40,9 @@ export class HttpRequestLoggingInterceptor implements NestInterceptor {
           typeof req.path === 'string' && req.path.length > 0
             ? req.path
             : String(req.url?.split('?')[0] ?? '');
+        const authUser = req.user as { sub?: string } | undefined;
+        const userId = typeof authUser?.sub === 'string' ? authUser.sub : null;
+
         this.logger.log('http_request_complete', {
           event: 'http_request_complete',
           requestId,
@@ -47,6 +50,7 @@ export class HttpRequestLoggingInterceptor implements NestInterceptor {
           path: pathLogged,
           statusCode: res.statusCode,
           durationMs,
+          userId,
         });
       }),
     );

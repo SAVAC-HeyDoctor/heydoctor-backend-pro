@@ -21,7 +21,17 @@ export class HealthController {
 export class HealthApiController {
   @SkipThrottle()
   @Get()
-  health(): { ok: true; service: string } {
-    return { ok: true, service: 'heydoctor-backend-pro' };
+  health(): {
+    ok: true;
+    service: string;
+    status: 'ok';
+    uptime: number;
+  } {
+    return {
+      ok: true,
+      service: 'heydoctor-backend-pro',
+      status: 'ok',
+      uptime: process.uptime(),
+    };
   }
 }

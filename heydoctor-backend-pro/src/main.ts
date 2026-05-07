@@ -4,6 +4,7 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { IoAdapter } from '@nestjs/platform-socket.io';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import cookieParser from 'cookie-parser';
+import { registerSlackWebhookFromEnv } from './common/alerts/slack-webhook.sink';
 import { logExpressRouteStackIfEnabled } from './common/bootstrap/log-express-routes';
 import { validateAndLogEnv } from './config/env-startup-check';
 import { EnvConfig, ENV_CONFIG_TOKEN } from './config/env.config';
@@ -43,6 +44,8 @@ function corsOriginList(): (string | RegExp)[] {
 }
 
 async function bootstrap() {
+  registerSlackWebhookFromEnv();
+
   console.log('ENV CHECK', {
     PRICING_PRO_CHECKOUT_AMOUNT_CLP:
       process.env.PRICING_PRO_CHECKOUT_AMOUNT_CLP,
@@ -118,7 +121,7 @@ async function bootstrap() {
       'X-Requested-With',
       'X-CSRF-Token',
     ],
-    exposedHeaders: ['Set-Cookie'],
+    exposedHeaders: ['Set-Cookie', 'X-Request-Id'],
   });
 
   app.use(

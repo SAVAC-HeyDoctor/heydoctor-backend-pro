@@ -107,6 +107,37 @@ export function validateAndLogEnv(env: EnvConfig): string[] {
       value: env.openaiModel,
     },
     {
+      name: 'SLACK_WEBHOOK_URL',
+      status: process.env.SLACK_WEBHOOK_URL?.trim() ? 'SET' : 'DEFAULT',
+      required: false,
+      value: process.env.SLACK_WEBHOOK_URL?.trim()
+        ? 'configured'
+        : 'unset (alerts only to other sinks)',
+    },
+    {
+      name: 'GROWTH_BUSINESS_ALERTS_ENABLED',
+      status: process.env.GROWTH_BUSINESS_ALERTS_ENABLED ? 'SET' : 'DEFAULT',
+      required: false,
+      value:
+        process.env.GROWTH_BUSINESS_ALERTS_ENABLED === 'false'
+          ? 'disabled'
+          : 'enabled (daily cron)',
+    },
+    {
+      name: 'GROWTH_ALERT_CHURN_MAX',
+      status: process.env.GROWTH_ALERT_CHURN_MAX ? 'SET' : 'DEFAULT',
+      required: false,
+      value: process.env.GROWTH_ALERT_CHURN_MAX ?? '0.15 (default)',
+    },
+    {
+      name: 'GROWTH_ALERT_SIGNUP_CONVERSION_MIN',
+      status: process.env.GROWTH_ALERT_SIGNUP_CONVERSION_MIN
+        ? 'SET'
+        : 'DEFAULT',
+      required: false,
+      value: process.env.GROWTH_ALERT_SIGNUP_CONVERSION_MIN ?? '0.05 (default)',
+    },
+    {
       name: 'HIPAA_MODE',
       status: env.hipaaMode ? 'SET' : 'DEFAULT',
       required: false,

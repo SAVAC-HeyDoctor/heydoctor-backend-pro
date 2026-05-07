@@ -34,11 +34,15 @@ export class AlertingExceptionFilter extends BaseExceptionFilter {
       const req = ctx.getRequest<Request>();
       const err =
         exception instanceof Error ? exception : new Error(String(exception));
+      const authUser = req.user as { sub?: string } | undefined;
+      const userId =
+        typeof authUser?.sub === 'string' ? authUser.sub : undefined;
       this.appLogger.error('server_error', err, {
         event: 'server_error',
         statusCode: status,
         path: typeof req.url === 'string' ? req.url : undefined,
         method: req.method,
+        userId,
       });
       notifyAlert({
         event: 'server_error',
@@ -46,6 +50,7 @@ export class AlertingExceptionFilter extends BaseExceptionFilter {
         path: typeof req.url === 'string' ? req.url : undefined,
         method: req.method,
         errorName: err.name,
+        userId,
       });
     }
 

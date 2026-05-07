@@ -10,6 +10,8 @@ export const GrowthFunnelEvents = {
   PAYMENT_SUCCESS: 'PAYMENT_SUCCESS',
   START_CALL: 'START_CALL',
   FIRST_CALL_COMPLETED: 'FIRST_CALL_COMPLETED',
+  /** Reporte anónimo de error en el cliente (mensaje acotado). */
+  FRONTEND_ERROR: 'FRONTEND_ERROR',
   /** Ciclo vida suscripción — también llegan desde subscription_events. */
   SUBSCRIPTION_UPGRADE: 'SUBSCRIPTION_UPGRADE',
 } as const;
@@ -22,4 +24,6 @@ export type GrowthProductEventName =
 export const GrowthPublicTrackableEvents: ReadonlySet<string> = new Set([
   GrowthFunnelEvents.VISIT_MARKETING,
   GrowthFunnelEvents.VIEW_PRICING_PAGE,
+  /** Errores cliente (sin PII agresivo): mensaje acotado en frontend. */
+  GrowthFunnelEvents.FRONTEND_ERROR,
 ]);
