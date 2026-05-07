@@ -62,6 +62,7 @@ type WebhookResult = {
 export class PaykuService {
   private readonly authConfig: PaykuWebhookAuthConfig;
   private readonly pendingExpireMinutes: number;
+  private readonly paykuApiKey?: string;
 
   constructor(
     @InjectRepository(PaykuPayment)
@@ -90,6 +91,12 @@ export class PaykuService {
     this.pendingExpireMinutes = Number(
       this.config.get<string>('PAYMENT_PENDING_EXPIRE_MINUTES') ?? '1440',
     );
+    this.paykuApiKey = this.config.get<string>('PAYKU_API_KEY')?.trim();
+    if (!this.paykuApiKey) {
+      this.logger.warn(
+        'Payku not configured: PAYKU_API_KEY is empty — live Payku API calls will use mock checkout URLs only',
+      );
+    }
   }
 
   // ── Create Payment Session ─────────────────────────────────────
@@ -166,7 +173,6 @@ export class PaykuService {
      */
     let paymentUrl: string | undefined;
     const paykuApiUrl = this.config.get<string>('PAYKU_API_URL');
-    const paykuApiKey = this.config.get<string>('PAYKU_API_KEY');
     const paykuLiveDisabled =
       this.config.get<string>('PAYKU_CONSULTATION_PAYMENTS_DISABLED') ===
       'true';
@@ -177,13 +183,13 @@ export class PaykuService {
       this.logger.warn(
         'PAYKU_CONSULTATION_PAYMENTS_DISABLED=true: skipping live Payku API (mock checkout URL)',
       );
-    } else if (paykuApiUrl && paykuApiKey) {
+    } else if (paykuApiUrl && this.paykuApiKey) {
       try {
         const res = await fetch(`${paykuApiUrl}/transaction`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${paykuApiKey}`,
+            Authorization: `Bearer ${this.paykuApiKey}`,
           },
           body: JSON.stringify({
             email: authUser.email,
@@ -237,7 +243,7 @@ export class PaykuService {
       mockMode:
         paykuLiveDisabled ||
         !paykuApiUrl ||
-        !paykuApiKey ||
+        !this.paykuApiKey ||
         paymentUrl === mockPaymentUrl,
     });
 
@@ -293,7 +299,6 @@ export class PaykuService {
 
     let paymentUrl: string | undefined;
     const paykuApiUrl = this.config.get<string>('PAYKU_API_URL');
-    const paykuApiKey = this.config.get<string>('PAYKU_API_KEY');
     const paykuLiveDisabled =
       this.config.get<string>('PAYKU_CONSULTATION_PAYMENTS_DISABLED') ===
       'true';
@@ -304,13 +309,17 @@ export class PaykuService {
       this.logger.warn(
         'PAYKU_CONSULTATION_PAYMENTS_DISABLED=true: skipping live Payku API (mock pricing checkout URL)',
       );
-    } else if (paykuApiUrl && paykuApiKey) {
+    } else if (!this.paykuApiKey) {
+      this.logger.warn(
+        'Payku not configured: PAYKU_API_KEY missing; using mock pricing checkout URL',
+      );
+    } else if (paykuApiUrl && this.paykuApiKey) {
       try {
         const res = await fetch(`${paykuApiUrl}/transaction`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${paykuApiKey}`,
+            Authorization: `Bearer ${this.paykuApiKey}`,
           },
           body: JSON.stringify({
             email: params.email,
@@ -347,7 +356,7 @@ export class PaykuService {
       }
     } else {
       this.logger.warn(
-        'PAYKU_API_URL/PAYKU_API_KEY not configured; returning mock pricing checkout URL',
+        'PAYKU_API_URL not configured; returning mock pricing checkout URL',
       );
     }
 
@@ -363,7 +372,7 @@ export class PaykuService {
       mockMode:
         paykuLiveDisabled ||
         !paykuApiUrl ||
-        !paykuApiKey ||
+        !this.paykuApiKey ||
         paymentUrl === mockPaymentUrl,
     });
 

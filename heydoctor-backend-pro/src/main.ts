@@ -43,6 +43,16 @@ function corsOriginList(): (string | RegExp)[] {
 }
 
 async function bootstrap() {
+  console.log('ENV CHECK', {
+    PRICING_PRO_CHECKOUT_AMOUNT_CLP:
+      process.env.PRICING_PRO_CHECKOUT_AMOUNT_CLP,
+    SUBSCRIPTION_PRO_MONTHLY_PRICE: process.env.SUBSCRIPTION_PRO_MONTHLY_PRICE,
+    CONSULTATION_PAYMENT_AMOUNT_CLP:
+      process.env.CONSULTATION_PAYMENT_AMOUNT_CLP,
+    PAYKU_API_KEY_SET: Boolean(process.env.PAYKU_API_KEY?.trim()),
+    NODE_ENV: process.env.NODE_ENV,
+  });
+
   if (process.env.NODE_ENV === 'production' && !process.env.REDIS_URL?.trim()) {
     bootstrapLogger.warn(
       'REDIS_URL is not set: throttling uses in-memory storage per instance (not shared across replicas). Add Redis for distributed rate limits in multi-instance production.',

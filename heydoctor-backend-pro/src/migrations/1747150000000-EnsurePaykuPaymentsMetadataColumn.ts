@@ -1,10 +1,15 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class PaykuPaymentMetadata1747100000000 implements MigrationInterface {
-  name = 'PaykuPaymentMetadata1747100000000';
+/**
+ * Idempotente: añade `metadata` como jsonb sin asumir estado previo (deploys Railway).
+ * Paso 2: normaliza NULLs antes de DEFAULT y NOT NULL.
+ */
+export class EnsurePaykuPaymentsMetadataColumn1747150000000
+  implements MigrationInterface
+{
+  name = 'EnsurePaykuPaymentsMetadataColumn1747150000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-    /** Misma secuencia segura que la migración de refuerzo (evita fallos si NOT NULL+DEFAULT en una sola línea falla). */
     await queryRunner.query(`
       ALTER TABLE "payku_payments"
       ADD COLUMN IF NOT EXISTS "metadata" jsonb;

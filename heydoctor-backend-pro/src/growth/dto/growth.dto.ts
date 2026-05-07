@@ -102,8 +102,9 @@ export class CreateExperimentDto {
 }
 
 export class StartGrowthCheckoutDto {
+  @IsString()
   @IsIn(['pro'])
-  plan!: 'pro';
+  plan!: string;
 
   @IsOptional()
   @IsString()

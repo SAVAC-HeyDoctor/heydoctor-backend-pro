@@ -2,12 +2,12 @@ import {
   BadRequestException,
   Inject,
   Injectable,
+  InternalServerErrorException,
   UnauthorizedException,
   forwardRef,
   type LoggerService,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { ConfigService } from '@nestjs/config';
 import type { Request } from 'express';
 import { ACCESS_TOKEN_COOKIE } from '../auth/auth-cookies';
 import type { JwtPayload } from '../auth/types/jwt-payload.interface';
@@ -23,7 +23,6 @@ export class GrowthCheckoutService {
   constructor(
     private readonly jwtService: JwtService,
     private readonly usersService: UsersService,
-    private readonly config: ConfigService,
     @Inject(forwardRef(() => PaykuService))
     private readonly paykuService: PaykuService,
     private readonly productEvents: ProductEventsService,
@@ -75,19 +74,24 @@ export class GrowthCheckoutService {
       payerEmail = guest.email.trim();
     }
 
-const amount = (() => {
-    const direct = Number(
-      this.config.get<string>('PRICING_PRO_CHECKOUT_AMOUNT_CLP') ?? '',
-    );
-    if (Number.isFinite(direct) && direct > 0) return direct;
-    const subReplay = Number(
-      this.config.get<string>('SUBSCRIPTION_PRO_MONTHLY_PRICE') ?? '0',
-    );
-    if (Number.isFinite(subReplay) && subReplay > 0) return subReplay;
-    return Number(
-      this.config.get<string>('CONSULTATION_PAYMENT_AMOUNT_CLP') ?? '15000',
-    );
-  })();
+    const amount =
+      Number(process.env.PRICING_PRO_CHECKOUT_AMOUNT_CLP) ||
+      Number(process.env.SUBSCRIPTION_PRO_MONTHLY_PRICE) ||
+      Number(process.env.CONSULTATION_PAYMENT_AMOUNT_CLP);
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      this.logger.error('growth_checkout_invalid_pricing_env', {
+        PRICING_PRO_CHECKOUT_AMOUNT_CLP:
+          process.env.PRICING_PRO_CHECKOUT_AMOUNT_CLP,
+        SUBSCRIPTION_PRO_MONTHLY_PRICE:
+          process.env.SUBSCRIPTION_PRO_MONTHLY_PRICE,
+        CONSULTATION_PAYMENT_AMOUNT_CLP:
+          process.env.CONSULTATION_PAYMENT_AMOUNT_CLP,
+      });
+      throw new InternalServerErrorException(
+        'Invalid pricing amount configuration',
+      );
+    }
 
     const experimentKey = dto.experimentKey?.trim() || 'pricing_upgrade_cta';
     const variant = dto.variant?.trim() || null;
