@@ -1,0 +1,66 @@
+# Sincroniza `frontend/` → jairosc23/heydoctor-frontend al integrar en main.
+# Requiere secret GH_TOKEN (PAT con push al repo público; no uses GITHUB_TOKEN del workflow).
+#
+# Vercel: tras el push en heydoctor-frontend suele dispararse Preview / Production según configuración.
+
+name: Sync Frontend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'frontend/**'
+  workflow_dispatch:
+
+concurrency:
+  group: sync-frontend-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require GH_TOKEN
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          if [[ -z "$GH_TOKEN" ]]; then
+            echo '::error::Configura el secret GH_TOKEN (PAT con permiso repo: push sobre jairosc23/heydoctor-frontend).'
+            exit 1
+          fi
+
+      - name: Checkout monorepo (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install & validate frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run lint
+          npm run build
+
+      - name: Git identity & jairo-fe remote
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          git config --global user.name "heydoctor-bot"
+          git config --global user.email "bot@heydoctor.health"
+          git remote remove jairo-fe 2>/dev/null || true
+          git remote add jairo-fe "https://x-access-token:${GH_TOKEN}@github.com/jairosc23/heydoctor-frontend.git"
+
+      - name: Sync to public frontend (squash-merge)
+        env:
+          SKIP_CHECK: '1'
+        run: npm run sync:frontend:safe
