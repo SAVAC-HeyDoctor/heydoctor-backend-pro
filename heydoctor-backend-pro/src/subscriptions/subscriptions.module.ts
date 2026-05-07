@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
@@ -16,7 +16,7 @@ import { SubscriptionsService } from './subscriptions.service';
   imports: [
     TypeOrmModule.forFeature([Subscription]),
     SubscriptionEventsModule,
-    AuthModule,
+    forwardRef(() => AuthModule),
     AuditModule,
     UsersModule,
   ],
