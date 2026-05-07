@@ -305,6 +305,12 @@ export default function AdminAnalyticsPage() {
         </div>
         <nav className="flex flex-wrap gap-3 text-sm">
           <Link
+            href="/admin/growth"
+            className="text-slate-600 underline hover:text-slate-900"
+          >
+            Growth
+          </Link>
+          <Link
             href="/admin/subscriptions"
             className="text-slate-600 underline hover:text-slate-900"
           >
