@@ -426,7 +426,9 @@ export class PaykuService {
         clinicId: null,
         httpStatus: 401,
         errorMessage: msg,
-        metadata: { ip: body._ip as string | undefined },
+        metadata: {
+          ip: typeof body._ip === 'string' ? body._ip : undefined,
+        },
       });
       if (err instanceof UnauthorizedException) {
         throw err;

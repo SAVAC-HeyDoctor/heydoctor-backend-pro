@@ -46,10 +46,12 @@ export class GrowthClientController {
   @Public()
   async contextPublic() {
     const flags = await this.flags.evaluatedForUser(null);
+    const experiments: Record<string, string | null> = {};
+    const userId: string | null = null;
     return {
       features: flags,
-      experiments: {} as Record<string, string | null>,
-      userId: null as string | null,
+      experiments,
+      userId,
     };
   }
 

@@ -29,8 +29,8 @@ function deterministicUserIdForPricingAnon(anonSessionId: string): string {
     .digest();
   const buf = Buffer.alloc(16);
   digest.copy(buf, 0, 0, 16);
-  buf[6] = (buf[6]! & 0x0f) | 0x40;
-  buf[8] = (buf[8]! & 0x3f) | 0x80;
+  buf[6] = (buf[6] & 0x0f) | 0x40;
+  buf[8] = (buf[8] & 0x3f) | 0x80;
   const hex = buf.toString('hex');
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
 }
