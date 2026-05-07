@@ -5,7 +5,11 @@
 # El GITHUB_TOKEN del workflow no vale para hacer push a un repositorio externo.
 #
 # El job usa `continue-on-error: true` para que un fallo de sync no pinte todo el chequeo en rojo.
-# Vercel: el push suele disparar Preview/Production según el proyecto enlazado.
+# Push a main con cambios en frontend/ también dispara el sync (CI tras merge).
+#
+# ── Manual ─────────────────────────────────────────────────────
+# Actions → Sync Frontend → Run workflow: no depende de `paths` (siempre ejecuta desde main).
+# Input opcional `force`: solo orientación en logs (“forzar revisión/sync” sin depender del diff).
 
 name: Sync Frontend
 
@@ -15,6 +19,12 @@ on:
     paths:
       - 'frontend/**'
   workflow_dispatch:
+    inputs:
+      force:
+        description: 'Run sync explicitly (manual always runs; logs this flag)'
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: sync-frontend-${{ github.ref }}
@@ -40,6 +50,19 @@ jobs:
             exit 1
           fi
           echo '✅ GH_TOKEN presente'
+
+      - name: Debug context
+        run: |
+          echo "Branch: ${GITHUB_REF:-}"
+          echo "Actor: ${GITHUB_ACTOR:-}"
+          echo "Commit: ${GITHUB_SHA:-}"
+          echo "Event: ${{ github.event_name }}"
+          echo "Run ID: ${{ github.run_id }}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "Manual force flag: ${{ github.event.inputs.force }}"
+          else
+            echo "Manual force flag: n/a (push only runs when frontend/** changed)"
+          fi
 
       - name: Checkout monorepo (full history)
         uses: actions/checkout@v4
