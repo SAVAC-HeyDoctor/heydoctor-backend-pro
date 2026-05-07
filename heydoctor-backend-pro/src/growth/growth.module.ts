@@ -2,9 +2,12 @@ import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from '../auth/auth.module';
 import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
+import { PaykuModule } from '../payku/payku.module';
+import { UsersModule } from '../users/users.module';
 import { AdminExperimentsController } from './admin-experiments.controller';
 import { AdminFeatureFlagsController } from './admin-feature-flags.controller';
 import { AdminGrowthInsightsController } from './admin-growth-insights.controller';
+import { GrowthCheckoutService } from './growth-checkout.service';
 import { GrowthExperiment } from './experiment.entity';
 import { FeatureFlag } from './feature-flag.entity';
 import { ProductEvent } from './product-event.entity';
@@ -19,6 +22,8 @@ import { GrowthAnalyticsService } from './growth-analytics.service';
     TypeOrmModule.forFeature([FeatureFlag, GrowthExperiment, ProductEvent]),
     SubscriptionsModule,
     forwardRef(() => AuthModule),
+    forwardRef(() => UsersModule),
+    forwardRef(() => PaykuModule),
   ],
   controllers: [
     AdminFeatureFlagsController,
@@ -31,6 +36,7 @@ import { GrowthAnalyticsService } from './growth-analytics.service';
     ExperimentsService,
     ProductEventsService,
     GrowthAnalyticsService,
+    GrowthCheckoutService,
   ],
   exports: [FeatureFlagsService, ExperimentsService, ProductEventsService],
 })

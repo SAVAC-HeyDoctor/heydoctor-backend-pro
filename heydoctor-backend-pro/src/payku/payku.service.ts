@@ -265,6 +265,126 @@ export class PaykuService {
   }
 
   /**
+   * Checkout PRO desde /pricing (sin consulta). Payku + fila `payku_payments` con `consultation_id` null.
+   */
+  async createPricingProCheckout(params: {
+    userId: string;
+    clinicId: string;
+    email: string;
+    amount: number;
+    metadata: Record<string, unknown>;
+  }): Promise<{ paymentId: string; paymentUrl: string }> {
+    const frontendUrl =
+      this.config.get<string>('FRONTEND_URL') ?? 'https://heydoctor.vercel.app';
+    const backendUrl =
+      this.config.get<string>('BACKEND_PUBLIC_URL') ??
+      'https://heydoctor-backend-pro-production.up.railway.app';
+
+    const payment = this.paymentsRepository.create({
+      userId: params.userId,
+      consultationId: null,
+      amount: params.amount,
+      currency: 'CLP',
+      status: PaykuPaymentStatus.PENDING,
+      metadata: params.metadata,
+    });
+    assignClinic(payment, params.clinicId);
+    const saved = await this.paymentsRepository.save(payment);
+
+    let paymentUrl: string | undefined;
+    const paykuApiUrl = this.config.get<string>('PAYKU_API_URL');
+    const paykuApiKey = this.config.get<string>('PAYKU_API_KEY');
+    const paykuLiveDisabled =
+      this.config.get<string>('PAYKU_CONSULTATION_PAYMENTS_DISABLED') ===
+      'true';
+
+    const mockPaymentUrl = `${frontendUrl}/pricing?payment=mock&paymentId=${saved.id}`;
+
+    if (paykuLiveDisabled) {
+      this.logger.warn(
+        'PAYKU_CONSULTATION_PAYMENTS_DISABLED=true: skipping live Payku API (mock pricing checkout URL)',
+      );
+    } else if (paykuApiUrl && paykuApiKey) {
+      try {
+        const res = await fetch(`${paykuApiUrl}/transaction`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${paykuApiKey}`,
+          },
+          body: JSON.stringify({
+            email: params.email,
+            order: saved.id,
+            subject: 'Suscripción PRO HeyDoctor',
+            amount: params.amount,
+            currency: 'CLP',
+            payment_id: saved.id,
+            urlreturn: `${frontendUrl}/pricing?payment=success&paymentId=${saved.id}`,
+            urlnotify: `${backendUrl}/api/payku/webhook`,
+          }),
+        });
+        if (!res.ok) {
+          this.logger.warn(
+            `Payku pricing HTTP ${res.status}: falling back to mock checkout URL`,
+          );
+        } else {
+          const data = (await res.json()) as {
+            url?: string;
+            redirect_url?: string;
+          };
+          paymentUrl = data.url ?? data.redirect_url ?? '';
+          if (!paymentUrl) {
+            this.logger.warn(
+              'Payku response missing payment URL; using mock checkout URL',
+            );
+          }
+        }
+      } catch (err) {
+        this.logger.error(
+          'Payku pricing API call failed; using mock checkout URL',
+          err instanceof Error ? err : new Error(String(err)),
+        );
+      }
+    } else {
+      this.logger.warn(
+        'PAYKU_API_URL/PAYKU_API_KEY not configured; returning mock pricing checkout URL',
+      );
+    }
+
+    if (!paymentUrl) {
+      paymentUrl = mockPaymentUrl;
+    }
+
+    this.logger.log('payku_pricing_checkout_created', {
+      event: 'payku_pricing_checkout_created',
+      paymentId: saved.id,
+      clinicId: params.clinicId,
+      amount: params.amount,
+      mockMode:
+        paykuLiveDisabled ||
+        !paykuApiUrl ||
+        !paykuApiKey ||
+        paymentUrl === mockPaymentUrl,
+    });
+
+    void this.auditService.logSuccess({
+      userId: params.userId,
+      action: 'PAYMENT_CREATED',
+      resource: 'payment',
+      resourceId: saved.id,
+      clinicId: params.clinicId,
+      httpStatus: 201,
+      metadata: {
+        kind: 'pricing_pro',
+        amount: params.amount,
+        ...params.metadata,
+      },
+    });
+
+    return { paymentId: saved.id, paymentUrl };
+  }
+
+  /**
    * Webhook Payku: 401 si falla autenticación; 4xx si el cuerpo o la transición no aplican;
    * 200 solo con procesamiento idempotente o actualización aplicada ({ ok: true }).
    */

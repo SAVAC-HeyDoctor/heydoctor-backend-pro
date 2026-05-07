@@ -133,3 +133,29 @@ export async function trackAuthedOrPublic(
     anonSessionId,
   });
 }
+
+export type StartPricingCheckoutBody = {
+  plan: 'pro';
+  anonSessionId: string;
+  experimentKey?: string;
+  variant?: string;
+};
+
+/** Checkout Payku PRO sin pasar por el panel (cookies incluidas si hay sesión). */
+export async function startGrowthPricingCheckout(
+  body: StartPricingCheckoutBody,
+): Promise<{ checkoutUrl: string; paymentId: string }> {
+  const res = await apiFetch(absPath('/api/growth/start-checkout'), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`start-checkout HTTP ${res.status}: ${text.slice(0, 200)}`);
+  }
+  return (await res.json()) as { checkoutUrl: string; paymentId: string };
+}

@@ -2,6 +2,7 @@ import {
   ArrayMaxSize,
   IsArray,
   IsBoolean,
+  IsIn,
   IsInt,
   IsObject,
   IsOptional,
@@ -9,6 +10,7 @@ import {
   Max,
   MaxLength,
   Min,
+  MinLength,
   IsUUID,
 } from 'class-validator';
 
@@ -97,4 +99,25 @@ export class CreateExperimentDto {
   @IsOptional()
   @IsObject()
   trafficSplit?: Record<string, number>;
+}
+
+export class StartGrowthCheckoutDto {
+  @IsIn(['pro'])
+  plan!: 'pro';
+
+  @IsOptional()
+  @IsString()
+  @MinLength(12)
+  @MaxLength(128)
+  anonSessionId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  experimentKey?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  variant?: string;
 }

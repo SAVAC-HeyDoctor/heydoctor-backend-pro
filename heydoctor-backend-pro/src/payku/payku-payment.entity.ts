@@ -76,6 +76,9 @@ export class PaykuPayment {
   @Column({ name: 'consultation_id', type: 'uuid', nullable: true })
   consultationId: string | null;
 
+  @Column({ type: 'jsonb', default: () => "'{}'" })
+  metadata: Record<string, unknown>;
+
   @Column({
     type: 'enum',
     enum: PaykuPaymentStatus,

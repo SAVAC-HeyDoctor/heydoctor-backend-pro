@@ -166,6 +166,10 @@ const ROUTE_MAP: Record<string, AuditActionDescriptor> = {
     action: 'GROWTH_PRODUCT_EVENT_PUBLIC',
     resource: 'growth',
   },
+  'POST /api/growth/start-checkout': {
+    action: 'GROWTH_START_CHECKOUT',
+    resource: 'growth',
+  },
   'GET /api/growth/experiment-preview': {
     action: 'GROWTH_EXPERIMENT_PREVIEW',
     resource: 'growth',

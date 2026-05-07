@@ -10,6 +10,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
+import { createHash, randomBytes } from 'crypto';
 import { JwtUserCacheInvalidationService } from '../auth/jwt-user-cache-invalidation.service';
 import { ClinicService } from '../clinic/clinic.service';
 import { assignClinic } from '../common/entity-clinic.util';
@@ -21,6 +22,18 @@ import { UserRole } from './user-role.enum';
 const BCRYPT_ROUNDS = 12;
 /** Rounds for admin/testing user creation (POST /users). */
 const BCRYPT_ROUNDS_ADMIN_CREATE = 10;
+
+function deterministicUserIdForPricingAnon(anonSessionId: string): string {
+  const digest = createHash('sha256')
+    .update(`heydoctor:pro_pricing:${anonSessionId}`)
+    .digest();
+  const buf = Buffer.alloc(16);
+  digest.copy(buf, 0, 0, 16);
+  buf[6] = (buf[6]! & 0x0f) | 0x40;
+  buf[8] = (buf[8]! & 0x3f) | 0x80;
+  const hex = buf.toString('hex');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
+}
 
 /** Clinic name for new registrations: use email (capped) per multi-tenant phase 1. */
 function clinicNameForNewUser(email: string): string {
@@ -299,5 +312,53 @@ export class UsersService {
       isActive,
     });
     return user;
+  }
+
+  /**
+   * Checkout PRO sin cuenta: mismo anonSessionId ⇒ mismo user/clínica (determinístico).
+   * Password aleatorio; uso previsto: activar PRO vía webhook y luego recuperar acceso (ej. flujo futuro).
+   */
+  async ensureGuestUserForProPricing(anonSessionId: string): Promise<User> {
+    const trimmed = anonSessionId.trim();
+    if (trimmed.length < 12 || trimmed.length > 128) {
+      throw new BadRequestException('anonSessionId must be 12–128 characters');
+    }
+    const id = deterministicUserIdForPricingAnon(trimmed);
+    const existing = await this.findById(id);
+    if (existing) return existing;
+
+    const clinic = await this.clinicService.createClinic(
+      `PRO checkout ${id.slice(0, 8)}`,
+    );
+    const passwordHash = await bcrypt.hash(
+      randomBytes(48).toString('base64url'),
+      BCRYPT_ROUNDS,
+    );
+    const email =
+      `guest.${id.replace(/-/g, '').slice(0, 12)}.pro@checkout.heydoctor.internal`.toLowerCase();
+
+    const entity = this.usersRepository.create({
+      id,
+      email,
+      name: 'Checkout guest',
+      passwordHash,
+      role: UserRole.DOCTOR,
+      isActive: true,
+    });
+    assignClinic(entity, clinic.id);
+    try {
+      const saved = await this.usersRepository.save(entity);
+      const user = await this.findById(saved.id);
+      if (!user) throw new Error('Failed to load guest after create');
+      this.logger.log('pricing_checkout_guest_created', {
+        userId: user.id,
+        clinicId: user.clinicId,
+      });
+      return user;
+    } catch (err) {
+      const again = await this.findById(id);
+      if (again) return again;
+      throw err;
+    }
   }
 }

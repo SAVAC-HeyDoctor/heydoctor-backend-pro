@@ -5,15 +5,18 @@ import {
   Get,
   Post,
   Query,
+  Req,
   UseGuards,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import { Throttle } from '@nestjs/throttler';
 import { Public } from '../auth/decorators/public.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
-import { TrackProductEventDto } from './dto/growth.dto';
+import { StartGrowthCheckoutDto, TrackProductEventDto } from './dto/growth.dto';
 import { ExperimentsService } from './experiments.service';
+import { GrowthCheckoutService } from './growth-checkout.service';
 import { FeatureFlagsService } from './feature-flags.service';
 import { GrowthPublicTrackableEvents } from './growth-event-names';
 import { ProductEventsService } from './product-events.service';
@@ -24,6 +27,7 @@ export class GrowthClientController {
     private readonly flags: FeatureFlagsService,
     private readonly experiments: ExperimentsService,
     private readonly productEvents: ProductEventsService,
+    private readonly growthCheckout: GrowthCheckoutService,
   ) {}
 
   @Get('context')
@@ -92,6 +96,19 @@ export class GrowthClientController {
     }
     await this.productEvents.track(null, name, props);
     return { ok: true };
+  }
+
+  /**
+   * Checkout Payku PRO directo desde /pricing (con o sin JWT). Anónimos: `anonSessionId` estable (12–128).
+   */
+  @Public()
+  @Post('start-checkout')
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  async startCheckout(
+    @Req() req: Request,
+    @Body() dto: StartGrowthCheckoutDto,
+  ): Promise<{ checkoutUrl: string; paymentId: string }> {
+    return this.growthCheckout.startCheckoutFromPricing(req, dto);
   }
 
   @Post('events')

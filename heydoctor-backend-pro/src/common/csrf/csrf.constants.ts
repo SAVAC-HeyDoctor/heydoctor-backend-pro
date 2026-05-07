@@ -14,4 +14,5 @@ export const CSRF_SKIP_PATH_PREFIXES = [
   '/api/auth/refresh',
   '/api/payku/webhook',
   '/api/public',
+  '/api/growth/start-checkout',
 ] as const;
