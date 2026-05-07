@@ -1,6 +1,6 @@
-# Comprobaciones previas a merge/release: backend Nest + frontend Next.js.
-# Bloqueo de merge (GitHub → Settings → Branches → main): marca requeridos
-# "Backend (Nest)", "Frontend (Next)" y, si configuraste Slack, "CI alert".
+# CI con fail-fast entre componentes (matrix): si falla Backend o Frontend, se cancela el otro.
+# Branch protection (Settings → Branches → main): exigir PR y checks
+# «Backend (Nest)» y «Frontend (Next)». Slack opcional: secret SLACK_WEBHOOK_URL.
 
 name: CI
 
@@ -15,12 +15,21 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  backend:
-    name: Backend (Nest)
+  checks:
+    name: ${{ matrix.name }}
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: heydoctor-backend-pro
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - name: Backend (Nest)
+            workdir: heydoctor-backend-pro
+            lint_script: lint:ci
+            run_test: true
+          - name: Frontend (Next)
+            workdir: frontend
+            lint_script: lint
+            run_test: false
 
     steps:
       - uses: actions/checkout@v4
@@ -29,63 +38,47 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-          cache-dependency-path: heydoctor-backend-pro/package-lock.json
+          cache-dependency-path: ${{ matrix.workdir }}/package-lock.json
 
       - name: Install dependencies
+        working-directory: ${{ matrix.workdir }}
         run: npm ci
 
       - name: Lint
-        run: npm run lint:ci
+        working-directory: ${{ matrix.workdir }}
+        run: npm run ${{ matrix.lint_script }}
 
       - name: Build
+        working-directory: ${{ matrix.workdir }}
         run: npm run build
 
-      - name: Test
+      - name: Test (backend only)
+        if: matrix.run_test
+        working-directory: ${{ matrix.workdir }}
         run: npm test
         env:
           JWT_SECRET: ci-jwt-secret-must-be-at-least-32-chars-long
 
-  frontend:
-    name: Frontend (Next)
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: frontend
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Lint
-        run: npm run lint
-
-      - name: Build
-        run: npm run build
-
   notify:
     name: CI alert (Slack opcional)
-    needs: [backend, frontend]
-    if: ${{ always() && (needs.backend.result == 'failure' || needs.frontend.result == 'failure') }}
+    needs: checks
+    if: ${{ always() && needs.checks.result != 'success' }}
     runs-on: ubuntu-latest
     steps:
       - name: Notify Slack
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          MSG_REF: ${{ github.ref }}
+          MSG_ACTOR: ${{ github.actor }}
+          MSG_REPO: ${{ github.repository }}
+          MSG_RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           if [[ -z "${SLACK_WEBHOOK_URL:-}" ]]; then
             echo "Sin SLACK_WEBHOOK_URL; no se envía alerta."
             exit 0
           fi
           BODY=$(jq -n \
-            --arg text "CI falló en ${{ github.repository }} (${{ github.ref_name }}) — ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            --arg text "🚨 CI failed in HeyDoctor — ${MSG_REPO} — ${MSG_REF} — actor: ${MSG_ACTOR} — ${MSG_RUN}" \
             '{text:$text}')
           curl -sS -X POST "$SLACK_WEBHOOK_URL" \
             -H 'Content-type: application/json' \

@@ -1,7 +1,7 @@
 # Sincroniza `frontend/` → jairosc23/heydoctor-frontend al integrar en main.
-# Requiere secret GH_TOKEN (PAT con push al repo público; no uses GITHUB_TOKEN del workflow).
-#
-# Vercel: tras el push en heydoctor-frontend suele dispararse Preview / Production según configuración.
+# Secret GH_TOKEN: PAT con push al repo público (no GITHUB_TOKEN del workflow).
+# Vercel: el push suele disparar Preview/Production según el proyecto enlazado.
+# Branch protection: ver .github/HARDENING.md (checks Backend + Frontend).
 
 name: Sync Frontend
 
