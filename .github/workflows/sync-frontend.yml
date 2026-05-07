@@ -1,14 +1,11 @@
 # Sincroniza `frontend/` → jairosc23/heydoctor-frontend al integrar en main.
 #
-# Requiere el secret GH_TOKEN: un PAT (Personal Access Token) con scope `repo`
-# configurado en Settings → Secrets and variables → Actions de este repositorio.
-# GITHUB_TOKEN no puede usarse aquí porque el destino es un repositorio externo.
+# Secret GH_TOKEN: PAT (Settings → Developer settings → Personal access tokens) con scope `repo`,
+# configurado como secret del repo: Settings → Secrets and variables → Actions → GH_TOKEN.
+# El GITHUB_TOKEN del workflow no vale para hacer push a un repositorio externo.
 #
-# Si GH_TOKEN no está configurado el job se omite con una advertencia (exit 0)
-# para no bloquear el resto del pipeline.
-#
+# El job usa `continue-on-error: true` para que un fallo de sync no pinte todo el chequeo en rojo.
 # Vercel: el push suele disparar Preview/Production según el proyecto enlazado.
-# Branch protection: ver .github/HARDENING.md (checks Backend + Frontend).
 
 name: Sync Frontend
 
@@ -26,31 +23,30 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  GH_TOKEN: ${{ secrets.GH_TOKEN }}
+
 jobs:
   sync:
     runs-on: ubuntu-latest
+    continue-on-error: true
+
     steps:
-      - name: Check GH_TOKEN availability
-        env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+      - name: Check GH_TOKEN
         run: |
-          if [[ -z "$GH_TOKEN" ]]; then
-            echo '::warning::GH_TOKEN no configurado — sync omitido.'
-            echo '  → Configura un PAT con scope "repo" en:'
-            echo '     Settings → Secrets and variables → Actions → New repository secret'
-            echo '     Nombre: GH_TOKEN'
-            echo '     Valor:  <tu PAT con permiso repo sobre jairosc23/heydoctor-frontend>'
-            echo 'SKIP_SYNC=true' >> "$GITHUB_ENV"
+          if [ -z "$GH_TOKEN" ]; then
+            echo '❌ GH_TOKEN not set'
+            echo '::error::Define el repository secret GH_TOKEN (PAT con scope repo sobre jairosc23/heydoctor-frontend).'
+            exit 1
           fi
+          echo '✅ GH_TOKEN presente'
 
       - name: Checkout monorepo (full history)
-        if: env.SKIP_SYNC != 'true'
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Setup Node
-        if: env.SKIP_SYNC != 'true'
         uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -58,7 +54,6 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install & validate frontend
-        if: env.SKIP_SYNC != 'true'
         working-directory: frontend
         run: |
           npm ci
@@ -66,17 +61,14 @@ jobs:
           npm run build
 
       - name: Git identity & jairo-fe remote
-        if: env.SKIP_SYNC != 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
-          git config --global user.name "heydoctor-bot"
-          git config --global user.email "bot@heydoctor.health"
+          git config --global user.name 'heydoctor-bot'
+          git config --global user.email 'bot@heydoctor.health'
           git remote remove jairo-fe 2>/dev/null || true
           git remote add jairo-fe "https://x-access-token:${GH_TOKEN}@github.com/jairosc23/heydoctor-frontend.git"
+          git remote -v | sed 's/x-access-token:[^@]*@/x-access-token:***@/'
 
       - name: Sync to public frontend (squash-merge)
-        if: env.SKIP_SYNC != 'true'
         env:
           SKIP_CHECK: '1'
         run: npm run sync:frontend:safe
