@@ -148,6 +148,7 @@ const METRICS_SUBSCRIPTION_EVENT_REPLAY_TYPES: SubscriptionEventType[] = [
   SubscriptionEventType.SUBSCRIPTION_DEACTIVATED,
   SubscriptionEventType.SUBSCRIPTION_EXPIRED,
   SubscriptionEventType.PAYMENT_SUCCEEDED,
+  SubscriptionEventType.SUBSCRIPTION_REACTIVATED,
 ];
 
 @Injectable()
@@ -730,6 +731,7 @@ function applyReplayEvent(
         status: ev.newStatus ?? SubscriptionStatus.ACTIVE,
       };
     case SubscriptionEventType.SUBSCRIPTION_ACTIVATED:
+    case SubscriptionEventType.SUBSCRIPTION_REACTIVATED:
       return {
         plan: ev.newPlan ?? cur.plan,
         status: SubscriptionStatus.ACTIVE,

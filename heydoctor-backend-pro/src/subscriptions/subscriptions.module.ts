@@ -27,6 +27,11 @@ import { SubscriptionsService } from './subscriptions.service';
     SubscriptionsAnalyticsService,
     SubscriptionAlertsService,
   ],
-  exports: [SubscriptionsService, FeatureGuard, SubscriptionAlertsService],
+  exports: [
+    SubscriptionsService,
+    FeatureGuard,
+    SubscriptionAlertsService,
+    SubscriptionsAnalyticsService,
+  ],
 })
 export class SubscriptionsModule {}

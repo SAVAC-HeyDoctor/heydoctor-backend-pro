@@ -348,7 +348,7 @@ export class SubscriptionsService {
         await this.subscriptionEventsService.append({
           userId,
           clinicId: saved.clinicId,
-          eventType: SubscriptionEventType.SUBSCRIPTION_ACTIVATED,
+          eventType: SubscriptionEventType.SUBSCRIPTION_REACTIVATED,
           previousPlan,
           newPlan: saved.plan,
           previousStatus,

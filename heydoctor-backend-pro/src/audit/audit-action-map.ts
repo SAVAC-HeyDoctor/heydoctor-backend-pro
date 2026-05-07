@@ -110,6 +110,50 @@ const ROUTE_MAP: Record<string, AuditActionDescriptor> = {
     action: 'SUBSCRIPTION_EVENTS_LIST',
     resource: 'subscription',
   },
+  'GET /api/admin/feature-flags': {
+    action: 'ADMIN_FEATURE_FLAGS_LIST',
+    resource: 'growth',
+  },
+  'POST /api/admin/feature-flags': {
+    action: 'ADMIN_FEATURE_FLAGS_CREATE',
+    resource: 'growth',
+  },
+  'PATCH /api/admin/feature-flags/:id': {
+    action: 'ADMIN_FEATURE_FLAGS_PATCH',
+    resource: 'growth',
+  },
+  'GET /api/admin/experiments': {
+    action: 'ADMIN_EXPERIMENTS_LIST',
+    resource: 'growth',
+  },
+  'POST /api/admin/experiments': {
+    action: 'ADMIN_EXPERIMENTS_CREATE',
+    resource: 'growth',
+  },
+  'PATCH /api/admin/experiments/:id': {
+    action: 'ADMIN_EXPERIMENTS_PATCH',
+    resource: 'growth',
+  },
+  'GET /api/admin/growth/summary': {
+    action: 'ADMIN_GROWTH_SUMMARY',
+    resource: 'growth',
+  },
+  'GET /api/admin/growth/alerts': {
+    action: 'ADMIN_GROWTH_ALERTS',
+    resource: 'growth',
+  },
+  'GET /api/growth/context-public': {
+    action: 'GROWTH_CONTEXT_PUBLIC',
+    resource: 'growth',
+  },
+  'GET /api/growth/context': {
+    action: 'GROWTH_CONTEXT',
+    resource: 'growth',
+  },
+  'POST /api/growth/events': {
+    action: 'GROWTH_PRODUCT_EVENT',
+    resource: 'growth',
+  },
   'GET /api/consultations': {
     action: 'CONSULTATION_LIST',
     resource: 'consultation',

@@ -39,6 +39,7 @@ import { UsersModule } from './users/users.module';
 import { DoctorApplicationsModule } from './doctor-applications/doctor-applications.module';
 import { DoctorProfilesModule } from './doctor-profiles/doctor-profiles.module';
 import { GdprModule } from './gdpr/gdpr.module';
+import { GrowthModule } from './growth/growth.module';
 import {
   HealthApiController,
   HealthController,
@@ -108,6 +109,7 @@ const dbUrl = process.env.DATABASE_PUBLIC_URL || process.env.DATABASE_URL;
     DoctorApplicationsModule,
     DoctorProfilesModule,
     GdprModule,
+    GrowthModule,
     WebrtcModule,
     PublicModule,
   ],
