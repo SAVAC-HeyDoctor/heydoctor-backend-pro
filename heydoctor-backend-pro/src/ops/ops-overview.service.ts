@@ -56,6 +56,8 @@ export class OpsOverviewService {
       uptime: Math.floor(process.uptime()),
       requestsPerMinute: httpSnap.requestsPerMinute,
       avgResponseTime: httpSnap.avgResponseTime,
+      p95ResponseTime: httpSnap.p95ResponseTime,
+      p99ResponseTime: httpSnap.p99ResponseTime,
       errorRate: httpSnap.errorRate,
       activeUsers,
       paymentsToday: payStats.paymentCount,

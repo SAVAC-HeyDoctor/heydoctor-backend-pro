@@ -48,7 +48,8 @@ function inferAlertLevel(payload: AlertPayload): AlertLevel {
   if (ev === 'ops_error_spike') return 'critical';
   if (ev === 'conversion_drop') return 'warning';
   if (ev === 'growth_business_alert') return 'warning';
-  if (ev === 'ops_latency_high' || ev === 'ops_traffic_drop') return 'warning';
+  if (ev === 'ops_latency_high' || ev === 'ops_traffic_drop' || ev === 'latency_spike')
+    return 'warning';
   return 'warning';
 }
 
@@ -75,6 +76,9 @@ function defaultDedupeKey(payload: AlertPayload, level: AlertLevel): string {
   }
   if (ev === 'conversion_drop') {
     return 'conversion_drop:signup_to_paid';
+  }
+  if (ev === 'latency_spike') {
+    return 'latency_spike:p95';
   }
   return `${ev}:${level}`;
 }

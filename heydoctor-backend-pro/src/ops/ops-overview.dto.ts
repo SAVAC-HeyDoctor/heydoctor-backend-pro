@@ -3,6 +3,8 @@ export type OpsOverviewDto = {
   uptime: number;
   requestsPerMinute: number;
   avgResponseTime: number;
+  p95ResponseTime: number;
+  p99ResponseTime: number;
   errorRate: number;
   activeUsers: number;
   paymentsToday: number;

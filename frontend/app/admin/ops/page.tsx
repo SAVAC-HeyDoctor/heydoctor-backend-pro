@@ -18,6 +18,8 @@ type OpsOverview = {
   uptime: number;
   requestsPerMinute: number;
   avgResponseTime: number;
+  p95ResponseTime: number;
+  p99ResponseTime: number;
   errorRate: number;
   activeUsers: number;
   paymentsToday: number;
@@ -57,6 +59,8 @@ type OpsScaling = {
   cpuLoad: number;
   requestsPerMinute: number;
   avgResponseTime: number;
+  p95ResponseTime: number;
+  p99ResponseTime: number;
   errorRate: number;
 };
 
@@ -209,7 +213,7 @@ export default function AdminOpsPage() {
           <h2 className="mb-2 text-sm font-semibold text-slate-900">
             Señales de autoscaling (referencia; Railway usa CPU/RAM en panel)
           </h2>
-          <div className="grid gap-3 sm:grid-cols-4 text-sm">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 text-sm">
             <div>
               <p className="text-xs uppercase text-slate-500">CPU load (1m)</p>
               <p className="tabular-nums text-lg font-semibold">{scaling.cpuLoad}</p>
@@ -221,6 +225,18 @@ export default function AdminOpsPage() {
             <div>
               <p className="text-xs uppercase text-slate-500">Latencia media</p>
               <p className="tabular-nums text-lg font-semibold">{scaling.avgResponseTime} ms</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase text-amber-800">P95 🔥</p>
+              <p className="tabular-nums text-lg font-semibold text-amber-950">
+                {scaling.p95ResponseTime} ms
+              </p>
+            </div>
+            <div>
+              <p className="text-xs uppercase text-orange-800">P99 🔥</p>
+              <p className="tabular-nums text-lg font-semibold text-orange-950">
+                {scaling.p99ResponseTime} ms
+              </p>
             </div>
             <div>
               <p className="text-xs uppercase text-slate-500">Error rate</p>
@@ -275,7 +291,7 @@ export default function AdminOpsPage() {
 
       {data && !loading && (
         <>
-          <section className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <section className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
             <div
               className={`rounded-lg border bg-white p-4 shadow-sm ${
                 highError ? 'border-red-400 ring-2 ring-red-100' : 'border-slate-200'
@@ -298,10 +314,29 @@ export default function AdminOpsPage() {
             </div>
             <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
               <p className="text-xs font-medium uppercase text-slate-500">
-                Latencia media (~1 min)
+                Latencia media
               </p>
               <p className="mt-1 text-2xl font-semibold tabular-nums text-slate-900">
                 {data.avgResponseTime} ms
+              </p>
+              <p className="mt-0.5 text-[10px] text-slate-500">
+                ventana misma que P95/P99
+              </p>
+            </div>
+            <div className="rounded-lg border border-amber-100 bg-amber-50/40 p-4 shadow-sm">
+              <p className="text-xs font-medium uppercase text-amber-900">
+                P95 🔥
+              </p>
+              <p className="mt-1 text-2xl font-semibold tabular-nums text-amber-950">
+                {data.p95ResponseTime} ms
+              </p>
+            </div>
+            <div className="rounded-lg border border-orange-100 bg-orange-50/40 p-4 shadow-sm">
+              <p className="text-xs font-medium uppercase text-orange-900">
+                P99 🔥
+              </p>
+              <p className="mt-1 text-2xl font-semibold tabular-nums text-orange-950">
+                {data.p99ResponseTime} ms
               </p>
             </div>
             <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">

@@ -13,6 +13,8 @@ const LAT_HIGH_MS = (): number =>
 const RPM_LOW = (): number => Number(process.env.OPS_ANOMALY_RPM_LOW ?? 20);
 const RPM_TRAFFIC_BASE = (): number =>
   Number(process.env.OPS_ANOMALY_RPM_BASELINE ?? 30);
+const P95_SPIKE_MS = (): number =>
+  Number(process.env.OPS_ANOMALY_P95_MS ?? 1000);
 
 @Injectable()
 export class OpsAnomalyScheduler {
@@ -31,6 +33,7 @@ export class OpsAnomalyScheduler {
       const rpm = snap.requestsPerMinute;
       const er = snap.errorRate;
       const lat = snap.avgResponseTime;
+      const p95 = snap.p95ResponseTime;
 
       if (er >= ERR_SPIKE()) {
         notifyAlert(
@@ -53,6 +56,19 @@ export class OpsAnomalyScheduler {
             avgResponseTime: lat,
           },
           { level: 'warning', key: 'ops:anomaly:latency' },
+        );
+      }
+
+      if (p95 > P95_SPIKE_MS()) {
+        notifyAlert(
+          {
+            event: 'latency_spike',
+            severity: 'warning',
+            message: `P95 de latencia > ${P95_SPIKE_MS()} ms (${p95} ms)`,
+            p95ResponseTime: p95,
+            p99ResponseTime: snap.p99ResponseTime,
+          },
+          { level: 'warning', key: 'ops:anomaly:latency_p95' },
         );
       }
 

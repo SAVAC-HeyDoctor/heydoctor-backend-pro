@@ -7,6 +7,8 @@ export type OpsScalingDto = {
   cpuLoad: number;
   requestsPerMinute: number;
   avgResponseTime: number;
+  p95ResponseTime: number;
+  p99ResponseTime: number;
   errorRate: number;
 };
 
@@ -26,6 +28,8 @@ export class OpsScalingService {
       cpuLoad,
       requestsPerMinute: snap.requestsPerMinute,
       avgResponseTime: snap.avgResponseTime,
+      p95ResponseTime: snap.p95ResponseTime,
+      p99ResponseTime: snap.p99ResponseTime,
       errorRate: snap.errorRate,
     };
   }

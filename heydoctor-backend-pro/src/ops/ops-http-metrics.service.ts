@@ -42,9 +42,38 @@ function decodePathField(field: string): string {
   }
 }
 
+/** Percentil por rango (mismo minuto que `avgResponseTime`: muestras del bucket de latencia). */
+function percentile(values: number[], p: number): number {
+  if (!values.length) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const idx = Math.min(
+    sorted.length - 1,
+    Math.floor((p / 100) * sorted.length),
+  );
+  return sorted[idx] ?? 0;
+}
+
+function latencyPercentiles(ms: number[]): {
+  avg: number;
+  p95: number;
+  p99: number;
+} {
+  if (!ms.length) {
+    return { avg: 0, p95: 0, p99: 0 };
+  }
+  const avg = Math.round(ms.reduce((a, b) => a + b, 0) / ms.length);
+  return {
+    avg,
+    p95: Math.round(percentile(ms, 95)),
+    p99: Math.round(percentile(ms, 99)),
+  };
+}
+
 export type OpsHttpSnapshot = {
   requestsPerMinute: number;
   avgResponseTime: number;
+  p95ResponseTime: number;
+  p99ResponseTime: number;
   errorRate: number;
   requestsPerMinuteSeries: { minute: string; count: number }[];
   errorsByEndpoint: {
@@ -150,12 +179,11 @@ export class OpsHttpMetricsService {
     ]);
 
     const requestsPerMinute = parseInt(rpmStr ?? '0', 10);
-    const avgResponseTime =
-      latVals.length > 0
-        ? Math.round(
-            latVals.reduce((a, s) => a + Number(s), 0) / latVals.length,
-          )
-        : 0;
+    const latencies = latVals.map((x) => Number(x));
+    const lp = latencyPercentiles(latencies);
+    const avgResponseTime = lp.avg;
+    const p95ResponseTime = lp.p95;
+    const p99ResponseTime = lp.p99;
 
     const tot = parseInt(gtotStr ?? '0', 10);
     const err = parseInt(gerrStr ?? '0', 10);
@@ -205,6 +233,8 @@ export class OpsHttpMetricsService {
     return {
       requestsPerMinute,
       avgResponseTime,
+      p95ResponseTime,
+      p99ResponseTime,
       errorRate,
       requestsPerMinuteSeries,
       errorsByEndpoint: topErrors,
@@ -219,10 +249,11 @@ export class OpsHttpMetricsService {
     const s5 = this.samples.filter((s) => s.t >= win5m);
 
     const requestsPerMinute = s1.length;
-    const avgResponseTime =
-      s1.length > 0
-        ? Math.round(s1.reduce((a, s) => a + s.ms, 0) / s1.length)
-        : 0;
+    const ms1 = s1.map((s) => s.ms);
+    const lp = latencyPercentiles(ms1);
+    const avgResponseTime = lp.avg;
+    const p95ResponseTime = lp.p95;
+    const p99ResponseTime = lp.p99;
     const err5 = s5.filter((s) => s.status >= 500).length;
     const errorRate = s5.length > 0 ? err5 / s5.length : 0;
 
@@ -260,6 +291,8 @@ export class OpsHttpMetricsService {
     return {
       requestsPerMinute,
       avgResponseTime,
+      p95ResponseTime,
+      p99ResponseTime,
       errorRate,
       requestsPerMinuteSeries: series,
       errorsByEndpoint,

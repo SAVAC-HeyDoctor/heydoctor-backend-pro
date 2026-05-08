@@ -32,6 +32,9 @@ export function analyzeIncident(payload: AlertPayload): string {
   if (ev === 'ops_latency_high') {
     return 'Latencia elevada; posible saturación o dependencia lenta.';
   }
+  if (ev === 'latency_spike') {
+    return 'Cola larga en latencia (P95 alto): revisar consultas lentas, N+1 y servicios externos.';
+  }
   if (ev === 'ops_traffic_drop') {
     return 'Caída de tráfico respecto al baseline; revisar CDN, DNS y salud del frontend.';
   }
