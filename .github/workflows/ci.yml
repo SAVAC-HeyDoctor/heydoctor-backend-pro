@@ -18,6 +18,20 @@ jobs:
   checks:
     name: ${{ matrix.name }}
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: heydoctor_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
     strategy:
       fail-fast: true
       matrix:
@@ -30,6 +44,10 @@ jobs:
             workdir: frontend
             lint_script: lint
             run_test: false
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/heydoctor_test
+      JWT_SECRET: test_secret
 
     steps:
       - uses: actions/checkout@v4
@@ -52,13 +70,22 @@ jobs:
         working-directory: ${{ matrix.workdir }}
         run: npm run build
 
-      - name: Test (backend only)
+      - name: Run migrations
+        if: matrix.run_test
+        working-directory: ${{ matrix.workdir }}
+        run: npm run migration:run
+
+      - name: Test (unit, backend)
         if: matrix.run_test
         working-directory: ${{ matrix.workdir }}
         run: npm test
+
+      - name: Run E2E tests
+        if: matrix.run_test
+        working-directory: ${{ matrix.workdir }}
+        run: npm run test:e2e
         env:
-          JWT_SECRET: ci-jwt-secret-must-be-at-least-32-chars-long
-      # E2E opcional (necesita Postgres): DATABASE_E2E=1 npm run test:e2e en backend
+          DATABASE_E2E: '1'
 
   notify:
     name: CI alert (Slack opcional)
