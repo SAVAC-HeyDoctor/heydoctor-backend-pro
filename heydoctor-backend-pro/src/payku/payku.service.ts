@@ -113,6 +113,10 @@ export class PaykuService {
       this.paykuApiKey === 'test' &&
       process.env.ALLOW_FAKE_PAYMENTS !== 'true'
     ) {
+      this.logger.error('Invalid Payku config', {
+        nodeEnv: process.env.NODE_ENV,
+        hasKey: Boolean(process.env.PAYKU_API_KEY),
+      });
       throw new Error('PAYKU_API_KEY not configured in production');
     }
   }
