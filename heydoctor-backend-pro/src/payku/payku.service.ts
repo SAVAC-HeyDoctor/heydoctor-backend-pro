@@ -62,14 +62,12 @@ type WebhookResult = {
   error?: string;
 };
 
-/** CI/E2E: permite dummy key sin tocar URLs reales cuando no hay `PAYKU_API_URL`. */
-function resolvePaykuApiKey(fromConfig?: string): string | undefined {
+/** Nunca indefinido: `process.env.PAYKU_API_KEY ?? 'test'` (mock si falta URL o falla HTTP). */
+function resolvePaykuApiKey(fromConfig?: string): string {
   const t = typeof fromConfig === 'string' ? fromConfig.trim() : '';
   if (t) return t;
-  if (process.env.CI !== 'true' && process.env.DATABASE_E2E !== '1') {
-    return undefined;
-  }
-  const fb = (process.env.PAYKU_API_KEY ?? 'test').trim();
+  const paykuKey = process.env.PAYKU_API_KEY ?? 'test';
+  const fb = typeof paykuKey === 'string' ? paykuKey.trim() : '';
   return fb.length > 0 ? fb : 'test';
 }
 
@@ -77,7 +75,7 @@ function resolvePaykuApiKey(fromConfig?: string): string | undefined {
 export class PaykuService {
   private readonly authConfig: PaykuWebhookAuthConfig;
   private readonly pendingExpireMinutes: number;
-  private readonly paykuApiKey?: string;
+  private readonly paykuApiKey: string;
   private readonly paykuCircuitBreaker = new CircuitBreaker(5, 10_000);
 
   constructor(
@@ -110,11 +108,6 @@ export class PaykuService {
     this.paykuApiKey = resolvePaykuApiKey(
       this.config.get<string>('PAYKU_API_KEY'),
     );
-    if (!this.paykuApiKey) {
-      this.logger.warn(
-        'Payku not configured: PAYKU_API_KEY is empty — live Payku API calls will use mock checkout URLs only',
-      );
-    }
   }
 
   /** Payku API externo: reintentos + circuit breaker; error si HTTP no OK. */
@@ -124,7 +117,7 @@ export class PaykuService {
     const span = createSpan('payku_create_transaction');
     try {
       const paykuApiUrl = this.config.get<string>('PAYKU_API_URL');
-      if (!paykuApiUrl || !this.paykuApiKey) {
+      if (!paykuApiUrl) {
         throw new Error('Payku API not configured');
       }
       return await retry(
@@ -234,7 +227,7 @@ export class PaykuService {
       this.logger.warn(
         'PAYKU_CONSULTATION_PAYMENTS_DISABLED=true: skipping live Payku API (mock checkout URL)',
       );
-    } else if (paykuApiUrl && this.paykuApiKey) {
+    } else if (paykuApiUrl) {
       try {
         const res = await this.callPaykuCreateTransaction({
           email: authUser.email,
@@ -264,7 +257,7 @@ export class PaykuService {
       }
     } else {
       this.logger.warn(
-        'PAYKU_API_URL/PAYKU_API_KEY not configured; returning mock payment URL',
+        'PAYKU_API_URL not configured; returning mock payment URL',
       );
     }
 
@@ -279,10 +272,7 @@ export class PaykuService {
       clinicId,
       amount,
       mockMode:
-        paykuLiveDisabled ||
-        !paykuApiUrl ||
-        !this.paykuApiKey ||
-        paymentUrl === mockPaymentUrl,
+        paykuLiveDisabled || !paykuApiUrl || paymentUrl === mockPaymentUrl,
     });
 
     void this.auditService.logSuccess({
@@ -347,11 +337,7 @@ export class PaykuService {
       this.logger.warn(
         'PAYKU_CONSULTATION_PAYMENTS_DISABLED=true: skipping live Payku API (mock pricing checkout URL)',
       );
-    } else if (!this.paykuApiKey) {
-      this.logger.warn(
-        'Payku not configured: PAYKU_API_KEY missing; using mock pricing checkout URL',
-      );
-    } else if (paykuApiUrl && this.paykuApiKey) {
+    } else if (paykuApiUrl) {
       try {
         const res = await this.callPaykuCreateTransaction({
           email: params.email,
@@ -395,10 +381,7 @@ export class PaykuService {
       clinicId: params.clinicId,
       amount: params.amount,
       mockMode:
-        paykuLiveDisabled ||
-        !paykuApiUrl ||
-        !this.paykuApiKey ||
-        paymentUrl === mockPaymentUrl,
+        paykuLiveDisabled || !paykuApiUrl || paymentUrl === mockPaymentUrl,
     });
 
     void this.auditService.logSuccess({

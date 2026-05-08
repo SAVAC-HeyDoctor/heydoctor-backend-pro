@@ -88,8 +88,11 @@ export function validateAndLogEnv(env: EnvConfig): string[] {
     },
     {
       name: 'PAYKU_API_KEY',
-      status: env.paykuApiKey ? 'SET' : 'MISSING',
+      status: process.env.PAYKU_API_KEY?.trim() ? 'SET' : 'DEFAULT',
       required: false,
+      value: process.env.PAYKU_API_KEY?.trim()
+        ? '(explicit)'
+        : 'fallback via PAYKU_API_KEY ?? test',
     },
     {
       name: 'PAYKU_WEBHOOK_SECRET',

@@ -32,7 +32,8 @@ export class EnvConfig {
 
   // ── PAYKU ──
   readonly paykuApiUrl: string | null;
-  readonly paykuApiKey: string | null;
+  /** Siempre definida; sin `PAYKU_API_URL` no se llamará la API live. */
+  readonly paykuApiKey: string;
   readonly paykuWebhookSecret: string | null;
   readonly paykuWebhookBearer: string | null;
   readonly paykuWebhookAllowUnsafeLocal: boolean;
@@ -81,11 +82,23 @@ export class EnvConfig {
       })
       .filter((rx): rx is RegExp => rx !== null);
 
-    const redisUrlRaw = config.get<string>('REDIS_URL')?.trim();
-    this.redisUrl = redisUrlRaw && redisUrlRaw.length > 0 ? redisUrlRaw : null;
+    const redisRaw = process.env.REDIS_URL ?? null;
+    const redisTrim =
+      typeof redisRaw === 'string' && redisRaw.trim().length > 0
+        ? redisRaw.trim()
+        : null;
+    this.redisUrl = redisTrim;
 
     this.paykuApiUrl = config.get<string>('PAYKU_API_URL') ?? null;
-    this.paykuApiKey = config.get<string>('PAYKU_API_KEY') ?? null;
+    const pk = config.get<string>('PAYKU_API_KEY');
+    const fromCfg = typeof pk === 'string' ? pk.trim() : '';
+    if (fromCfg) {
+      this.paykuApiKey = fromCfg;
+    } else {
+      const paykuKey = process.env.PAYKU_API_KEY ?? 'test';
+      const t = typeof paykuKey === 'string' ? paykuKey.trim() : '';
+      this.paykuApiKey = t.length > 0 ? t : 'test';
+    }
     this.paykuWebhookSecret =
       config.get<string>('PAYKU_WEBHOOK_SECRET') ?? null;
     this.paykuWebhookBearer =

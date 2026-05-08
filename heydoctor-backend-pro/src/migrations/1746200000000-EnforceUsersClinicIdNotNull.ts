@@ -50,9 +50,18 @@ export class EnforceUsersClinicIdNotNull1746200000000 implements MigrationInterf
       );
     }
 
-    await queryRunner.query(`
-      ALTER TABLE "users" ALTER COLUMN "clinic_id" SET NOT NULL
+    const clinicCol = await queryRunner.query(`
+      SELECT is_nullable
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'users'
+        AND column_name = 'clinic_id'
     `);
+    if (clinicCol[0]?.is_nullable === 'YES') {
+      await queryRunner.query(`
+        ALTER TABLE "users" ALTER COLUMN "clinic_id" SET NOT NULL
+      `);
+    }
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {

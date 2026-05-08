@@ -60,11 +60,26 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Wait for Postgres
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client
+          for i in {1..10}; do
+            pg_isready -h localhost -p 5432 -U postgres && break
+            sleep 2
+          done
+          pg_isready -h localhost -p 5432 -U postgres
+
       - name: Run migrations
         run: npm run migration:run
 
       - name: Seed E2E data
         run: node dist/database/seed.e2e.js
+
+      - name: Debug env
+        run: |
+          echo "NODE_ENV=$NODE_ENV"
+          if [ -n "${DATABASE_URL:-}" ]; then echo "DATABASE_URL set"; else echo "DATABASE_URL unset"; fi
 
       - name: Test (unit)
         run: npm test

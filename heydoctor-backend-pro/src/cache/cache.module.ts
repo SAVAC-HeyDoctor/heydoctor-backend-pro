@@ -10,8 +10,12 @@ const logger = new Logger('CacheModule');
     NestCacheModule.registerAsync({
       isGlobal: true,
       useFactory: async () => {
-        const redisUrl = process.env.REDIS_URL?.trim();
-        if (redisUrl) {
+        const redisRaw = process.env.REDIS_URL ?? null;
+        const redisUrl =
+          typeof redisRaw === 'string' && redisRaw.trim().length > 0
+            ? redisRaw.trim()
+            : null;
+        if (redisUrl !== null) {
           return {
             stores: [
               new Keyv({

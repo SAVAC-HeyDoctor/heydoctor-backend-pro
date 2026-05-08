@@ -3,7 +3,7 @@ import Redis from 'ioredis';
 let sharedClient: Redis | null | undefined;
 
 function createClient(): Redis | null {
-  const raw = process.env.REDIS_URL;
+  const raw = process.env.REDIS_URL ?? null;
   const url =
     typeof raw === 'string' && raw.trim().length > 0 ? raw.trim() : null;
   return url

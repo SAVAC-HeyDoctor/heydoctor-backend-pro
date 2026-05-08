@@ -84,7 +84,11 @@ const ormLogging: boolean | ('query' | 'error')[] =
     ScheduleModule.forRoot(),
     ThrottlerModule.forRootAsync({
       useFactory: () => {
-        const redisUrl = process.env.REDIS_URL?.trim();
+        const redisRaw = process.env.REDIS_URL ?? null;
+        const redisUrl =
+          typeof redisRaw === 'string' && redisRaw.trim().length > 0
+            ? redisRaw.trim()
+            : null;
         return {
           throttlers: [
             {
@@ -93,7 +97,7 @@ const ormLogging: boolean | ('query' | 'error')[] =
               limit: 120,
             },
           ],
-          ...(redisUrl
+          ...(redisUrl !== null
             ? { storage: new ThrottlerStorageRedisService(redisUrl) }
             : {}),
           getTracker: (req) => String(req.ip ?? 'unknown'),
