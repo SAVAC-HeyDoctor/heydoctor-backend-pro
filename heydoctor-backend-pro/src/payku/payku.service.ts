@@ -108,13 +108,14 @@ export class PaykuService {
     this.paykuApiKey = resolvePaykuApiKey(
       this.config.get<string>('PAYKU_API_KEY'),
     );
-    if (
-      process.env.NODE_ENV === 'production' &&
-      this.paykuApiKey === 'test' &&
-      process.env.ALLOW_FAKE_PAYMENTS !== 'true'
-    ) {
+    const isProd = process.env.NODE_ENV === 'production';
+    const isRailway = Boolean(process.env.RAILWAY_ENVIRONMENT);
+    const allowFake = process.env.ALLOW_FAKE_PAYMENTS === 'true';
+
+    if (isProd && isRailway && this.paykuApiKey === 'test' && !allowFake) {
       this.logger.error('Invalid Payku config', {
         nodeEnv: process.env.NODE_ENV,
+        isRailway,
         hasKey: Boolean(process.env.PAYKU_API_KEY),
       });
       throw new Error('PAYKU_API_KEY not configured in production');
