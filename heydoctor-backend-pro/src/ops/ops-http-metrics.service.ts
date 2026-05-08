@@ -1,8 +1,12 @@
 import { Injectable } from '@nestjs/common';
+import type Redis from 'ioredis';
+import { getMetricsRedis } from '../common/redis/alert-redis.client';
 
 const MAX_AGE_MS = 10 * 60 * 1000;
 const MAX_SAMPLES = 25_000;
 const CHART_BUCKETS = 30;
+
+const NS = 'ops:v2';
 
 type Sample = { t: number; path: string; status: number; ms: number };
 
@@ -16,8 +20,44 @@ function normalizePathForGrouping(path: string): string {
   return p.replace(/\/[0-9]+(?=\/|$)/g, '/:num');
 }
 
+/** Minuto UTC `YYYY-MM-DDTHH:mm` alineado entre réplicas. */
+function minuteKeyUtc(epochMs: number): string {
+  return new Date(epochMs).toISOString().slice(0, 16);
+}
+
+/** Ventana de 5 minutos (misma lógica en todos los pods). */
+function fiveMinBucket(epochMs: number): number {
+  return Math.floor(epochMs / (5 * 60 * 1000));
+}
+
+function pathField(path: string): string {
+  return Buffer.from(path, 'utf8').toString('base64url');
+}
+
+function decodePathField(field: string): string {
+  try {
+    return Buffer.from(field, 'base64url').toString('utf8');
+  } catch {
+    return field;
+  }
+}
+
+export type OpsHttpSnapshot = {
+  requestsPerMinute: number;
+  avgResponseTime: number;
+  errorRate: number;
+  requestsPerMinuteSeries: { minute: string; count: number }[];
+  errorsByEndpoint: {
+    path: string;
+    errorCount: number;
+    requestCount: number;
+    errorRate: number;
+  }[];
+};
+
 /**
- * Muestras HTTP en memoria (por instancia). Usado para rpm, latencia y tasa de error.
+ * RPM/latencia/error: Redis agregado si hay `REDIS_URL` y `OPS_METRICS_REDIS` no es `false`.
+ * Siempre mantiene muestras en memoria como fallback ante fallo de Redis.
  */
 @Injectable()
 export class OpsHttpMetricsService {
@@ -26,6 +66,18 @@ export class OpsHttpMetricsService {
   record(pathRaw: string, status: number, durationMs: number): void {
     const t = Date.now();
     const path = normalizePathForGrouping(pathRaw || '/');
+    this.recordMemory(path, status, durationMs, t);
+    void this.recordDistributed(path, status, durationMs).catch(() => {
+      /* degradación silenciosa */
+    });
+  }
+
+  private recordMemory(
+    path: string,
+    status: number,
+    durationMs: number,
+    t: number,
+  ): void {
     this.samples.push({ t, path, status, ms: durationMs });
     const cutoff = t - MAX_AGE_MS;
     let i = 0;
@@ -40,18 +92,126 @@ export class OpsHttpMetricsService {
     }
   }
 
-  getSnapshot(): {
-    requestsPerMinute: number;
-    avgResponseTime: number;
-    errorRate: number;
-    requestsPerMinuteSeries: { minute: string; count: number }[];
-    errorsByEndpoint: {
-      path: string;
-      errorCount: number;
-      requestCount: number;
-      errorRate: number;
-    }[];
-  } {
+  private async recordDistributed(
+    path: string,
+    status: number,
+    durationMs: number,
+  ): Promise<void> {
+    const redis = getMetricsRedis();
+    if (!redis) {
+      return;
+    }
+    const now = Date.now();
+    const mk = minuteKeyUtc(now);
+    const b5 = fiveMinBucket(now);
+    const pf = pathField(path);
+    const pipe = redis.pipeline();
+    pipe.incr(`${NS}:rpm:${mk}`);
+    pipe.expire(`${NS}:rpm:${mk}`, 120);
+    pipe.lpush(`${NS}:lat:${mk}`, String(durationMs));
+    pipe.ltrim(`${NS}:lat:${mk}`, 0, 999);
+    pipe.expire(`${NS}:lat:${mk}`, 120);
+    pipe.incr(`${NS}:gtot:${b5}`);
+    pipe.expire(`${NS}:gtot:${b5}`, 360);
+    if (status >= 500) {
+      pipe.incr(`${NS}:gerr:${b5}`);
+      pipe.expire(`${NS}:gerr:${b5}`, 360);
+    }
+    pipe.hincrby(`${NS}:ptot:${b5}`, pf, 1);
+    pipe.expire(`${NS}:ptot:${b5}`, 360);
+    if (status >= 500) {
+      pipe.hincrby(`${NS}:perr:${b5}`, pf, 1);
+      pipe.expire(`${NS}:perr:${b5}`, 360);
+    }
+    await pipe.exec();
+  }
+
+  async getSnapshot(): Promise<OpsHttpSnapshot> {
+    const redis = getMetricsRedis();
+    if (redis) {
+      try {
+        return await this.getSnapshotRedis(redis);
+      } catch {
+        return this.getSnapshotMemory();
+      }
+    }
+    return this.getSnapshotMemory();
+  }
+
+  private async getSnapshotRedis(redis: Redis): Promise<OpsHttpSnapshot> {
+    const now = Date.now();
+    const mkPrev = minuteKeyUtc(now - 60_000);
+
+    const [rpmStr, latVals, gtotStr, gerrStr] = await Promise.all([
+      redis.get(`${NS}:rpm:${mkPrev}`),
+      redis.lrange(`${NS}:lat:${mkPrev}`, 0, -1),
+      redis.get(`${NS}:gtot:${fiveMinBucket(now)}`),
+      redis.get(`${NS}:gerr:${fiveMinBucket(now)}`),
+    ]);
+
+    const requestsPerMinute = parseInt(rpmStr ?? '0', 10);
+    const avgResponseTime =
+      latVals.length > 0
+        ? Math.round(
+            latVals.reduce((a, s) => a + Number(s), 0) / latVals.length,
+          )
+        : 0;
+
+    const tot = parseInt(gtotStr ?? '0', 10);
+    const err = parseInt(gerrStr ?? '0', 10);
+    const errorRate = tot > 0 ? err / tot : 0;
+
+    const pipeSeries = redis.pipeline();
+    const minuteKeys: string[] = [];
+    for (let b = CHART_BUCKETS - 1; b >= 0; b--) {
+      const t = now - b * 60_000;
+      const mk = minuteKeyUtc(t);
+      minuteKeys.push(mk);
+      pipeSeries.get(`${NS}:rpm:${mk}`);
+    }
+    const seriesRes = await pipeSeries.exec();
+    const requestsPerMinuteSeries = minuteKeys.map((mkFull, i) => {
+      const row = seriesRes?.[i];
+      const val = (row?.[1] as string | null) ?? null;
+      const count = parseInt(val ?? '0', 10);
+      return { minute: mkFull.slice(11, 16), count };
+    });
+
+    const b5 = fiveMinBucket(now);
+    const [totH, errH] = await Promise.all([
+      redis.hgetall(`${NS}:ptot:${b5}`),
+      redis.hgetall(`${NS}:perr:${b5}`),
+    ]);
+
+    const fieldSet = new Set([
+      ...Object.keys(totH ?? {}),
+      ...Object.keys(errH ?? {}),
+    ]);
+    const errorsByEndpoint: OpsHttpSnapshot['errorsByEndpoint'] = [];
+    for (const f of fieldSet) {
+      const ec = parseInt(errH?.[f] ?? '0', 10);
+      if (ec <= 0) continue;
+      const tc = parseInt(totH?.[f] ?? '0', 10);
+      errorsByEndpoint.push({
+        path: decodePathField(f),
+        errorCount: ec,
+        requestCount: tc,
+        errorRate: tc > 0 ? ec / tc : ec > 0 ? 1 : 0,
+      });
+    }
+    errorsByEndpoint.sort((a, b) => b.errorCount - a.errorCount);
+    const topErrors = errorsByEndpoint.slice(0, 25);
+
+    return {
+      requestsPerMinute,
+      avgResponseTime,
+      errorRate,
+      requestsPerMinuteSeries,
+      errorsByEndpoint: topErrors,
+    };
+  }
+
+  private getSnapshotMemory(): OpsHttpSnapshot {
     const now = Date.now();
     const win1m = now - 60_000;
     const win5m = now - 5 * 60_000;

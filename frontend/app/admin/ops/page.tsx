@@ -101,8 +101,8 @@ export default function AdminOpsPage() {
             Operations
           </h1>
           <p className="text-sm text-slate-600">
-            Estado del sistema y negocio (métricas locales por instancia; auto
-            cada 10s)
+            RPM/latencia/errores agregados en Redis cuando hay REDIS_URL; si no,
+            vista por instancia (memoria). Auto cada 10s
           </p>
         </div>
         <nav className="flex flex-wrap gap-3 text-sm">

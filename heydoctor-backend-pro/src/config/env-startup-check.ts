@@ -56,8 +56,8 @@ export function validateAndLogEnv(env: EnvConfig): string[] {
       status: env.redisUrl ? 'SET' : 'DEFAULT',
       required: false,
       value: env.redisUrl
-        ? 'set (cache/throttle + distributed incident correlation)'
-        : 'memory cache / in-memory throttle / in-memory alert correlation',
+        ? 'set (cache/throttle + incidents + ops HTTP metrics)'
+        : 'memory cache / in-memory throttle / in-memory alert correlation / in-memory ops metrics',
     },
     {
       name: 'INCIDENT_CORRELATION_REDIS',
@@ -68,6 +68,17 @@ export function validateAndLogEnv(env: EnvConfig): string[] {
           ? 'disabled (always in-memory incident map)'
           : env.redisUrl
             ? 'Redis when REDIS_URL is set'
+            : 'omitted (in-memory until Redis configured)',
+    },
+    {
+      name: 'OPS_METRICS_REDIS',
+      status: process.env.OPS_METRICS_REDIS ? 'SET' : 'DEFAULT',
+      required: false,
+      value:
+        process.env.OPS_METRICS_REDIS === 'false'
+          ? 'disabled (ops /admin/ops uses in-memory HTTP samples only)'
+          : env.redisUrl
+            ? 'aggregated ops RPM/latency/errors via Redis when REDIS_URL is set'
             : 'omitted (in-memory until Redis configured)',
     },
     {

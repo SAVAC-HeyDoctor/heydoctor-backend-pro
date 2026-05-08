@@ -1,36 +1,55 @@
 import Redis from 'ioredis';
 
-let client: Redis | null | undefined;
+let sharedClient: Redis | null | undefined;
 
-/**
- * Cliente Redis dedicado a correlación de incidentes (alertas).
- * Comparte `REDIS_URL` con caché/throttle; lazy init.
- */
-export function getAlertRedis(): Redis | null {
-  if (client !== undefined) {
-    return client;
-  }
-  if (process.env.INCIDENT_CORRELATION_REDIS === 'false') {
-    client = null;
-    return client;
-  }
+function createClient(): Redis | null {
   const url = process.env.REDIS_URL?.trim();
-  client = url
+  return url
     ? new Redis(url, {
         lazyConnect: true,
         maxRetriesPerRequest: 2,
         enableReadyCheck: true,
       })
     : null;
-  return client;
+}
+
+/**
+ * Conexión Redis compartida (`REDIS_URL`). Usada por alertas, incidentes y métricas ops.
+ */
+export function getSharedRedis(): Redis | null {
+  if (sharedClient !== undefined) {
+    return sharedClient;
+  }
+  sharedClient = createClient();
+  return sharedClient;
+}
+
+/**
+ * Correlación de incidentes: desactivable con `INCIDENT_CORRELATION_REDIS=false`.
+ */
+export function getAlertRedis(): Redis | null {
+  if (process.env.INCIDENT_CORRELATION_REDIS === 'false') {
+    return null;
+  }
+  return getSharedRedis();
+}
+
+/**
+ * Métricas OPS distribuidas: desactivable con `OPS_METRICS_REDIS=false`.
+ */
+export function getMetricsRedis(): Redis | null {
+  if (process.env.OPS_METRICS_REDIS === 'false') {
+    return null;
+  }
+  return getSharedRedis();
 }
 
 /** Para tests / reinicio en el mismo proceso. */
 export function resetAlertRedisClientForTests(): void {
   try {
-    client?.disconnect();
+    sharedClient?.disconnect();
   } catch {
     /* empty */
   }
-  client = undefined;
+  sharedClient = undefined;
 }

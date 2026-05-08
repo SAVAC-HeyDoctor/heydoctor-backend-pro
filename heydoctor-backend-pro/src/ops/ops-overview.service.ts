@@ -30,7 +30,7 @@ export class OpsOverviewService {
     );
 
     const [httpSnap, payStats, activeRow] = await Promise.all([
-      Promise.resolve(this.httpMetrics.getSnapshot()),
+      this.httpMetrics.getSnapshot(),
       this.subscriptionsAnalytics.getPaymentSucceededStatsUtcDay(todayUtc),
       this.productEvents
         .createQueryBuilder('e')
