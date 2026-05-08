@@ -1,6 +1,6 @@
-# CI con fail-fast entre componentes (matrix): si falla Backend o Frontend, se cancela el otro.
-# Branch protection (Settings → Branches → main): exigir PR y checks
-# «Backend (Nest)» y «Frontend (Next)». Slack opcional: secret SLACK_WEBHOOK_URL.
+# CI en paralelo: backend (Postgres + migraciones + E2E) y frontend (sin servicios extra).
+# Branch protection: exigir checks «backend» y «frontend» (Settings → Branches → main).
+# Slack opcional: secret SLACK_WEBHOOK_URL.
 
 name: CI
 
@@ -15,8 +15,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  checks:
-    name: ${{ matrix.name }}
+  backend:
+    name: Backend (Nest)
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -32,22 +32,14 @@ jobs:
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
-    strategy:
-      fail-fast: true
-      matrix:
-        include:
-          - name: Backend (Nest)
-            workdir: heydoctor-backend-pro
-            lint_script: lint:ci
-            run_test: true
-          - name: Frontend (Next)
-            workdir: frontend
-            lint_script: lint
-            run_test: false
 
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/heydoctor_test
       JWT_SECRET: test_secret
+
+    defaults:
+      run:
+        working-directory: heydoctor-backend-pro
 
     steps:
       - uses: actions/checkout@v4
@@ -56,41 +48,58 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-          cache-dependency-path: ${{ matrix.workdir }}/package-lock.json
+          cache-dependency-path: heydoctor-backend-pro/package-lock.json
 
       - name: Install dependencies
-        working-directory: ${{ matrix.workdir }}
         run: npm ci
 
       - name: Lint
-        working-directory: ${{ matrix.workdir }}
-        run: npm run ${{ matrix.lint_script }}
+        run: npm run lint:ci
 
       - name: Build
-        working-directory: ${{ matrix.workdir }}
         run: npm run build
 
       - name: Run migrations
-        if: matrix.run_test
-        working-directory: ${{ matrix.workdir }}
         run: npm run migration:run
 
-      - name: Test (unit, backend)
-        if: matrix.run_test
-        working-directory: ${{ matrix.workdir }}
+      - name: Test (unit)
         run: npm test
 
       - name: Run E2E tests
-        if: matrix.run_test
-        working-directory: ${{ matrix.workdir }}
         run: npm run test:e2e
         env:
           DATABASE_E2E: '1'
 
+  frontend:
+    name: Frontend (Next)
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
   notify:
     name: CI alert (Slack opcional)
-    needs: checks
-    if: ${{ always() && needs.checks.result != 'success' }}
+    needs: [backend, frontend]
+    if: ${{ always() && (needs.backend.result != 'success' || needs.frontend.result != 'success') }}
     runs-on: ubuntu-latest
     steps:
       - name: Notify Slack
