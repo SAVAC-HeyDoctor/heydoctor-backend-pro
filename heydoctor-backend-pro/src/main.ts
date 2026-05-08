@@ -14,6 +14,20 @@ import type { Request, Response } from 'express';
 
 const bootstrapLogger = new Logger('Bootstrap');
 
+function sanitizeDatabaseUrlForLog(raw?: string): string {
+  const s = typeof raw === 'string' ? raw.trim() : '';
+  if (!s) return '(not set)';
+  try {
+    const u = new URL(s.replace(/^postgresql:\/\//i, 'postgres://'));
+    const port = u.port || (u.protocol === 'postgres:' ? '5432' : '');
+    const hostPort = port ? `${u.hostname}:${port}` : u.hostname;
+    const db = u.pathname.replace(/^\//, '') || '(defaultdb)';
+    return `${u.protocol}//${hostPort}/${db}`;
+  } catch {
+    return '(unparseable)';
+  }
+}
+
 /**
  * Producción: `app.heydoctor.health` + previews Vercel (`credentials: true`, sin `*`).
  * Desarrollo: añade marketing, `CORS_ORIGIN` y localhost.
@@ -45,6 +59,15 @@ function corsOriginList(): (string | RegExp)[] {
 
 async function bootstrap() {
   registerSlackWebhookFromEnv();
+
+  bootstrapLogger.log('bootstrap_context', {
+    NODE_ENV: process.env.NODE_ENV ?? 'undefined',
+    DATABASE_URL_HINT: sanitizeDatabaseUrlForLog(
+      process.env.DATABASE_URL ?? process.env.DATABASE_PUBLIC_URL,
+    ),
+    REDIS_URL_CONFIGURED: Boolean(process.env.REDIS_URL?.trim()),
+    E2E_SEED_APPLIED: process.env.E2E_SEED_APPLIED ?? 'not reported',
+  });
 
   console.log('ENV CHECK', {
     PRICING_PRO_CHECKOUT_AMOUNT_CLP:

@@ -4,12 +4,13 @@ export class CreateAppointments1746100000000 implements MigrationInterface {
   name = 'CreateAppointments1746100000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(
-      `CREATE TYPE "appointments_status_enum" AS ENUM ('pending', 'confirmed', 'cancelled')`,
-    );
+    await queryRunner.query(`
+DO $$ BEGIN CREATE TYPE "appointments_status_enum" AS ENUM ('pending', 'confirmed', 'cancelled');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+`);
 
     await queryRunner.query(`
-      CREATE TABLE "appointments" (
+      CREATE TABLE IF NOT EXISTS "appointments" (
         "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
         "clinic_id" uuid NOT NULL,
         "patient_id" uuid NOT NULL,
@@ -28,13 +29,13 @@ export class CreateAppointments1746100000000 implements MigrationInterface {
     `);
 
     await queryRunner.query(`
-      CREATE UNIQUE INDEX "UQ_appointments_confirmation_token"
+      CREATE UNIQUE INDEX IF NOT EXISTS "UQ_appointments_confirmation_token"
       ON "appointments" ("confirmation_token")
       WHERE "confirmation_token" IS NOT NULL
     `);
 
     await queryRunner.query(`
-      CREATE INDEX "IDX_appointments_clinic_starts_at"
+      CREATE INDEX IF NOT EXISTS "IDX_appointments_clinic_starts_at"
       ON "appointments" ("clinic_id", "starts_at")
     `);
   }

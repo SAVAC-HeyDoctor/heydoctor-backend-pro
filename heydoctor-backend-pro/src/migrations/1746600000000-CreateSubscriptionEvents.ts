@@ -5,7 +5,7 @@ export class CreateSubscriptionEvents1746600000000 implements MigrationInterface
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`
-      CREATE TABLE "subscription_events" (
+      CREATE TABLE IF NOT EXISTS "subscription_events" (
         "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
         "clinic_id" uuid NOT NULL,
         "user_id" uuid NOT NULL,
@@ -25,7 +25,7 @@ export class CreateSubscriptionEvents1746600000000 implements MigrationInterface
       )
     `);
     await queryRunner.query(`
-      CREATE INDEX "IDX_subscription_events_user_created_at"
+      CREATE INDEX IF NOT EXISTS "IDX_subscription_events_user_created_at"
       ON "subscription_events" ("user_id", "created_at")
     `);
   }

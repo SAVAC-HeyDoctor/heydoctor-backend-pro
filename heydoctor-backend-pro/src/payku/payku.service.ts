@@ -62,6 +62,17 @@ type WebhookResult = {
   error?: string;
 };
 
+/** CI/E2E: permite dummy key sin tocar URLs reales cuando no hay `PAYKU_API_URL`. */
+function resolvePaykuApiKey(fromConfig?: string): string | undefined {
+  const t = typeof fromConfig === 'string' ? fromConfig.trim() : '';
+  if (t) return t;
+  if (process.env.CI !== 'true' && process.env.DATABASE_E2E !== '1') {
+    return undefined;
+  }
+  const fb = (process.env.PAYKU_API_KEY ?? 'test').trim();
+  return fb.length > 0 ? fb : 'test';
+}
+
 @Injectable()
 export class PaykuService {
   private readonly authConfig: PaykuWebhookAuthConfig;
@@ -96,7 +107,9 @@ export class PaykuService {
     this.pendingExpireMinutes = Number(
       this.config.get<string>('PAYMENT_PENDING_EXPIRE_MINUTES') ?? '1440',
     );
-    this.paykuApiKey = this.config.get<string>('PAYKU_API_KEY')?.trim();
+    this.paykuApiKey = resolvePaykuApiKey(
+      this.config.get<string>('PAYKU_API_KEY'),
+    );
     if (!this.paykuApiKey) {
       this.logger.warn(
         'Payku not configured: PAYKU_API_KEY is empty — live Payku API calls will use mock checkout URLs only',

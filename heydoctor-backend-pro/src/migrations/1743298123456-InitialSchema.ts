@@ -13,33 +13,27 @@ export class InitialSchema1743298123456 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`);
 
-    await queryRunner.query(
-      `CREATE TYPE "users_role_enum" AS ENUM ('doctor', 'admin')`,
-    );
-    await queryRunner.query(
-      `CREATE TYPE "consultations_status_enum" AS ENUM ('draft', 'in_progress', 'completed', 'signed', 'locked')`,
-    );
-    await queryRunner.query(
-      `CREATE TYPE "audit_logs_status_enum" AS ENUM ('success', 'error')`,
-    );
-    await queryRunner.query(
-      `CREATE TYPE "subscriptions_plan_enum" AS ENUM ('free', 'pro')`,
-    );
-    await queryRunner.query(
-      `CREATE TYPE "subscriptions_status_enum" AS ENUM ('active', 'inactive')`,
-    );
-    await queryRunner.query(
-      `CREATE TYPE "payku_payments_status_enum" AS ENUM ('pending', 'paid', 'failed', 'cancelled', 'expired')`,
-    );
-    await queryRunner.query(
-      `CREATE TYPE "doctor_applications_status_enum" AS ENUM ('pending', 'approved', 'rejected')`,
-    );
-    await queryRunner.query(
-      `CREATE TYPE "gdpr_deletion_requests_status_enum" AS ENUM ('pending', 'processing', 'completed', 'failed')`,
-    );
+    await queryRunner.query(`
+DO $$ BEGIN CREATE TYPE "users_role_enum" AS ENUM ('doctor', 'admin');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE "consultations_status_enum" AS ENUM ('draft', 'in_progress', 'completed', 'signed', 'locked');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE "audit_logs_status_enum" AS ENUM ('success', 'error');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE "subscriptions_plan_enum" AS ENUM ('free', 'pro');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE "subscriptions_status_enum" AS ENUM ('active', 'inactive');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE "payku_payments_status_enum" AS ENUM ('pending', 'paid', 'failed', 'cancelled', 'expired');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE "doctor_applications_status_enum" AS ENUM ('pending', 'approved', 'rejected');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE "gdpr_deletion_requests_status_enum" AS ENUM ('pending', 'processing', 'completed', 'failed');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+`);
 
     await queryRunner.query(`
-      CREATE TABLE "clinics" (
+      CREATE TABLE IF NOT EXISTS "clinics" (
         "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
         "name" character varying(200) NOT NULL,
         "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
@@ -48,7 +42,7 @@ export class InitialSchema1743298123456 implements MigrationInterface {
     `);
 
     await queryRunner.query(`
-      CREATE TABLE "users" (
+      CREATE TABLE IF NOT EXISTS "users" (
         "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
         "email" character varying NOT NULL,
         "password_hash" character varying NOT NULL,
@@ -62,7 +56,7 @@ export class InitialSchema1743298123456 implements MigrationInterface {
     `);
 
     await queryRunner.query(`
-      CREATE TABLE "telemedicine_consents" (
+      CREATE TABLE IF NOT EXISTS "telemedicine_consents" (
         "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
         "user_id" uuid NOT NULL,
         "clinic_id" uuid NOT NULL,
@@ -75,11 +69,11 @@ export class InitialSchema1743298123456 implements MigrationInterface {
       )
     `);
     await queryRunner.query(`
-      CREATE UNIQUE INDEX "IDX_3a6b79e0d1c4f8b2e9a1c2d3e4" ON "telemedicine_consents" ("user_id", "version")
+      CREATE UNIQUE INDEX IF NOT EXISTS "IDX_3a6b79e0d1c4f8b2e9a1c2d3e4" ON "telemedicine_consents" ("user_id", "version")
     `);
 
     await queryRunner.query(`
-      CREATE TABLE "patients" (
+      CREATE TABLE IF NOT EXISTS "patients" (
         "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
         "name" character varying(200) NOT NULL,
         "email" character varying NOT NULL,
@@ -90,11 +84,11 @@ export class InitialSchema1743298123456 implements MigrationInterface {
       )
     `);
     await queryRunner.query(`
-      CREATE UNIQUE INDEX "UQ_patients_clinic_email" ON "patients" ("clinic_id", "email")
+      CREATE UNIQUE INDEX IF NOT EXISTS "UQ_patients_clinic_email" ON "patients" ("clinic_id", "email")
     `);
 
     await queryRunner.query(`
-      CREATE TABLE "doctor_applications" (
+      CREATE TABLE IF NOT EXISTS "doctor_applications" (
         "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
         "name" character varying(200) NOT NULL,
         "email" character varying(320) NOT NULL,
@@ -111,14 +105,14 @@ export class InitialSchema1743298123456 implements MigrationInterface {
       )
     `);
     await queryRunner.query(`
-      CREATE UNIQUE INDEX "IDX_7c9f4f8e6d5c4b3a2918273645" ON "doctor_applications" ("email")
+      CREATE UNIQUE INDEX IF NOT EXISTS "IDX_7c9f4f8e6d5c4b3a2918273645" ON "doctor_applications" ("email")
     `);
     await queryRunner.query(`
-      CREATE INDEX "IDX_6b5a4a392817163f4e5d3c2b1a" ON "doctor_applications" ("status")
+      CREATE INDEX IF NOT EXISTS "IDX_6b5a4a392817163f4e5d3c2b1a" ON "doctor_applications" ("status")
     `);
 
     await queryRunner.query(`
-      CREATE TABLE "subscriptions" (
+      CREATE TABLE IF NOT EXISTS "subscriptions" (
         "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
         "user_id" uuid NOT NULL,
         "plan" "subscriptions_plan_enum" NOT NULL DEFAULT 'free',
@@ -128,11 +122,11 @@ export class InitialSchema1743298123456 implements MigrationInterface {
       )
     `);
     await queryRunner.query(`
-      CREATE UNIQUE INDEX "IDX_4fdd01d4e77ea3c4e3e9f8a7b6c" ON "subscriptions" ("user_id")
+      CREATE UNIQUE INDEX IF NOT EXISTS "IDX_4fdd01d4e77ea3c4e3e9f8a7b6c" ON "subscriptions" ("user_id")
     `);
 
     await queryRunner.query(`
-      CREATE TABLE "refresh_tokens" (
+      CREATE TABLE IF NOT EXISTS "refresh_tokens" (
         "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
         "token_hash" character varying NOT NULL,
         "user_id" uuid NOT NULL,
@@ -146,14 +140,14 @@ export class InitialSchema1743298123456 implements MigrationInterface {
       )
     `);
     await queryRunner.query(`
-      CREATE UNIQUE INDEX "UQ_refresh_tokens_token_hash" ON "refresh_tokens" ("token_hash")
+      CREATE UNIQUE INDEX IF NOT EXISTS "UQ_refresh_tokens_token_hash" ON "refresh_tokens" ("token_hash")
     `);
     await queryRunner.query(`
-      CREATE INDEX "IDX_refresh_tokens_user_id" ON "refresh_tokens" ("user_id")
+      CREATE INDEX IF NOT EXISTS "IDX_refresh_tokens_user_id" ON "refresh_tokens" ("user_id")
     `);
 
     await queryRunner.query(`
-      CREATE TABLE "audit_logs" (
+      CREATE TABLE IF NOT EXISTS "audit_logs" (
         "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
         "user_id" uuid,
         "action" character varying(128) NOT NULL,
@@ -169,17 +163,17 @@ export class InitialSchema1743298123456 implements MigrationInterface {
       )
     `);
     await queryRunner.query(`
-      CREATE INDEX "IDX_audit_logs_clinic_created" ON "audit_logs" ("clinic_id", "created_at")
+      CREATE INDEX IF NOT EXISTS "IDX_audit_logs_clinic_created" ON "audit_logs" ("clinic_id", "created_at")
     `);
     await queryRunner.query(`
-      CREATE INDEX "IDX_audit_logs_action_created" ON "audit_logs" ("action", "created_at")
+      CREATE INDEX IF NOT EXISTS "IDX_audit_logs_action_created" ON "audit_logs" ("action", "created_at")
     `);
     await queryRunner.query(`
-      CREATE INDEX "IDX_audit_logs_clinic_action_created" ON "audit_logs" ("clinic_id", "action", "created_at")
+      CREATE INDEX IF NOT EXISTS "IDX_audit_logs_clinic_action_created" ON "audit_logs" ("clinic_id", "action", "created_at")
     `);
 
     await queryRunner.query(`
-      CREATE TABLE "daily_metrics" (
+      CREATE TABLE IF NOT EXISTS "daily_metrics" (
         "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
         "date" date NOT NULL,
         "upgrades_total" integer NOT NULL DEFAULT 0,
@@ -196,11 +190,11 @@ export class InitialSchema1743298123456 implements MigrationInterface {
       )
     `);
     await queryRunner.query(`
-      CREATE UNIQUE INDEX "UQ_daily_metrics_date" ON "daily_metrics" ("date")
+      CREATE UNIQUE INDEX IF NOT EXISTS "UQ_daily_metrics_date" ON "daily_metrics" ("date")
     `);
 
     await queryRunner.query(`
-      CREATE TABLE "doctor_profiles" (
+      CREATE TABLE IF NOT EXISTS "doctor_profiles" (
         "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
         "user_id" uuid NOT NULL,
         "name" character varying(200) NOT NULL,
@@ -220,14 +214,14 @@ export class InitialSchema1743298123456 implements MigrationInterface {
       )
     `);
     await queryRunner.query(`
-      CREATE UNIQUE INDEX "UQ_doctor_profiles_user_id" ON "doctor_profiles" ("user_id")
+      CREATE UNIQUE INDEX IF NOT EXISTS "UQ_doctor_profiles_user_id" ON "doctor_profiles" ("user_id")
     `);
     await queryRunner.query(`
-      CREATE INDEX "IDX_doctor_profiles_is_public" ON "doctor_profiles" ("is_public")
+      CREATE INDEX IF NOT EXISTS "IDX_doctor_profiles_is_public" ON "doctor_profiles" ("is_public")
     `);
 
     await queryRunner.query(`
-      CREATE TABLE "doctor_ratings" (
+      CREATE TABLE IF NOT EXISTS "doctor_ratings" (
         "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
         "doctor_profile_id" uuid NOT NULL,
         "consultation_id" uuid,
@@ -240,11 +234,11 @@ export class InitialSchema1743298123456 implements MigrationInterface {
       )
     `);
     await queryRunner.query(`
-      CREATE INDEX "IDX_doctor_ratings_profile" ON "doctor_ratings" ("doctor_profile_id")
+      CREATE INDEX IF NOT EXISTS "IDX_doctor_ratings_profile" ON "doctor_ratings" ("doctor_profile_id")
     `);
 
     await queryRunner.query(`
-      CREATE TABLE "consultations" (
+      CREATE TABLE IF NOT EXISTS "consultations" (
         "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
         "patient_id" uuid NOT NULL,
         "clinic_id" uuid NOT NULL,
@@ -275,11 +269,11 @@ export class InitialSchema1743298123456 implements MigrationInterface {
       )
     `);
     await queryRunner.query(`
-      CREATE INDEX "IDX_consultations_clinic_created" ON "consultations" ("clinic_id", "created_at")
+      CREATE INDEX IF NOT EXISTS "IDX_consultations_clinic_created" ON "consultations" ("clinic_id", "created_at")
     `);
 
     await queryRunner.query(`
-      CREATE TABLE "payku_payments" (
+      CREATE TABLE IF NOT EXISTS "payku_payments" (
         "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
         "user_id" uuid NOT NULL,
         "consultation_id" uuid,
@@ -296,17 +290,17 @@ export class InitialSchema1743298123456 implements MigrationInterface {
       )
     `);
     await queryRunner.query(`
-      CREATE INDEX "IDX_payku_user" ON "payku_payments" ("user_id")
+      CREATE INDEX IF NOT EXISTS "IDX_payku_user" ON "payku_payments" ("user_id")
     `);
     await queryRunner.query(`
-      CREATE INDEX "IDX_payku_status" ON "payku_payments" ("status")
+      CREATE INDEX IF NOT EXISTS "IDX_payku_status" ON "payku_payments" ("status")
     `);
     await queryRunner.query(`
-      CREATE INDEX "IDX_payku_consultation" ON "payku_payments" ("consultation_id")
+      CREATE INDEX IF NOT EXISTS "IDX_payku_consultation" ON "payku_payments" ("consultation_id")
     `);
 
     await queryRunner.query(`
-      CREATE TABLE "gdpr_deletion_requests" (
+      CREATE TABLE IF NOT EXISTS "gdpr_deletion_requests" (
         "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
         "user_id" uuid NOT NULL,
         "status" "gdpr_deletion_requests_status_enum" NOT NULL DEFAULT 'pending',
@@ -321,10 +315,10 @@ export class InitialSchema1743298123456 implements MigrationInterface {
       )
     `);
     await queryRunner.query(`
-      CREATE INDEX "IDX_gdpr_user" ON "gdpr_deletion_requests" ("user_id")
+      CREATE INDEX IF NOT EXISTS "IDX_gdpr_user" ON "gdpr_deletion_requests" ("user_id")
     `);
     await queryRunner.query(`
-      CREATE INDEX "IDX_gdpr_status" ON "gdpr_deletion_requests" ("status")
+      CREATE INDEX IF NOT EXISTS "IDX_gdpr_status" ON "gdpr_deletion_requests" ("status")
     `);
   }
 

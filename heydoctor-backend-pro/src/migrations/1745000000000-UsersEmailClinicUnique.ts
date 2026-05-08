@@ -16,7 +16,7 @@ export class UsersEmailClinicUnique1745000000000 implements MigrationInterface {
     );
 
     await queryRunner.query(`
-      CREATE UNIQUE INDEX "users_email_clinic_unique"
+      CREATE UNIQUE INDEX IF NOT EXISTS "users_email_clinic_unique"
       ON "users" ("email", "clinic_id")
     `);
   }

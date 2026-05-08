@@ -36,6 +36,7 @@ jobs:
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/heydoctor_test
       JWT_SECRET: test_secret
+      CI: 'true'
 
     defaults:
       run:
@@ -62,13 +63,17 @@ jobs:
       - name: Run migrations
         run: npm run migration:run
 
+      - name: Seed E2E data
+        run: node dist/database/seed.e2e.js
+
       - name: Test (unit)
         run: npm test
 
       - name: Run E2E tests
-        run: npm run test:e2e
+        run: DATABASE_E2E=1 npm run test:e2e
         env:
-          DATABASE_E2E: '1'
+          E2E_SEED_APPLIED: 'true'
+          INCIDENT_CORRELATION_REDIS: 'false'
 
   frontend:
     name: Frontend (Next)

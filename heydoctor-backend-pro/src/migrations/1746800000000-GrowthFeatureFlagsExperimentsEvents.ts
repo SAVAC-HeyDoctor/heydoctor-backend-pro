@@ -7,7 +7,7 @@ export class GrowthFeatureFlagsExperimentsEvents1746800000000
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`
-      CREATE TABLE "feature_flags" (
+      CREATE TABLE IF NOT EXISTS "feature_flags" (
         "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
         "key" varchar(128) NOT NULL UNIQUE,
         "enabled" boolean NOT NULL DEFAULT true,
@@ -20,7 +20,7 @@ export class GrowthFeatureFlagsExperimentsEvents1746800000000
         "updated_at" TIMESTAMPTZ NOT NULL DEFAULT now()
       );
 
-      CREATE TABLE "growth_experiments" (
+      CREATE TABLE IF NOT EXISTS "growth_experiments" (
         "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
         "key" varchar(128) NOT NULL UNIQUE,
         "enabled" boolean NOT NULL DEFAULT true,
@@ -30,7 +30,7 @@ export class GrowthFeatureFlagsExperimentsEvents1746800000000
         "updated_at" TIMESTAMPTZ NOT NULL DEFAULT now()
       );
 
-      CREATE TABLE "product_events" (
+      CREATE TABLE IF NOT EXISTS "product_events" (
         "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
         "user_id" uuid REFERENCES "users" ("id") ON DELETE SET NULL,
         "event_name" varchar(128) NOT NULL,
@@ -38,9 +38,9 @@ export class GrowthFeatureFlagsExperimentsEvents1746800000000
         "created_at" TIMESTAMPTZ NOT NULL DEFAULT now()
       );
 
-      CREATE INDEX "IDX_product_events_name_created_at"
+      CREATE INDEX IF NOT EXISTS "IDX_product_events_name_created_at"
         ON "product_events" ("event_name", "created_at");
-      CREATE INDEX "IDX_product_events_user_created_at"
+      CREATE INDEX IF NOT EXISTS "IDX_product_events_user_created_at"
         ON "product_events" ("user_id", "created_at");
     `);
   }

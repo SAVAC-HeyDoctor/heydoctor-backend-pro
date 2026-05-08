@@ -20,16 +20,19 @@ import type { App } from 'supertest/types';
 import { DataSource } from 'typeorm';
 import { IoAdapter } from '@nestjs/platform-socket.io';
 import { AppModule } from '../../src/app.module';
+import {
+  E2E_CI_ADMIN_EMAIL,
+  E2E_CI_DOCTOR_EMAIL,
+  E2E_CI_PASSWORD,
+} from '../../src/database/e2e-ci-seed.constants';
+import { seedE2E } from '../../src/database/seed.e2e';
 import { RequestIdMiddleware } from '../../src/common/middleware/request-id.middleware';
 import {
   clearAlertSinksForTests,
   notifyAlert,
   registerAlertSink,
 } from '../../src/common/alerts/alert.hooks';
-import { Clinic } from '../../src/clinic/clinic.entity';
 import { GrowthFunnelEvents } from '../../src/growth/growth-event-names';
-import { Subscription, SubscriptionPlan } from '../../src/subscriptions/subscription.entity';
-import { UserRole } from '../../src/users/user-role.enum';
 
 const runCritical = process.env.DATABASE_E2E === '1';
 
@@ -74,7 +77,6 @@ async function flushAlertDispatch(): Promise<void> {
       80,
     );
 
-    let clinicId: string;
     let cookieAdmin: string;
     let csrfAdmin: string;
     let accessTokenAdmin: string;
@@ -83,14 +85,10 @@ async function flushAlertDispatch(): Promise<void> {
     let csrfDoctor: string;
     let accessDoctor: string;
 
-    let patientId: string;
     let consultationPaidId: string;
     let paymentPaidId: string;
     let consultationFailedId: string;
 
-    const password = 'Password123!';
-    const emailAdmin = `cf_admin_${suffix}@e2e.test`;
-    const emailDoctor = `cf_doc_${suffix}@e2e.test`;
     const paymentAmount = 15_000;
 
     beforeAll(async () => {
@@ -103,6 +101,7 @@ async function flushAlertDispatch(): Promise<void> {
       }
       process.env.PORT = process.env.PORT ?? '3999';
       process.env.NODE_ENV = process.env.NODE_ENV ?? 'development';
+      process.env.DATABASE_E2E = '1';
       process.env.PAYKU_WEBHOOK_ALLOW_UNSAFE_LOCAL = 'true';
       process.env.PAYKU_CONSULTATION_PAYMENTS_DISABLED = 'true';
       process.env.CONSULTATION_PAYMENT_AMOUNT_CLP = String(paymentAmount);
@@ -136,6 +135,11 @@ async function flushAlertDispatch(): Promise<void> {
 
       await app.init();
 
+      const ds = app.get(DataSource);
+      const seedSnapshot = await seedE2E(ds);
+      consultationPaidId = seedSnapshot.consultationPaidReadyId;
+      consultationFailedId = seedSnapshot.consultationFailedReadyId;
+
       const server = app.getHttpServer();
       await new Promise<void>((resolve, reject) => {
         server.listen(0, '127.0.0.1', () => resolve());
@@ -144,36 +148,9 @@ async function flushAlertDispatch(): Promise<void> {
       const addr = server.address() as AddressInfo;
       httpPort = addr.port;
 
-      const ds = app.get(DataSource);
-      const clinicRepo = ds.getRepository(Clinic);
-      const c = await clinicRepo.save(
-        clinicRepo.create({ name: `CF Clinic ${suffix}` }),
-      );
-      clinicId = c.id;
-
-      await request(server)
-        .post('/api/auth/register')
-        .send({
-          email: emailAdmin,
-          password,
-          clinicId,
-          role: UserRole.ADMIN,
-        })
-        .expect(201);
-
-      await request(server)
-        .post('/api/auth/register')
-        .send({
-          email: emailDoctor,
-          password,
-          clinicId,
-          role: UserRole.DOCTOR,
-        })
-        .expect(201);
-
       const loginAdmin = await request(server)
         .post('/api/auth/login')
-        .send({ email: emailAdmin, password })
+        .send({ email: E2E_CI_ADMIN_EMAIL, password: E2E_CI_PASSWORD })
         .expect(200);
       cookieAdmin = cookieHeaderFromSetCookie(loginAdmin.headers['set-cookie']);
       csrfAdmin = csrfTokenFromSetCookie(loginAdmin.headers['set-cookie']);
@@ -181,62 +158,14 @@ async function flushAlertDispatch(): Promise<void> {
 
       const loginDoc = await request(server)
         .post('/api/auth/login')
-        .send({ email: emailDoctor, password })
+        .send({
+          email: E2E_CI_DOCTOR_EMAIL,
+          password: E2E_CI_PASSWORD,
+        })
         .expect(200);
       cookieDoctor = cookieHeaderFromSetCookie(loginDoc.headers['set-cookie']);
       csrfDoctor = csrfTokenFromSetCookie(loginDoc.headers['set-cookie']);
       accessDoctor = loginDoc.body.access_token as string;
-
-      const docUserRow = await ds.query(
-        `SELECT id FROM users WHERE email = $1`,
-        [emailDoctor],
-      );
-      const docUserId = docUserRow[0].id as string;
-      const subRepo = ds.getRepository(Subscription);
-      const sub = await subRepo.findOne({ where: { userId: docUserId } });
-      if (sub) {
-        sub.plan = SubscriptionPlan.PRO;
-        await subRepo.save(sub);
-      }
-
-      await request(server)
-        .post('/api/consents/telemedicine')
-        .set('Cookie', cookieDoctor)
-        .set('X-CSRF-Token', csrfDoctor)
-        .expect(201);
-
-      const patientRes = await request(server)
-        .post('/api/patients')
-        .set('Cookie', cookieDoctor)
-        .set('X-CSRF-Token', csrfDoctor)
-        .send({
-          name: 'Paciente QA',
-          email: `cf_pat_${suffix}@e2e.test`,
-        })
-        .expect(201);
-      patientId = patientRes.body.id as string;
-
-      const cons1 = await request(server)
-        .post('/api/consultations')
-        .set('Cookie', cookieDoctor)
-        .set('X-CSRF-Token', csrfDoctor)
-        .send({
-          patientId,
-          reason: 'E2E pago consulta',
-        })
-        .expect(201);
-      consultationPaidId = cons1.body.id as string;
-
-      const cons2 = await request(server)
-        .post('/api/consultations')
-        .set('Cookie', cookieDoctor)
-        .set('X-CSRF-Token', csrfDoctor)
-        .send({
-          patientId,
-          reason: 'E2E pago fallido',
-        })
-        .expect(201);
-      consultationFailedId = cons2.body.id as string;
 
       const payRes = await request(server)
         .post('/api/payku/create-payment-session')
@@ -255,31 +184,28 @@ async function flushAlertDispatch(): Promise<void> {
     });
 
     describe('Auth', () => {
-      it('login válido devuelve tokens y cookies', async () => {
+      it('login válido: sesión activa tras seed (JWT / Bearer)', async () => {
         const res = await request(app.getHttpServer())
-          .post('/api/auth/login')
-          .send({ email: emailDoctor, password })
+          .get('/api/auth/me')
+          .set('Authorization', `Bearer ${accessDoctor}`)
           .expect(200);
-        expect(res.body.access_token).toBeTruthy();
-        expect(res.body.user?.email).toBe(emailDoctor);
+        expect(res.body.email).toBe(E2E_CI_DOCTOR_EMAIL);
       });
 
       it('login inválido → 401', () => {
         return request(app.getHttpServer())
           .post('/api/auth/login')
-          .send({ email: emailDoctor, password: 'wrong-pass-xyz' })
+          .send({
+            email: E2E_CI_DOCTOR_EMAIL,
+            password: 'wrong-pass-xyz-___',
+          })
           .expect(401);
       });
 
       it('refresh con cookie emite nuevo access_token', async () => {
-        const login = await request(app.getHttpServer())
-          .post('/api/auth/login')
-          .send({ email: emailAdmin, password })
-          .expect(200);
-        const cookie = cookieHeaderFromSetCookie(login.headers['set-cookie']);
         const res = await request(app.getHttpServer())
           .post('/api/auth/refresh')
-          .set('Cookie', cookie)
+          .set('Cookie', cookieAdmin)
           .expect(200);
         expect(res.body.access_token).toBeTruthy();
         expect(res.body.ok).toBe(true);
