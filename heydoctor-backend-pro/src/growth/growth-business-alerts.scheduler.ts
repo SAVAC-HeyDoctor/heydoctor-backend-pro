@@ -22,13 +22,19 @@ export class GrowthBusinessAlertsScheduler {
     try {
       const alerts = await this.growthAnalytics.getAlerts();
       for (const a of alerts) {
-        notifyAlert({
-          event: 'growth_business_alert',
-          code: a.code,
-          severity: a.severity,
-          message: a.message,
-          value: a.value,
-        });
+        notifyAlert(
+          {
+            event: 'growth_business_alert',
+            code: a.code,
+            severity: a.severity,
+            message: a.message,
+            value: a.value,
+          },
+          {
+            level: a.severity === 'critical' ? 'critical' : 'warning',
+            key: `growth:${a.code}`,
+          },
+        );
       }
       if (alerts.length > 0) {
         this.logger.log('growth_business_alerts_emitted', {

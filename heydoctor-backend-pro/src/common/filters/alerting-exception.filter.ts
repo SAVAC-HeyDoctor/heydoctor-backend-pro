@@ -44,14 +44,17 @@ export class AlertingExceptionFilter extends BaseExceptionFilter {
         method: req.method,
         userId,
       });
-      notifyAlert({
-        event: 'server_error',
-        statusCode: status,
-        path: typeof req.url === 'string' ? req.url : undefined,
-        method: req.method,
-        errorName: err.name,
-        userId,
-      });
+      notifyAlert(
+        {
+          event: 'server_error',
+          statusCode: status,
+          path: typeof req.url === 'string' ? req.url : undefined,
+          method: req.method,
+          errorName: err.name,
+          userId,
+        },
+        { level: 'critical' },
+      );
     }
 
     super.catch(exception, host);

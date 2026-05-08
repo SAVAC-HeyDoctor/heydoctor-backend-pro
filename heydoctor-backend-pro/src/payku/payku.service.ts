@@ -31,6 +31,7 @@ import {
   SubscriptionEventType,
 } from '../subscriptions/subscription-event.entity';
 import { SubscriptionEventsService } from '../subscriptions/subscription-events.service';
+import { notifyAlert } from '../common/alerts/alert.hooks';
 import { SubscriptionAlertsService } from '../subscriptions/subscription-alerts.service';
 import { UserRole } from '../users/user-role.enum';
 import {
@@ -418,6 +419,17 @@ export class PaykuService {
         event: 'payku_webhook_auth_failed',
         error: msg,
       });
+      notifyAlert(
+        {
+          event: 'payku_webhook_auth_failed',
+          error: msg,
+        },
+        {
+          level: 'critical',
+          key: 'payku_webhook_auth',
+          ttlMs: 60_000,
+        },
+      );
       void this.auditService.logError({
         action: 'PAYKU_WEBHOOK_AUTH_FAILED',
         resource: 'payment',

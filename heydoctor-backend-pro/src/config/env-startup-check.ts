@@ -115,6 +115,12 @@ export function validateAndLogEnv(env: EnvConfig): string[] {
         : 'unset (alerts only to other sinks)',
     },
     {
+      name: 'ALERT_MAX_PER_MINUTE',
+      status: process.env.ALERT_MAX_PER_MINUTE ? 'SET' : 'DEFAULT',
+      required: false,
+      value: process.env.ALERT_MAX_PER_MINUTE ?? '10 (per instance)',
+    },
+    {
       name: 'GROWTH_BUSINESS_ALERTS_ENABLED',
       status: process.env.GROWTH_BUSINESS_ALERTS_ENABLED ? 'SET' : 'DEFAULT',
       required: false,

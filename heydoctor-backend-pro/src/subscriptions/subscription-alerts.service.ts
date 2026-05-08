@@ -19,11 +19,18 @@ export class SubscriptionAlertsService {
       clinicId: event.clinicId,
       ...(paymentId ? { paymentId } : {}),
     });
-    notifyAlert({
-      ...(event.metadata ?? {}),
-      alert: 'subscription_payment_failed',
-      userId: event.userId,
-      clinicId: event.clinicId,
-    });
+    notifyAlert(
+      {
+        ...(event.metadata ?? {}),
+        alert: 'subscription_payment_failed',
+        userId: event.userId,
+        clinicId: event.clinicId,
+        ...(paymentId ? { paymentId } : {}),
+      },
+      {
+        level: 'critical',
+        key: `payment_failed:${event.userId}:${paymentId ?? 'none'}`,
+      },
+    );
   }
 }

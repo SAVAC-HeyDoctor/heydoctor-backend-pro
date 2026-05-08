@@ -1,22 +1,35 @@
 import {
-  registerAlertSink,
   type AlertPayload,
+  primStr,
+  registerAlertSink,
   type AlertSink,
 } from './alert.hooks';
 
 const SLACK_TEXT_MAX = 3_500;
 
 function formatSlackText(payload: AlertPayload): string {
+  const levelRaw = payload.alertLevel;
+  const level =
+    typeof levelRaw === 'string' ? levelRaw.toUpperCase() : 'WARNING';
+  const headline = `🚨 *${level}*`;
+  const eventLabel = primStr(payload.event, 'alert');
+  const eventLine = `*${eventLabel}*`;
+
+  const rest: Record<string, unknown> = { ...payload };
+  delete rest.alertLevel;
+  delete rest.alertDedupeKey;
+  delete rest.alertAt;
+
   let body: string;
   try {
-    body = JSON.stringify(payload, null, 2);
+    body = JSON.stringify(rest, null, 2);
   } catch {
-    body = String(payload);
+    body = '[payload no serializable]';
   }
   if (body.length > SLACK_TEXT_MAX) {
     body = `${body.slice(0, SLACK_TEXT_MAX)}…`;
   }
-  return `HeyDoctor alert\n\`\`\`json\n${body}\n\`\`\``;
+  return `${headline}\n${eventLine}\n\`\`\`json\n${body}\n\`\`\``;
 }
 
 /** Sink no bloqueante: fallos de red no afectan el request. */
