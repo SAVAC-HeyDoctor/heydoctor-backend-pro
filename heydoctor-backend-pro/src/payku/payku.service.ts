@@ -108,7 +108,11 @@ export class PaykuService {
     this.paykuApiKey = resolvePaykuApiKey(
       this.config.get<string>('PAYKU_API_KEY'),
     );
-    if (process.env.NODE_ENV === 'production' && this.paykuApiKey === 'test') {
+    if (
+      process.env.NODE_ENV === 'production' &&
+      this.paykuApiKey === 'test' &&
+      process.env.ALLOW_FAKE_PAYMENTS !== 'true'
+    ) {
       throw new Error('PAYKU_API_KEY not configured in production');
     }
   }
