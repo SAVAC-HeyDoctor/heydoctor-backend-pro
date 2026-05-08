@@ -1,12 +1,12 @@
 /**
- * Hooks para alertas operativas (Slack, Sentry, Datadog…).
- * Dedupe + tope global/min en {@link tryAcquireAlertSlot}.
+ * Hooks para alertas: correlación por incidente + tope global/min.
  */
 
 import {
   clearAlertDedupeStateForTests,
-  tryAcquireAlertSlot,
+  tryAcquireGlobalAlertBudget,
 } from './alert-dedupe';
+import { clearIncidentStoreForTests, trackIncident } from './incident.store';
 
 export type AlertPayload = Record<string, unknown>;
 
@@ -15,9 +15,7 @@ export type AlertLevel = 'info' | 'warning' | 'critical';
 export type AlertSink = (payload: AlertPayload) => void;
 
 export type NotifyAlertOptions = {
-  /** Clave estable para dedupe (misma incidencia no spam). */
   key?: string;
-  ttlMs?: number;
   level?: AlertLevel;
 };
 
@@ -65,26 +63,6 @@ function defaultDedupeKey(payload: AlertPayload, level: AlertLevel): string {
   return `${ev}:${level}`;
 }
 
-function defaultTtlMs(
-  payload: AlertPayload,
-  level: AlertLevel,
-  explicit?: number,
-): number {
-  if (explicit !== undefined) return explicit;
-  if (primStr(payload.event, '') === 'growth_business_alert') {
-    return 86_400_000;
-  }
-  switch (level) {
-    case 'critical':
-      return 45_000;
-    case 'warning':
-      return 90_000;
-    case 'info':
-    default:
-      return 120_000;
-  }
-}
-
 /** Registra un sink (p. ej. una vez en main.ts). Idempotente si el mismo ref se pasa dos veces. */
 export function registerAlertSink(sink: AlertSink): void {
   if (!sinks.includes(sink)) {
@@ -92,10 +70,11 @@ export function registerAlertSink(sink: AlertSink): void {
   }
 }
 
-/** Para tests: vacía sinks y estado de dedupe. */
+/** Para tests: vacía sinks, presupuesto global e incidentes. */
 export function clearAlertSinksForTests(): void {
   sinks.length = 0;
   clearAlertDedupeStateForTests();
+  clearIncidentStoreForTests();
 }
 
 /**
@@ -107,9 +86,13 @@ export function notifyAlert(
 ): void {
   const level = options?.level ?? inferAlertLevel(payload);
   const dedupeKey = options?.key ?? defaultDedupeKey(payload, level);
-  const ttlMs = defaultTtlMs(payload, level, options?.ttlMs);
 
-  if (!tryAcquireAlertSlot(dedupeKey, ttlMs)) {
+  const incident = trackIncident(dedupeKey);
+  if (incident.count > 1) {
+    return;
+  }
+
+  if (!tryAcquireGlobalAlertBudget()) {
     return;
   }
 
@@ -118,6 +101,12 @@ export function notifyAlert(
     alertLevel: level,
     alertDedupeKey: dedupeKey,
     alertAt: new Date().toISOString(),
+    incident: {
+      key: incident.key,
+      count: incident.count,
+      firstSeenAt: new Date(incident.firstSeenAt).toISOString(),
+      lastSeenAt: new Date(incident.lastSeenAt).toISOString(),
+    },
   };
 
   for (const sink of sinks) {

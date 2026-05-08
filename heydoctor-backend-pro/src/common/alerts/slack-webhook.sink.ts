@@ -11,14 +11,31 @@ function formatSlackText(payload: AlertPayload): string {
   const levelRaw = payload.alertLevel;
   const level =
     typeof levelRaw === 'string' ? levelRaw.toUpperCase() : 'WARNING';
-  const headline = `🚨 *${level}*`;
   const eventLabel = primStr(payload.event, 'alert');
-  const eventLine = `*${eventLabel}*`;
+  const headline = `🚨 *${level}*`;
+
+  const rawIncident = payload.incident;
+  const incident =
+    rawIncident &&
+    typeof rawIncident === 'object' &&
+    rawIncident !== null &&
+    !Array.isArray(rawIncident)
+      ? (rawIncident as Record<string, unknown>)
+      : null;
+
+  let correlation = '';
+  if (incident) {
+    correlation =
+      `\n🔁 Count: ${primStr(incident.count, '1')}\n` +
+      `🕒 First: ${primStr(incident.firstSeenAt, '')}\n` +
+      `🕒 Last: ${primStr(incident.lastSeenAt, '')}\n`;
+  }
 
   const rest: Record<string, unknown> = { ...payload };
   delete rest.alertLevel;
   delete rest.alertDedupeKey;
   delete rest.alertAt;
+  delete rest.incident;
 
   let body: string;
   try {
@@ -29,7 +46,7 @@ function formatSlackText(payload: AlertPayload): string {
   if (body.length > SLACK_TEXT_MAX) {
     body = `${body.slice(0, SLACK_TEXT_MAX)}…`;
   }
-  return `${headline}\n${eventLine}\n\`\`\`json\n${body}\n\`\`\``;
+  return `${headline}\n*${eventLabel}*${correlation}\n\`\`\`json\n${body}\n\`\`\``;
 }
 
 /** Sink no bloqueante: fallos de red no afectan el request. */

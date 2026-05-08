@@ -121,6 +121,21 @@ export function validateAndLogEnv(env: EnvConfig): string[] {
       value: process.env.ALERT_MAX_PER_MINUTE ?? '10 (per instance)',
     },
     {
+      name: 'INCIDENT_IDLE_TTL_MS',
+      status: process.env.INCIDENT_IDLE_TTL_MS ? 'SET' : 'DEFAULT',
+      required: false,
+      value: process.env.INCIDENT_IDLE_TTL_MS ?? '300000 (5m idle → drop incident)',
+    },
+    {
+      name: 'ALERT_INCIDENT_RESOLUTION_SLACK',
+      status: process.env.ALERT_INCIDENT_RESOLUTION_SLACK ? 'SET' : 'DEFAULT',
+      required: false,
+      value:
+        process.env.ALERT_INCIDENT_RESOLUTION_SLACK === 'true'
+          ? 'ping Slack when multi-hit incident goes quiet'
+          : 'false',
+    },
+    {
       name: 'GROWTH_BUSINESS_ALERTS_ENABLED',
       status: process.env.GROWTH_BUSINESS_ALERTS_ENABLED ? 'SET' : 'DEFAULT',
       required: false,

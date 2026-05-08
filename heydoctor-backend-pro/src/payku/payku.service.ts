@@ -427,7 +427,6 @@ export class PaykuService {
         {
           level: 'critical',
           key: 'payku_webhook_auth',
-          ttlMs: 60_000,
         },
       );
       void this.auditService.logError({
