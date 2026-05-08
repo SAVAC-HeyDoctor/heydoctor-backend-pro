@@ -20,7 +20,9 @@ export class OpsScalingService {
     const snap = await this.http.getSnapshot();
     const load = os.loadavg();
     const cpuLoad =
-      Array.isArray(load) && typeof load[0] === 'number' && Number.isFinite(load[0])
+      Array.isArray(load) &&
+      typeof load[0] === 'number' &&
+      Number.isFinite(load[0])
         ? Math.round(load[0] * 1000) / 1000
         : 0;
 

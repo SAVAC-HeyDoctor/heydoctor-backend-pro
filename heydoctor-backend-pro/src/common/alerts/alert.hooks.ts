@@ -48,7 +48,11 @@ function inferAlertLevel(payload: AlertPayload): AlertLevel {
   if (ev === 'ops_error_spike') return 'critical';
   if (ev === 'conversion_drop') return 'warning';
   if (ev === 'growth_business_alert') return 'warning';
-  if (ev === 'ops_latency_high' || ev === 'ops_traffic_drop' || ev === 'latency_spike')
+  if (
+    ev === 'ops_latency_high' ||
+    ev === 'ops_traffic_drop' ||
+    ev === 'latency_spike'
+  )
     return 'warning';
   return 'warning';
 }
