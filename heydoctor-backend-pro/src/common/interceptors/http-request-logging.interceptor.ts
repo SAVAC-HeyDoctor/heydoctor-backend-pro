@@ -2,8 +2,9 @@ import {
   CallHandler,
   ExecutionContext,
   Injectable,
-  NestInterceptor,
   Inject,
+  NestInterceptor,
+  Optional,
   type LoggerService,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
@@ -15,10 +16,16 @@ import {
   getRequestStartedAtMs,
   mergeHttpLogContextFromUser,
 } from '../request-context.storage';
+import { RequestTraceIndexService } from '../observability/request-trace-index.service';
 
 @Injectable()
 export class HttpRequestLoggingInterceptor implements NestInterceptor {
-  constructor(@Inject(APP_LOGGER) private readonly logger: LoggerService) {}
+  constructor(
+    @Inject(APP_LOGGER) private readonly logger: LoggerService,
+    @Optional()
+    @Inject(RequestTraceIndexService)
+    private readonly traceIndex?: RequestTraceIndexService,
+  ) {}
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     if (context.getType() !== 'http') {
@@ -57,6 +64,16 @@ export class HttpRequestLoggingInterceptor implements NestInterceptor {
           durationMs,
           serverDurationMs,
           userId,
+        });
+
+        const rid = requestId ?? 'unknown';
+        this.traceIndex?.record({
+          requestId: rid,
+          traceId: rid,
+          method: req.method,
+          path: pathLogged,
+          statusCode: res.statusCode,
+          durationMs,
         });
       }),
     );

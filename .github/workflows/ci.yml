@@ -58,6 +58,7 @@ jobs:
         run: npm test
         env:
           JWT_SECRET: ci-jwt-secret-must-be-at-least-32-chars-long
+      # E2E opcional (necesita Postgres): DATABASE_E2E=1 npm run test:e2e en backend
 
   notify:
     name: CI alert (Slack opcional)

@@ -30,13 +30,45 @@ type OpsOverview = {
     requestCount: number;
     errorRate: number;
   }[];
+  topEndpointsByLatency: {
+    path: string;
+    avgMs: number;
+    count: number;
+  }[];
+  requestTraceTimeline: {
+    requestId: string;
+    traceId: string;
+    method: string;
+    path: string;
+    statusCode: number;
+    durationMs: number;
+    at: string;
+  }[];
   recentAlerts: {
     at: string;
     event: string;
     level: string;
     message?: string;
+    analysis?: string;
   }[];
 };
+
+type OpsScaling = {
+  cpuLoad: number;
+  requestsPerMinute: number;
+  avgResponseTime: number;
+  errorRate: number;
+};
+
+async function fetchOpsScaling(): Promise<OpsScaling | null> {
+  const base = getApiBase();
+  const res = await apiFetchWithRefresh(`${base}/api/admin/ops/scaling`, {
+    method: 'GET',
+    headers: { Accept: 'application/json' },
+  });
+  if (!res.ok) return null;
+  return (await res.json()) as OpsScaling;
+}
 
 async function fetchOpsOverview(): Promise<OpsOverview> {
   const base = getApiBase();
@@ -62,6 +94,9 @@ function formatUptime(seconds: number): string {
 
 export default function AdminOpsPage() {
   const [data, setData] = useState<OpsOverview | null>(null);
+  const [scaling, setScaling] = useState<OpsScaling | null>(null);
+  const [traceId, setTraceId] = useState('');
+  const [traceHit, setTraceHit] = useState<unknown>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -69,15 +104,32 @@ export default function AdminOpsPage() {
     setError(null);
     setLoading(true);
     try {
-      const o = await fetchOpsOverview();
+      const [o, s] = await Promise.all([fetchOpsOverview(), fetchOpsScaling()]);
       setData(o);
+      setScaling(s);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error');
       setData(null);
+      setScaling(null);
     } finally {
       setLoading(false);
     }
   }, []);
+
+  const lookupTrace = useCallback(async () => {
+    const id = traceId.trim();
+    if (!id) return;
+    const base = getApiBase();
+    const res = await apiFetchWithRefresh(
+      `${base}/api/admin/ops/traces/${encodeURIComponent(id)}`,
+      { method: 'GET', headers: { Accept: 'application/json' } },
+    );
+    if (!res.ok) {
+      setTraceHit({ error: await res.text() });
+      return;
+    }
+    setTraceHit(await res.json());
+  }, [traceId]);
 
   useEffect(() => {
     void load();
@@ -101,8 +153,9 @@ export default function AdminOpsPage() {
             Operations
           </h1>
           <p className="text-sm text-slate-600">
-            RPM/latencia/errores agregados en Redis cuando hay REDIS_URL; si no,
-            vista por instancia (memoria). Auto cada 10s
+            RPM/latencia/errores (Redis si aplica). CPU load y señales de scaling
+            en tarjeta dedicada.             Trazas: índice por réplica. Documentación de escalado en el repositorio
+            backend: <code className="text-xs">docs/RAILWAY-SCALING.md</code>.
           </p>
         </div>
         <nav className="flex flex-wrap gap-3 text-sm">
@@ -150,6 +203,62 @@ export default function AdminOpsPage() {
           comenzó.
         </div>
       )}
+
+      {data && !loading && scaling !== null && (
+        <section className="mb-6 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+          <h2 className="mb-2 text-sm font-semibold text-slate-900">
+            Señales de autoscaling (referencia; Railway usa CPU/RAM en panel)
+          </h2>
+          <div className="grid gap-3 sm:grid-cols-4 text-sm">
+            <div>
+              <p className="text-xs uppercase text-slate-500">CPU load (1m)</p>
+              <p className="tabular-nums text-lg font-semibold">{scaling.cpuLoad}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase text-slate-500">RPM</p>
+              <p className="tabular-nums text-lg font-semibold">{scaling.requestsPerMinute}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase text-slate-500">Latencia media</p>
+              <p className="tabular-nums text-lg font-semibold">{scaling.avgResponseTime} ms</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase text-slate-500">Error rate</p>
+              <p className="tabular-nums text-lg font-semibold">
+                {(scaling.errorRate * 100).toFixed(2)}%
+              </p>
+            </div>
+          </div>
+          <p className="mt-2 text-xs text-slate-500">
+            Reglas orientativas: RPM &gt; 200 o error &gt; 5% o latencia &gt; 800ms →
+            revisar scale up; RPM &lt; 20 sostenido → scale down.
+          </p>
+        </section>
+      )}
+
+      <section className="mb-6 flex flex-wrap items-end gap-2 rounded-lg border border-slate-200 bg-slate-50/80 p-3">
+        <label className="text-xs font-medium text-slate-600">
+          Buscar trace / X-Request-Id (esta réplica)
+          <input
+            value={traceId}
+            onChange={(e) => setTraceId(e.target.value)}
+            className="ml-2 mt-1 block min-w-[220px] rounded border border-slate-300 px-2 py-1 text-sm"
+            placeholder="uuid"
+          />
+        </label>
+        <button
+          type="button"
+          onClick={() => void lookupTrace()}
+          className="rounded bg-slate-800 px-3 py-1.5 text-sm text-white"
+        >
+          Buscar
+        </button>
+        {traceHit !== null && (
+          <pre className="max-h-40 w-full overflow-auto rounded border border-slate-200 bg-white p-2 text-xs">
+            {JSON.stringify(traceHit, null, 2)}
+          </pre>
+        )}
+      </section>
 
       {loading && (
         <p className="text-sm text-slate-600">Cargando panel…</p>
@@ -307,9 +416,71 @@ export default function AdminOpsPage() {
             </section>
           )}
 
+          {data.topEndpointsByLatency.length > 0 && (
+            <section className="mb-10">
+              <h2 className="mb-3 text-sm font-semibold text-slate-900">
+                Top latencia por path (~5 min, muestras en esta réplica)
+              </h2>
+              <div className="overflow-x-auto rounded-lg border border-slate-200">
+                <table className="min-w-full text-left text-sm">
+                  <thead className="bg-slate-50 text-xs uppercase text-slate-600">
+                    <tr>
+                      <th className="px-3 py-2">Path</th>
+                      <th className="px-3 py-2">Avg ms</th>
+                      <th className="px-3 py-2">Muestras</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.topEndpointsByLatency.map((row) => (
+                      <tr key={row.path} className="border-t border-slate-100">
+                        <td className="px-3 py-2 font-mono text-xs">{row.path}</td>
+                        <td className="px-3 py-2 tabular-nums">{row.avgMs}</td>
+                        <td className="px-3 py-2 tabular-nums">{row.count}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )}
+
+          {data.requestTraceTimeline.length > 0 && (
+            <section className="mb-10">
+              <h2 className="mb-3 text-sm font-semibold text-slate-900">
+                Línea de tiempo de peticiones (esta réplica)
+              </h2>
+              <div className="overflow-x-auto rounded-lg border border-slate-200">
+                <table className="min-w-full text-left text-xs">
+                  <thead className="bg-slate-50 uppercase text-slate-600">
+                    <tr>
+                      <th className="px-2 py-2">requestId</th>
+                      <th className="px-2 py-2">method</th>
+                      <th className="px-2 py-2">path</th>
+                      <th className="px-2 py-2">status</th>
+                      <th className="px-2 py-2">ms</th>
+                      <th className="px-2 py-2">at</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.requestTraceTimeline.map((r) => (
+                      <tr key={`${r.at}-${r.requestId}`} className="border-t border-slate-100">
+                        <td className="px-2 py-1 font-mono">{r.requestId.slice(0, 8)}…</td>
+                        <td className="px-2 py-1">{r.method}</td>
+                        <td className="px-2 py-1 font-mono">{r.path}</td>
+                        <td className="px-2 py-1">{r.statusCode}</td>
+                        <td className="px-2 py-1">{r.durationMs}</td>
+                        <td className="px-2 py-1 text-slate-500">{r.at}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )}
+
           <section>
             <h2 className="mb-3 text-sm font-semibold text-slate-900">
-              Alertas recientes (memoria local)
+              Alertas recientes (insights + memoria local)
             </h2>
             {data.recentAlerts.length === 0 ? (
               <p className="text-sm text-slate-600">Sin alertas en ventana.</p>
@@ -331,6 +502,11 @@ export default function AdminOpsPage() {
                     </span>
                     {a.message && (
                       <p className="mt-1 text-slate-700">{a.message}</p>
+                    )}
+                    {a.analysis && (
+                      <p className="mt-1 text-sm text-indigo-900">
+                        🧠 {a.analysis}
+                      </p>
                     )}
                   </li>
                 ))}

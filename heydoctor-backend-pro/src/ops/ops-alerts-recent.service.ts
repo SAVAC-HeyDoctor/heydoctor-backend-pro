@@ -9,6 +9,7 @@ type Entry = {
   event: string;
   level: string;
   message?: string;
+  analysis?: string;
 };
 
 /**
@@ -35,7 +36,9 @@ export class OpsAlertsRecentService implements OnModuleInit {
       );
       const message =
         typeof payload.message === 'string' ? payload.message : undefined;
-      this.entries.push({ at, event, level, message });
+      const analysis =
+        typeof payload.analysis === 'string' ? payload.analysis : undefined;
+      this.entries.push({ at, event, level, message, analysis });
       const cutoff = Date.now() - TTL_MS;
       this.entries = this.entries
         .filter((e) => e.at >= cutoff)

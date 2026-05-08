@@ -16,6 +16,7 @@ import { AppCacheModule } from './cache/cache.module';
 import { AiModule } from './ai/ai.module';
 import { AppointmentsModule } from './appointments/appointments.module';
 import { AuditModule } from './audit/audit.module';
+import { ObservabilityModule } from './common/observability/observability.module';
 import { LoggerModule } from './common/logger/logger.module';
 import { APP_LOGGER } from './common/logger/logger.tokens';
 import { AlertingExceptionFilter } from './common/filters/alerting-exception.filter';
@@ -67,6 +68,7 @@ const ormLogging: boolean | ('query' | 'error')[] =
       envFilePath: ['.env.local', '.env'],
     }),
     LoggerModule,
+    ObservabilityModule,
     AppCacheModule,
     JwtUserCacheModule,
     TypeOrmModule.forRoot({

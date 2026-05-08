@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { RequestTraceIndexService } from '../common/observability/request-trace-index.service';
 import { ProductEvent } from '../growth/product-event.entity';
 import { SubscriptionsAnalyticsService } from '../subscriptions/subscriptions-analytics.service';
 import { OpsAlertsRecentService } from './ops-alerts-recent.service';
@@ -18,6 +19,7 @@ export class OpsOverviewService {
   constructor(
     private readonly httpMetrics: OpsHttpMetricsService,
     private readonly opsAlerts: OpsAlertsRecentService,
+    private readonly requestTraceIndex: RequestTraceIndexService,
     private readonly subscriptionsAnalytics: SubscriptionsAnalyticsService,
     @InjectRepository(ProductEvent)
     private readonly productEvents: Repository<ProductEvent>,
@@ -47,6 +49,8 @@ export class OpsOverviewService {
     const activeUsers = Number(activeRow?.cnt ?? 0);
     const alertsLast24h = this.opsAlerts.countLast24h();
     const recent = this.opsAlerts.getRecent(40);
+    const topEndpointsByLatency = this.httpMetrics.getTopLatencyEndpoints(15);
+    const requestTraceTimeline = this.requestTraceIndex.timeline(40);
 
     return {
       uptime: Math.floor(process.uptime()),
@@ -59,11 +63,14 @@ export class OpsOverviewService {
       alertsLast24h,
       requestsPerMinuteSeries: httpSnap.requestsPerMinuteSeries,
       errorsByEndpoint: httpSnap.errorsByEndpoint,
+      topEndpointsByLatency,
+      requestTraceTimeline,
       recentAlerts: recent.map((e) => ({
         at: new Date(e.at).toISOString(),
         event: e.event,
         level: e.level,
         message: e.message,
+        analysis: e.analysis,
       })),
     };
   }

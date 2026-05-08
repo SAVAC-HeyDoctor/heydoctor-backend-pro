@@ -31,11 +31,18 @@ function formatSlackText(payload: AlertPayload): string {
       `🕒 Last: ${primStr(incident.lastSeenAt, '')}\n`;
   }
 
+  const insightRaw = payload.analysis;
+  const insight =
+    typeof insightRaw === 'string' && insightRaw.length > 0
+      ? `\n🧠 *Insight:* ${insightRaw}\n`
+      : '';
+
   const rest: Record<string, unknown> = { ...payload };
   delete rest.alertLevel;
   delete rest.alertDedupeKey;
   delete rest.alertAt;
   delete rest.incident;
+  delete rest.analysis;
 
   let body: string;
   try {
@@ -46,7 +53,7 @@ function formatSlackText(payload: AlertPayload): string {
   if (body.length > SLACK_TEXT_MAX) {
     body = `${body.slice(0, SLACK_TEXT_MAX)}…`;
   }
-  return `${headline}\n*${eventLabel}*${correlation}\n\`\`\`json\n${body}\n\`\`\``;
+  return `${headline}\n*${eventLabel}*${insight}${correlation}\n\`\`\`json\n${body}\n\`\`\``;
 }
 
 /** Sink no bloqueante: fallos de red no afectan el request. */

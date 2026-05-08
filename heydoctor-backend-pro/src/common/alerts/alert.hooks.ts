@@ -8,6 +8,7 @@ import {
 } from './alert-dedupe';
 import { clearIncidentStoreForTests } from './incident.store';
 import { trackIncidentAsync } from './incident.store.distributed';
+import { analyzeIncident } from './incident-analyzer';
 import { resetAlertRedisClientForTests } from '../redis/alert-redis.client';
 
 export type AlertPayload = Record<string, unknown>;
@@ -44,8 +45,10 @@ function inferAlertLevel(payload: AlertPayload): AlertLevel {
   if (ev === 'payku_webhook_auth_failed') return 'critical';
   if (payload.alert === 'subscription_payment_failed') return 'critical';
   if (ev === 'revenue_drop' || ev === 'no_payments_detected') return 'critical';
+  if (ev === 'ops_error_spike') return 'critical';
   if (ev === 'conversion_drop') return 'warning';
   if (ev === 'growth_business_alert') return 'warning';
+  if (ev === 'ops_latency_high' || ev === 'ops_traffic_drop') return 'warning';
   return 'warning';
 }
 
@@ -131,6 +134,10 @@ async function dispatchNotifyAlert(
       firstSeenAt: new Date(incident.firstSeenAt).toISOString(),
       lastSeenAt: new Date(incident.lastSeenAt).toISOString(),
     },
+    analysis: analyzeIncident({
+      ...payload,
+      alertDedupeKey: dedupeKey,
+    }),
   };
 
   for (const sink of sinks) {

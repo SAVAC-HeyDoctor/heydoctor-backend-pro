@@ -39,6 +39,9 @@ export function apiFetch(input: RequestInfo | URL, init?: RequestInit): Promise<
       headers.set(CSRF_HEADER, csrf);
     }
   }
+  if (typeof window !== 'undefined' && typeof crypto !== 'undefined') {
+    headers.set('X-Request-Id', crypto.randomUUID());
+  }
   return fetch(input, {
     ...init,
     credentials: 'include',

@@ -265,4 +265,30 @@ export class OpsHttpMetricsService {
       errorsByEndpoint,
     };
   }
+
+  /**
+   * Media de latencia por path (~5 min, **muestras en esta instancia**).
+   */
+  getTopLatencyEndpoints(
+    limit = 15,
+  ): { path: string; avgMs: number; count: number }[] {
+    const now = Date.now();
+    const win5m = now - 5 * 60_000;
+    const s5 = this.samples.filter((s) => s.t >= win5m);
+    const byPath = new Map<string, { sum: number; n: number }>();
+    for (const s of s5) {
+      const cur = byPath.get(s.path) ?? { sum: 0, n: 0 };
+      cur.sum += s.ms;
+      cur.n += 1;
+      byPath.set(s.path, cur);
+    }
+    return [...byPath.entries()]
+      .map(([path, v]) => ({
+        path,
+        avgMs: Math.round(v.sum / v.n),
+        count: v.n,
+      }))
+      .sort((a, b) => b.avgMs - a.avgMs)
+      .slice(0, limit);
+  }
 }

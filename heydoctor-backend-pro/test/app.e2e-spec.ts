@@ -79,4 +79,13 @@ const runDbE2e = process.env.DATABASE_E2E === '1';
       .expect('Content-Type', /text\/plain/)
       .expect('ok');
   });
+
+  it('/api/growth/context-public (GET)', () => {
+    return request(app.getHttpServer())
+      .get('/api/growth/context-public')
+      .expect(200)
+      .expect((res) => {
+        expect(res.body).toHaveProperty('features');
+      });
+  });
 });

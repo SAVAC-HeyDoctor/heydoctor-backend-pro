@@ -31,6 +31,7 @@ import {
   SubscriptionEventType,
 } from '../subscriptions/subscription-event.entity';
 import { SubscriptionEventsService } from '../subscriptions/subscription-events.service';
+import { createSpan } from '../common/tracing/span';
 import { notifyAlert } from '../common/alerts/alert.hooks';
 import { CircuitBreaker } from '../common/resilience/circuit-breaker';
 import { retry } from '../common/resilience/retry.util';
@@ -107,28 +108,33 @@ export class PaykuService {
   private async callPaykuCreateTransaction(
     body: Record<string, unknown>,
   ): Promise<Response> {
-    const paykuApiUrl = this.config.get<string>('PAYKU_API_URL');
-    if (!paykuApiUrl || !this.paykuApiKey) {
-      throw new Error('Payku API not configured');
+    const span = createSpan('payku_create_transaction');
+    try {
+      const paykuApiUrl = this.config.get<string>('PAYKU_API_URL');
+      if (!paykuApiUrl || !this.paykuApiKey) {
+        throw new Error('Payku API not configured');
+      }
+      return await retry(
+        () =>
+          this.paykuCircuitBreaker.exec(async () => {
+            const res = await fetch(`${paykuApiUrl}/transaction`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${this.paykuApiKey}`,
+              },
+              body: JSON.stringify(body),
+            });
+            if (!res.ok) {
+              throw new Error(`Payku HTTP ${res.status}`);
+            }
+            return res;
+          }),
+        { retries: 3, delayMs: 300 },
+      );
+    } finally {
+      span.end();
     }
-    return retry(
-      () =>
-        this.paykuCircuitBreaker.exec(async () => {
-          const res = await fetch(`${paykuApiUrl}/transaction`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${this.paykuApiKey}`,
-            },
-            body: JSON.stringify(body),
-          });
-          if (!res.ok) {
-            throw new Error(`Payku HTTP ${res.status}`);
-          }
-          return res;
-        }),
-      { retries: 3, delayMs: 300 },
-    );
   }
 
   // ── Create Payment Session ─────────────────────────────────────

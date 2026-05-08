@@ -5,9 +5,11 @@ import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 import { ProductEvent } from '../growth/product-event.entity';
 import { AdminOpsController } from './admin-ops.controller';
 import { OpsAlertsRecentService } from './ops-alerts-recent.service';
+import { OpsAnomalyScheduler } from './ops-anomaly.scheduler';
 import { OpsHttpMetricsService } from './ops-http-metrics.service';
 import { OpsMetricsInterceptor } from './ops-metrics.interceptor';
 import { OpsOverviewService } from './ops-overview.service';
+import { OpsScalingService } from './ops-scaling.service';
 
 @Module({
   imports: [TypeOrmModule.forFeature([ProductEvent]), SubscriptionsModule],
@@ -15,6 +17,8 @@ import { OpsOverviewService } from './ops-overview.service';
   providers: [
     OpsHttpMetricsService,
     OpsAlertsRecentService,
+    OpsScalingService,
+    OpsAnomalyScheduler,
     OpsOverviewService,
     OpsMetricsInterceptor,
     { provide: APP_INTERCEPTOR, useExisting: OpsMetricsInterceptor },

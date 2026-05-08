@@ -17,11 +17,28 @@ export type OpsOverviewDto = {
     requestCount: number;
     errorRate: number;
   }[];
+  /** Top paths por latencia media (muestras en esta réplica, ~5 min). */
+  topEndpointsByLatency: {
+    path: string;
+    avgMs: number;
+    count: number;
+  }[];
+  /** Línea de tiempo: últimas peticiones indexadas en esta instancia. */
+  requestTraceTimeline: {
+    requestId: string;
+    traceId: string;
+    method: string;
+    path: string;
+    statusCode: number;
+    durationMs: number;
+    at: string;
+  }[];
   /** Últimas alertas vía sink (memoria por instancia). */
   recentAlerts: {
     at: string;
     event: string;
     level: string;
     message?: string;
+    analysis?: string;
   }[];
 };
