@@ -52,6 +52,13 @@ import { buildTypeOrmSslConfig } from './config/typeorm-ssl';
 
 const dbUrl = process.env.DATABASE_PUBLIC_URL || process.env.DATABASE_URL;
 
+const ormLogging: boolean | ('query' | 'error')[] =
+  process.env.TYPEORM_LOG_QUERIES === 'true'
+    ? ['query', 'error']
+    : process.env.NODE_ENV === 'production'
+      ? ['error']
+      : true;
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -67,7 +74,7 @@ const dbUrl = process.env.DATABASE_PUBLIC_URL || process.env.DATABASE_URL;
       ssl: buildTypeOrmSslConfig(dbUrl ?? ''),
       autoLoadEntities: true,
       synchronize: false,
-      logging: process.env.NODE_ENV === 'production' ? false : true,
+      logging: ormLogging,
       migrations: [join(__dirname, 'migrations', '*.{js,ts}')],
       migrationsRun: true,
     }),

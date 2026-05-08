@@ -78,9 +78,6 @@ export type GrowthRetentionDto = {
 const CHURN_CRITICAL = (): number =>
   Number(process.env.GROWTH_ALERT_CHURN_MAX ?? 0.15);
 
-const SIGNUP_TOO_LOW_CONV = (): number =>
-  Number(process.env.GROWTH_ALERT_SIGNUP_CONVERSION_MIN ?? 0.05);
-
 function distinctActorExpr(alias = 'e'): string {
   return `COALESCE(${alias}.user_id::text, ${alias}.properties->>'anonSessionId')`;
 }
@@ -398,32 +395,6 @@ export class GrowthAnalyticsService {
       });
     }
 
-    const summary = await this.getSummary();
-    const minConv = SIGNUP_TOO_LOW_CONV();
-    if (
-      funnelHasVolume(summary.funnelDistinctUsers) &&
-      signupVolumeOk(summary.funnelDistinctUsers) &&
-      summary.signupToPaidApprox < minConv
-    ) {
-      alerts.push({
-        code: 'LOW_SIGNUP_TO_PAID',
-        severity: 'warning',
-        message: `Conversión signup→señales de pago baja (<${(minConv * 100).toFixed(1)}%) con volumen.`,
-        value: summary.signupToPaidApprox,
-      });
-    }
-
     return alerts;
   }
-}
-
-function funnelHasVolume(f: Record<string, number>): boolean {
-  let n = 0;
-  for (const v of Object.values(f)) n += v;
-  return n > 0;
-}
-
-function signupVolumeOk(f: Record<string, number>): boolean {
-  const s = f[GrowthFunnelEvents.SIGNUP_COMPLETED] ?? 0;
-  return s >= 20;
 }

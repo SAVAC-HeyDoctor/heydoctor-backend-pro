@@ -12,6 +12,7 @@ import { finalize } from 'rxjs/operators';
 import { APP_LOGGER } from '../logger/logger.tokens';
 import {
   getCurrentRequestId,
+  getRequestStartedAtMs,
   mergeHttpLogContextFromUser,
 } from '../request-context.storage';
 
@@ -42,14 +43,19 @@ export class HttpRequestLoggingInterceptor implements NestInterceptor {
             : String(req.url?.split('?')[0] ?? '');
         const authUser = req.user as { sub?: string } | undefined;
         const userId = typeof authUser?.sub === 'string' ? authUser.sub : null;
+        const alsStart = getRequestStartedAtMs();
+        const serverDurationMs =
+          alsStart !== undefined ? Date.now() - alsStart : durationMs;
 
         this.logger.log('http_request_complete', {
           event: 'http_request_complete',
           requestId,
+          traceId: requestId,
           method: req.method,
           path: pathLogged,
           statusCode: res.statusCode,
           durationMs,
+          serverDurationMs,
           userId,
         });
       }),

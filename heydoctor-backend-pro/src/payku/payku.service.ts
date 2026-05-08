@@ -32,6 +32,8 @@ import {
 } from '../subscriptions/subscription-event.entity';
 import { SubscriptionEventsService } from '../subscriptions/subscription-events.service';
 import { notifyAlert } from '../common/alerts/alert.hooks';
+import { CircuitBreaker } from '../common/resilience/circuit-breaker';
+import { retry } from '../common/resilience/retry.util';
 import { SubscriptionAlertsService } from '../subscriptions/subscription-alerts.service';
 import { UserRole } from '../users/user-role.enum';
 import {
@@ -64,6 +66,7 @@ export class PaykuService {
   private readonly authConfig: PaykuWebhookAuthConfig;
   private readonly pendingExpireMinutes: number;
   private readonly paykuApiKey?: string;
+  private readonly paykuCircuitBreaker = new CircuitBreaker(5, 10_000);
 
   constructor(
     @InjectRepository(PaykuPayment)
@@ -98,6 +101,34 @@ export class PaykuService {
         'Payku not configured: PAYKU_API_KEY is empty — live Payku API calls will use mock checkout URLs only',
       );
     }
+  }
+
+  /** Payku API externo: reintentos + circuit breaker; error si HTTP no OK. */
+  private async callPaykuCreateTransaction(
+    body: Record<string, unknown>,
+  ): Promise<Response> {
+    const paykuApiUrl = this.config.get<string>('PAYKU_API_URL');
+    if (!paykuApiUrl || !this.paykuApiKey) {
+      throw new Error('Payku API not configured');
+    }
+    return retry(
+      () =>
+        this.paykuCircuitBreaker.exec(async () => {
+          const res = await fetch(`${paykuApiUrl}/transaction`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${this.paykuApiKey}`,
+            },
+            body: JSON.stringify(body),
+          });
+          if (!res.ok) {
+            throw new Error(`Payku HTTP ${res.status}`);
+          }
+          return res;
+        }),
+      { retries: 3, delayMs: 300 },
+    );
   }
 
   // ── Create Payment Session ─────────────────────────────────────
@@ -186,38 +217,25 @@ export class PaykuService {
       );
     } else if (paykuApiUrl && this.paykuApiKey) {
       try {
-        const res = await fetch(`${paykuApiUrl}/transaction`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${this.paykuApiKey}`,
-          },
-          body: JSON.stringify({
-            email: authUser.email,
-            order: saved.id,
-            subject: `Consulta médica HeyDoctor`,
-            amount,
-            currency: 'CLP',
-            payment_id: saved.id,
-            urlreturn: `${frontendUrl}/panel/consultas/${consultationId}?payment=success`,
-            urlnotify: `${backendUrl}/api/payku/webhook`,
-          }),
+        const res = await this.callPaykuCreateTransaction({
+          email: authUser.email,
+          order: saved.id,
+          subject: `Consulta médica HeyDoctor`,
+          amount,
+          currency: 'CLP',
+          payment_id: saved.id,
+          urlreturn: `${frontendUrl}/panel/consultas/${consultationId}?payment=success`,
+          urlnotify: `${backendUrl}/api/payku/webhook`,
         });
-        if (!res.ok) {
+        const data = (await res.json()) as {
+          url?: string;
+          redirect_url?: string;
+        };
+        paymentUrl = data.url ?? data.redirect_url ?? '';
+        if (!paymentUrl) {
           this.logger.warn(
-            `Payku HTTP ${res.status}: falling back to mock checkout URL`,
+            'Payku response missing payment URL; using mock checkout URL',
           );
-        } else {
-          const data = (await res.json()) as {
-            url?: string;
-            redirect_url?: string;
-          };
-          paymentUrl = data.url ?? data.redirect_url ?? '';
-          if (!paymentUrl) {
-            this.logger.warn(
-              'Payku response missing payment URL; using mock checkout URL',
-            );
-          }
         }
       } catch (err) {
         this.logger.error(
@@ -316,38 +334,25 @@ export class PaykuService {
       );
     } else if (paykuApiUrl && this.paykuApiKey) {
       try {
-        const res = await fetch(`${paykuApiUrl}/transaction`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${this.paykuApiKey}`,
-          },
-          body: JSON.stringify({
-            email: params.email,
-            order: saved.id,
-            subject: 'Suscripción PRO HeyDoctor',
-            amount: params.amount,
-            currency: 'CLP',
-            payment_id: saved.id,
-            urlreturn: `${frontendUrl}/pricing?payment=success&paymentId=${saved.id}`,
-            urlnotify: `${backendUrl}/api/payku/webhook`,
-          }),
+        const res = await this.callPaykuCreateTransaction({
+          email: params.email,
+          order: saved.id,
+          subject: 'Suscripción PRO HeyDoctor',
+          amount: params.amount,
+          currency: 'CLP',
+          payment_id: saved.id,
+          urlreturn: `${frontendUrl}/pricing?payment=success&paymentId=${saved.id}`,
+          urlnotify: `${backendUrl}/api/payku/webhook`,
         });
-        if (!res.ok) {
+        const data = (await res.json()) as {
+          url?: string;
+          redirect_url?: string;
+        };
+        paymentUrl = data.url ?? data.redirect_url ?? '';
+        if (!paymentUrl) {
           this.logger.warn(
-            `Payku pricing HTTP ${res.status}: falling back to mock checkout URL`,
+            'Payku response missing payment URL; using mock checkout URL',
           );
-        } else {
-          const data = (await res.json()) as {
-            url?: string;
-            redirect_url?: string;
-          };
-          paymentUrl = data.url ?? data.redirect_url ?? '';
-          if (!paymentUrl) {
-            this.logger.warn(
-              'Payku response missing payment URL; using mock checkout URL',
-            );
-          }
         }
       } catch (err) {
         this.logger.error(

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { DataSource, In, MoreThanOrEqual } from 'typeorm';
+import { DataSource, In, And, LessThan, MoreThanOrEqual } from 'typeorm';
 import { User } from '../users/user.entity';
 import {
   Subscription,
@@ -695,6 +695,24 @@ export class SubscriptionsAnalyticsService {
       horizonMonths,
       cohorts,
     };
+  }
+
+  /**
+   * Conteo de PAYMENT_SUCCEEDED en el día calendario UTC de `day` (00:00–24:00 UTC).
+   */
+  async countPaymentSucceededUtcDate(day: Date): Promise<number> {
+    const y = day.getUTCFullYear();
+    const m = day.getUTCMonth();
+    const d = day.getUTCDate();
+    const start = new Date(Date.UTC(y, m, d, 0, 0, 0, 0));
+    const end = new Date(Date.UTC(y, m, d + 1, 0, 0, 0, 0));
+    const eventRepo = this.dataSource.getRepository(SubscriptionEvent);
+    return eventRepo.count({
+      where: {
+        eventType: SubscriptionEventType.PAYMENT_SUCCEEDED,
+        createdAt: And(MoreThanOrEqual(start), LessThan(end)),
+      },
+    });
   }
 }
 

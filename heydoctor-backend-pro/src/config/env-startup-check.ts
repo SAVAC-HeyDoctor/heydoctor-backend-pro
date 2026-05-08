@@ -159,6 +159,39 @@ export function validateAndLogEnv(env: EnvConfig): string[] {
       value: process.env.GROWTH_ALERT_SIGNUP_CONVERSION_MIN ?? '0.05 (default)',
     },
     {
+      name: 'TYPEORM_LOG_QUERIES',
+      status: process.env.TYPEORM_LOG_QUERIES ? 'SET' : 'DEFAULT',
+      required: false,
+      value:
+        process.env.TYPEORM_LOG_QUERIES === 'true'
+          ? 'query+error logging enabled'
+          : 'omitted (dev: all logs; prod: errors only unless true)',
+    },
+    {
+      name: 'BUSINESS_ALERT_REVENUE_DROP_RATIO',
+      status: process.env.BUSINESS_ALERT_REVENUE_DROP_RATIO
+        ? 'SET'
+        : 'DEFAULT',
+      required: false,
+      value: process.env.BUSINESS_ALERT_REVENUE_DROP_RATIO ?? '0.7',
+    },
+    {
+      name: 'BUSINESS_ALERT_REVENUE_MIN_PRIOR_CLP',
+      status: process.env.BUSINESS_ALERT_REVENUE_MIN_PRIOR_CLP
+        ? 'SET'
+        : 'DEFAULT',
+      required: false,
+      value: process.env.BUSINESS_ALERT_REVENUE_MIN_PRIOR_CLP ?? '1000',
+    },
+    {
+      name: 'BUSINESS_ALERT_NO_PAYMENTS_HOUR_UTC',
+      status: process.env.BUSINESS_ALERT_NO_PAYMENTS_HOUR_UTC
+        ? 'SET'
+        : 'DEFAULT',
+      required: false,
+      value: process.env.BUSINESS_ALERT_NO_PAYMENTS_HOUR_UTC ?? '8',
+    },
+    {
       name: 'HIPAA_MODE',
       status: env.hipaaMode ? 'SET' : 'DEFAULT',
       required: false,

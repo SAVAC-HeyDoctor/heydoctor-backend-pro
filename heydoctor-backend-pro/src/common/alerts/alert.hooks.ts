@@ -41,6 +41,8 @@ function inferAlertLevel(payload: AlertPayload): AlertLevel {
   if (ev === 'server_error') return 'critical';
   if (ev === 'payku_webhook_auth_failed') return 'critical';
   if (payload.alert === 'subscription_payment_failed') return 'critical';
+  if (ev === 'revenue_drop' || ev === 'no_payments_detected') return 'critical';
+  if (ev === 'conversion_drop') return 'warning';
   if (ev === 'growth_business_alert') return 'warning';
   return 'warning';
 }
@@ -59,6 +61,15 @@ function defaultDedupeKey(payload: AlertPayload, level: AlertLevel): string {
   }
   if (ev === 'growth_business_alert') {
     return `growth:${primStr(payload.code, 'na')}:${level}`;
+  }
+  if (ev === 'revenue_drop') {
+    return `revenue_drop:${primStr(payload.lastClosedMonth, 'na')}`;
+  }
+  if (ev === 'no_payments_detected') {
+    return `no_payments:${primStr(payload.dayUtc, 'na')}`;
+  }
+  if (ev === 'conversion_drop') {
+    return 'conversion_drop:signup_to_paid';
   }
   return `${ev}:${level}`;
 }

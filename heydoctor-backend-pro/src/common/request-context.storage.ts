@@ -2,6 +2,8 @@ import { AsyncLocalStorage } from 'async_hooks';
 
 type RequestContextStore = {
   requestId: string;
+  /** Marca temporal al entrar al middleware (duración server-side). */
+  startedAtMs: number;
   /** Rellenado tras JWT (interceptor HTTP). */
   userId?: string;
   clinicId?: string | null;
@@ -15,8 +17,10 @@ const storage = new AsyncLocalStorage<RequestContextStore>();
  */
 export function enterRequestContext(requestId: string): void {
   const prev = storage.getStore();
+  const startedAtMs = prev?.startedAtMs ?? Date.now();
   storage.enterWith({
     requestId,
+    startedAtMs,
     userId: prev?.userId,
     clinicId: prev?.clinicId,
   });
@@ -25,6 +29,11 @@ export function enterRequestContext(requestId: string): void {
 /** Returns correlation ID for the active HTTP request, if any. */
 export function getCurrentRequestId(): string | undefined {
   return storage.getStore()?.requestId;
+}
+
+/** Inicio del request en servidor (ms epoch), para span / duración ALS. */
+export function getRequestStartedAtMs(): number | undefined {
+  return storage.getStore()?.startedAtMs;
 }
 
 export function getCurrentUserIdForLog(): string | undefined {
@@ -48,6 +57,7 @@ export function mergeHttpLogContextFromUser(user: {
   }
   storage.enterWith({
     requestId: prev.requestId,
+    startedAtMs: prev.startedAtMs,
     userId: user.sub,
     clinicId: user.clinicId ?? null,
   });
