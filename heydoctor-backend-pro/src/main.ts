@@ -58,7 +58,7 @@ async function bootstrap() {
 
   if (process.env.NODE_ENV === 'production' && !process.env.REDIS_URL?.trim()) {
     bootstrapLogger.warn(
-      'REDIS_URL is not set: throttling uses in-memory storage per instance (not shared across replicas). Add Redis for distributed rate limits in multi-instance production.',
+      'REDIS_URL is not set: throttling uses in-memory storage per instance (not shared across replicas). Alert incident correlation is also per-instance. Add Redis for distributed rate limits and deduplicated alerts in multi-instance production.',
     );
   }
 

@@ -104,10 +104,7 @@ export class GrowthBusinessAlertsScheduler {
     const minPrior = REV_MIN_PRIOR_CLP();
     const ratio = REV_DROP_RATIO();
 
-    if (
-      priorAmount >= minPrior &&
-      lastAmount < priorAmount * ratio
-    ) {
+    if (priorAmount >= minPrior && lastAmount < priorAmount * ratio) {
       notifyAlert(
         {
           event: 'revenue_drop',

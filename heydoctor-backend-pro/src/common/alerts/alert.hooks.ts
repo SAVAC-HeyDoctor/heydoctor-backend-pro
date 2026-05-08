@@ -6,7 +6,9 @@ import {
   clearAlertDedupeStateForTests,
   tryAcquireGlobalAlertBudget,
 } from './alert-dedupe';
-import { clearIncidentStoreForTests, trackIncident } from './incident.store';
+import { clearIncidentStoreForTests } from './incident.store';
+import { trackIncidentAsync } from './incident.store.distributed';
+import { resetAlertRedisClientForTests } from '../redis/alert-redis.client';
 
 export type AlertPayload = Record<string, unknown>;
 
@@ -86,19 +88,30 @@ export function clearAlertSinksForTests(): void {
   sinks.length = 0;
   clearAlertDedupeStateForTests();
   clearIncidentStoreForTests();
+  resetAlertRedisClientForTests();
 }
 
 /**
  * Notificación no bloqueante; errores en sinks se ignoran para no romper el request.
+ * Con `REDIS_URL`, la correlación de incidentes es **distribuida** (un solo aviso global por clave).
  */
 export function notifyAlert(
   payload: AlertPayload,
   options?: NotifyAlertOptions,
 ): void {
+  void dispatchNotifyAlert(payload, options).catch(() => {
+    /* intentionally empty */
+  });
+}
+
+async function dispatchNotifyAlert(
+  payload: AlertPayload,
+  options?: NotifyAlertOptions,
+): Promise<void> {
   const level = options?.level ?? inferAlertLevel(payload);
   const dedupeKey = options?.key ?? defaultDedupeKey(payload, level);
 
-  const incident = trackIncident(dedupeKey);
+  const incident = await trackIncidentAsync(dedupeKey);
   if (incident.count > 1) {
     return;
   }

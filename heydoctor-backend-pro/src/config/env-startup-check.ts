@@ -55,7 +55,20 @@ export function validateAndLogEnv(env: EnvConfig): string[] {
       name: 'REDIS_URL',
       status: env.redisUrl ? 'SET' : 'DEFAULT',
       required: false,
-      value: env.redisUrl ? 'set' : 'memory cache / in-memory throttle',
+      value: env.redisUrl
+        ? 'set (cache/throttle + distributed incident correlation)'
+        : 'memory cache / in-memory throttle / in-memory alert correlation',
+    },
+    {
+      name: 'INCIDENT_CORRELATION_REDIS',
+      status: process.env.INCIDENT_CORRELATION_REDIS ? 'SET' : 'DEFAULT',
+      required: false,
+      value:
+        process.env.INCIDENT_CORRELATION_REDIS === 'false'
+          ? 'disabled (always in-memory incident map)'
+          : env.redisUrl
+            ? 'Redis when REDIS_URL is set'
+            : 'omitted (in-memory until Redis configured)',
     },
     {
       name: 'PAYKU_API_URL',
@@ -124,7 +137,8 @@ export function validateAndLogEnv(env: EnvConfig): string[] {
       name: 'INCIDENT_IDLE_TTL_MS',
       status: process.env.INCIDENT_IDLE_TTL_MS ? 'SET' : 'DEFAULT',
       required: false,
-      value: process.env.INCIDENT_IDLE_TTL_MS ?? '300000 (5m idle → drop incident)',
+      value:
+        process.env.INCIDENT_IDLE_TTL_MS ?? '300000 (5m idle → drop incident)',
     },
     {
       name: 'ALERT_INCIDENT_RESOLUTION_SLACK',
@@ -169,9 +183,7 @@ export function validateAndLogEnv(env: EnvConfig): string[] {
     },
     {
       name: 'BUSINESS_ALERT_REVENUE_DROP_RATIO',
-      status: process.env.BUSINESS_ALERT_REVENUE_DROP_RATIO
-        ? 'SET'
-        : 'DEFAULT',
+      status: process.env.BUSINESS_ALERT_REVENUE_DROP_RATIO ? 'SET' : 'DEFAULT',
       required: false,
       value: process.env.BUSINESS_ALERT_REVENUE_DROP_RATIO ?? '0.7',
     },
