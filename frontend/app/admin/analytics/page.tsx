@@ -311,6 +311,12 @@ export default function AdminAnalyticsPage() {
             Growth
           </Link>
           <Link
+            href="/admin/ops"
+            className="text-slate-600 underline hover:text-slate-900"
+          >
+            Ops
+          </Link>
+          <Link
             href="/admin/subscriptions"
             className="text-slate-600 underline hover:text-slate-900"
           >

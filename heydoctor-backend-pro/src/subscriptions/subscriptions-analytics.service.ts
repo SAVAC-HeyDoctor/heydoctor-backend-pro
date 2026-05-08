@@ -698,6 +698,38 @@ export class SubscriptionsAnalyticsService {
   }
 
   /**
+   * Conteo e ingreso (metadata.amount CLP) de PAYMENT_SUCCEEDED en el día UTC `day`.
+   */
+  async getPaymentSucceededStatsUtcDay(day: Date): Promise<{
+    paymentCount: number;
+    revenueClp: number;
+  }> {
+    const y = day.getUTCFullYear();
+    const m = day.getUTCMonth();
+    const d = day.getUTCDate();
+    const start = new Date(Date.UTC(y, m, d, 0, 0, 0, 0));
+    const end = new Date(Date.UTC(y, m, d + 1, 0, 0, 0, 0));
+    const eventRepo = this.dataSource.getRepository(SubscriptionEvent);
+    const row = await eventRepo
+      .createQueryBuilder('e')
+      .select('COUNT(*)', 'cnt')
+      .addSelect(
+        `COALESCE(SUM(NULLIF(TRIM(e.metadata->>'amount'), '')::numeric), 0)`,
+        'total',
+      )
+      .where('e.eventType = :et', {
+        et: SubscriptionEventType.PAYMENT_SUCCEEDED,
+      })
+      .andWhere('e.createdAt >= :start AND e.createdAt < :end', { start, end })
+      .getRawOne<{ cnt: string; total: string }>();
+
+    return {
+      paymentCount: Number(row?.cnt ?? 0),
+      revenueClp: Number(row?.total ?? 0),
+    };
+  }
+
+  /**
    * Conteo de PAYMENT_SUCCEEDED en el día calendario UTC de `day` (00:00–24:00 UTC).
    */
   async countPaymentSucceededUtcDate(day: Date): Promise<number> {

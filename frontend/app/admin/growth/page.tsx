@@ -148,6 +148,12 @@ export default function AdminGrowthPage() {
             Analytics SaaS
           </Link>
           <Link
+            href="/admin/ops"
+            className="text-slate-600 underline hover:text-slate-900"
+          >
+            Ops
+          </Link>
+          <Link
             href="/panel"
             className="text-slate-600 underline hover:text-slate-900"
           >

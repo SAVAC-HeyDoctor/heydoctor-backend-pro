@@ -31,6 +31,7 @@ import { ConsultationsModule } from './consultations/consultations.module';
 import { LegalPdfModule } from './legal-pdf/legal-pdf.module';
 import { LegalModule } from './legal/legal.module';
 import { MetricsModule } from './metrics/metrics.module';
+import { OpsModule } from './ops/ops.module';
 import { PaykuModule } from './payku/payku.module';
 import { PatientsModule } from './patients/patients.module';
 import { PublicModule } from './public/public.module';
@@ -110,6 +111,7 @@ const ormLogging: boolean | ('query' | 'error')[] =
     LegalPdfModule,
     LegalModule,
     MetricsModule,
+    OpsModule,
     PaykuModule,
     SubscriptionsModule,
     AiModule,
