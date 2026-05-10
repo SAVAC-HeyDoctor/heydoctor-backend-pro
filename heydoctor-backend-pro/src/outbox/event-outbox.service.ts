@@ -187,11 +187,7 @@ export class EventOutboxService {
         ON CONFLICT DO NOTHING
         RETURNING *
       `,
-      [
-        event.type,
-        event.idempotencyKey ?? null,
-        JSON.stringify(event.payload),
-      ],
+      [event.type, event.idempotencyKey ?? null, JSON.stringify(event.payload)],
     )) as ClaimedOutboxRow[];
 
     if (rows[0]) {
@@ -363,9 +359,7 @@ export class EventOutboxService {
       lastError: row.last_error,
       failed: row.failed,
       failedAt: row.failed_at ? new Date(row.failed_at) : null,
-      nextAttemptAt: row.next_attempt_at
-        ? new Date(row.next_attempt_at)
-        : null,
+      nextAttemptAt: row.next_attempt_at ? new Date(row.next_attempt_at) : null,
       processedAt: row.processed_at ? new Date(row.processed_at) : null,
       createdAt: new Date(row.created_at),
     });
@@ -503,10 +497,11 @@ export class EventOutboxService {
       await this.appendPaymentSucceededLedgerEntry(manager, payload);
 
       if (payload.consultationId) {
-        const consultation = await lockSignedConsultationAfterPaymentWithManager(
-          manager,
-          payload.consultationId,
-        );
+        const consultation =
+          await lockSignedConsultationAfterPaymentWithManager(
+            manager,
+            payload.consultationId,
+          );
         if (consultation) {
           audits.push(() =>
             this.auditService.logSuccess({

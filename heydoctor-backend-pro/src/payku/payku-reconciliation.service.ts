@@ -6,10 +6,7 @@ import {
   SubscriptionPlan,
   SubscriptionStatus,
 } from '../subscriptions/subscription.entity';
-import {
-  PaykuPayment,
-  PaykuPaymentStatus,
-} from './payku-payment.entity';
+import { PaykuPayment, PaykuPaymentStatus } from './payku-payment.entity';
 import { PaykuFinancialReconciliation } from './payku-financial-reconciliation.entity';
 
 type RevenueRow = {

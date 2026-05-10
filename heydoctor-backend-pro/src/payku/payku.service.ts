@@ -656,130 +656,94 @@ export class PaykuService {
     const postCommitActions: PostCommitAction[] = [];
     const result = await this.dataSource.transaction<WebhookResult>(
       async (manager) => {
-      const repo = manager.getRepository(PaykuPayment);
+        const repo = manager.getRepository(PaykuPayment);
 
-      const payment = await repo.findOne({
-        where: { id: paymentId },
-        lock: { mode: 'pessimistic_write' },
-      });
-
-      if (!payment) {
-        postCommitActions.push(() => {
-          this.logger.warn(`Payment ${paymentId} not found`);
+        const payment = await repo.findOne({
+          where: { id: paymentId },
+          lock: { mode: 'pessimistic_write' },
         });
-        postCommitActions.push(() => {
-          void this.auditService.logError({
-            action: 'PAYKU_WEBHOOK_PAYMENT_NOT_FOUND',
-            resource: 'payment',
-            resourceId: paymentId,
-            userId: null,
-            clinicId: null,
-            httpStatus: 200,
-            errorMessage: 'Payment not found',
-          });
-        });
-        return { action: 'payment_not_found', paymentId };
-      }
 
-      const statusBefore = payment.status;
-
-      if (isFinalStatus(payment.status)) {
-        const isDuplicate = payment.status === incomingStatus;
-        postCommitActions.push(() => {
-          void this.auditService.logSuccess({
-            action: 'PAYMENT_STATUS_UPDATED',
-            resource: 'payment',
-            resourceId: paymentId,
-            userId: payment.userId,
-            clinicId: payment.clinicId,
-            httpStatus: 200,
-            metadata: {
-              statusBefore,
-              statusAfter: payment.status,
-              duplicate: true,
-              reason: isDuplicate
-                ? 'duplicate_webhook'
-                : 'final_status_unchanged',
-              transactionId: payment.transactionId,
-            },
-          });
-        });
-        return { action: 'already_final', paymentId, duplicate: true };
-      }
-
-      const expiredAgeMinutes = this.expireIfStale(payment);
-      if (expiredAgeMinutes !== null) {
-        postCommitActions.push(() => {
-          this.logger.log(
-            `Payment ${payment.id} auto-expired (age: ${expiredAgeMinutes}min)`,
-          );
-        });
-      }
-
-      if (isFinalStatus(payment.status) && payment.status !== incomingStatus) {
-        await repo.save(payment);
-        postCommitActions.push(() => {
-          void this.auditService.logSuccess({
-            action: 'PAYMENT_STATUS_UPDATED',
-            resource: 'payment',
-            resourceId: paymentId,
-            userId: payment.userId,
-            clinicId: payment.clinicId,
-            httpStatus: 200,
-            metadata: {
-              statusBefore,
-              statusAfter: payment.status,
-              reason: 'expired_before_webhook',
-              transactionId: payment.transactionId,
-            },
-          });
-        });
-        return { action: 'expired_before_webhook', paymentId };
-      }
-
-      if (!isTransitionAllowed(payment.status, incomingStatus)) {
-        postCommitActions.push(() => {
-          this.logger.warn(
-            `Invalid transition ${payment.status} → ${incomingStatus} for ${paymentId}`,
-          );
-        });
-        postCommitActions.push(() => {
-          void this.auditService.logError({
-            action: 'PAYMENT_STATUS_UPDATED',
-            resource: 'payment',
-            resourceId: paymentId,
-            userId: payment.userId,
-            clinicId: payment.clinicId,
-            httpStatus: 200,
-            errorMessage: `Invalid transition: ${payment.status} → ${incomingStatus}`,
-          });
-        });
-        return { action: 'invalid_transition', paymentId };
-      }
-
-      if (incomingStatus === PaykuPaymentStatus.PAID) {
-        if (incomingAmount == null) {
+        if (!payment) {
           postCommitActions.push(() => {
-            this.logger.warn(`Missing amount in paid webhook for ${paymentId}`);
+            this.logger.warn(`Payment ${paymentId} not found`);
           });
           postCommitActions.push(() => {
             void this.auditService.logError({
+              action: 'PAYKU_WEBHOOK_PAYMENT_NOT_FOUND',
+              resource: 'payment',
+              resourceId: paymentId,
+              userId: null,
+              clinicId: null,
+              httpStatus: 200,
+              errorMessage: 'Payment not found',
+            });
+          });
+          return { action: 'payment_not_found', paymentId };
+        }
+
+        const statusBefore = payment.status;
+
+        if (isFinalStatus(payment.status)) {
+          const isDuplicate = payment.status === incomingStatus;
+          postCommitActions.push(() => {
+            void this.auditService.logSuccess({
               action: 'PAYMENT_STATUS_UPDATED',
               resource: 'payment',
               resourceId: paymentId,
               userId: payment.userId,
               clinicId: payment.clinicId,
               httpStatus: 200,
-              errorMessage: 'Missing amount in webhook payload',
+              metadata: {
+                statusBefore,
+                statusAfter: payment.status,
+                duplicate: true,
+                reason: isDuplicate
+                  ? 'duplicate_webhook'
+                  : 'final_status_unchanged',
+                transactionId: payment.transactionId,
+              },
             });
           });
-          return { action: 'missing_amount', paymentId };
+          return { action: 'already_final', paymentId, duplicate: true };
         }
 
-        if (incomingAmount !== payment.amount) {
+        const expiredAgeMinutes = this.expireIfStale(payment);
+        if (expiredAgeMinutes !== null) {
+          postCommitActions.push(() => {
+            this.logger.log(
+              `Payment ${payment.id} auto-expired (age: ${expiredAgeMinutes}min)`,
+            );
+          });
+        }
+
+        if (
+          isFinalStatus(payment.status) &&
+          payment.status !== incomingStatus
+        ) {
+          await repo.save(payment);
+          postCommitActions.push(() => {
+            void this.auditService.logSuccess({
+              action: 'PAYMENT_STATUS_UPDATED',
+              resource: 'payment',
+              resourceId: paymentId,
+              userId: payment.userId,
+              clinicId: payment.clinicId,
+              httpStatus: 200,
+              metadata: {
+                statusBefore,
+                statusAfter: payment.status,
+                reason: 'expired_before_webhook',
+                transactionId: payment.transactionId,
+              },
+            });
+          });
+          return { action: 'expired_before_webhook', paymentId };
+        }
+
+        if (!isTransitionAllowed(payment.status, incomingStatus)) {
           postCommitActions.push(() => {
             this.logger.warn(
-              `Amount mismatch for ${paymentId}: expected ${payment.amount}, got ${incomingAmount}`,
+              `Invalid transition ${payment.status} → ${incomingStatus} for ${paymentId}`,
             );
           });
           postCommitActions.push(() => {
@@ -790,157 +754,202 @@ export class PaykuService {
               userId: payment.userId,
               clinicId: payment.clinicId,
               httpStatus: 200,
-              errorMessage: `Amount mismatch: expected ${payment.amount}, got ${incomingAmount}`,
-              metadata: {
-                expectedAmount: payment.amount,
-                receivedAmount: incomingAmount,
-              },
+              errorMessage: `Invalid transition: ${payment.status} → ${incomingStatus}`,
             });
           });
-          return { action: 'amount_mismatch', paymentId };
+          return { action: 'invalid_transition', paymentId };
         }
-      }
 
-      payment.status = incomingStatus;
-      payment.rawResponse = rawBody;
-      const webhookIp = firstString(
-        rawBody._ip,
-        rawBody.ip,
-        rawBody.remote_ip,
-        rawBody.remoteIp,
-      );
-      if (webhookIp) {
-        payment.metadata = {
-          ...(payment.metadata ?? {}),
-          paykuWebhookIp: webhookIp,
-        };
-      }
+        if (incomingStatus === PaykuPaymentStatus.PAID) {
+          if (incomingAmount == null) {
+            postCommitActions.push(() => {
+              this.logger.warn(
+                `Missing amount in paid webhook for ${paymentId}`,
+              );
+            });
+            postCommitActions.push(() => {
+              void this.auditService.logError({
+                action: 'PAYMENT_STATUS_UPDATED',
+                resource: 'payment',
+                resourceId: paymentId,
+                userId: payment.userId,
+                clinicId: payment.clinicId,
+                httpStatus: 200,
+                errorMessage: 'Missing amount in webhook payload',
+              });
+            });
+            return { action: 'missing_amount', paymentId };
+          }
 
-      if (incomingStatus === PaykuPaymentStatus.PAID) {
-        payment.transactionId =
-          scalarToString(
-            rawBody.transaction_id ?? rawBody.transactionId,
-          ).trim() || null;
-        payment.paidAt = new Date();
-      }
+          if (incomingAmount !== payment.amount) {
+            postCommitActions.push(() => {
+              this.logger.warn(
+                `Amount mismatch for ${paymentId}: expected ${payment.amount}, got ${incomingAmount}`,
+              );
+            });
+            postCommitActions.push(() => {
+              void this.auditService.logError({
+                action: 'PAYMENT_STATUS_UPDATED',
+                resource: 'payment',
+                resourceId: paymentId,
+                userId: payment.userId,
+                clinicId: payment.clinicId,
+                httpStatus: 200,
+                errorMessage: `Amount mismatch: expected ${payment.amount}, got ${incomingAmount}`,
+                metadata: {
+                  expectedAmount: payment.amount,
+                  receivedAmount: incomingAmount,
+                },
+              });
+            });
+            return { action: 'amount_mismatch', paymentId };
+          }
+        }
 
-      const fraud = await this.detectFraudSignals(manager, payment, webhookIp);
-      payment.fraudFlag = fraud.fraudFlag;
-      payment.riskScore = fraud.riskScore;
-      payment.fraudReason = fraud.fraudReason;
-      payment.metadata = withFraudActionMetadata(payment.metadata, fraud);
-
-      await repo.save(payment);
-      this.enqueueFraudResponseLogs(postCommitActions, payment, fraud);
-      if (fraud.fraudFlag) {
-        postCommitActions.push(() =>
-          this.logger.warn('payku_fraud_flagged', {
-            paymentId,
-            userId: payment.userId,
-            clinicId: payment.clinicId,
-            riskScore: fraud.riskScore,
-            reason: fraud.fraudReason,
-          });
+        payment.status = incomingStatus;
+        payment.rawResponse = rawBody;
+        const webhookIp = firstString(
+          rawBody._ip,
+          rawBody.ip,
+          rawBody.remote_ip,
+          rawBody.remoteIp,
         );
-      }
+        if (webhookIp) {
+          payment.metadata = {
+            ...(payment.metadata ?? {}),
+            paykuWebhookIp: webhookIp,
+          };
+        }
 
-      const outboxType =
-        incomingStatus === PaykuPaymentStatus.PAID
-          ? EventOutboxType.PAYMENT_SUCCEEDED
-          : incomingStatus === PaykuPaymentStatus.FAILED
-            ? EventOutboxType.PAYMENT_FAILED
-            : EventOutboxType.PAYMENT_STATUS_UPDATED;
-      const outboxKey =
-        incomingStatus === PaykuPaymentStatus.PAID
-          ? `payku:${paymentId}:payment_succeeded`
-          : incomingStatus === PaykuPaymentStatus.FAILED
-            ? `payku:${paymentId}:payment_failed`
-            : `payku:${paymentId}:status:${incomingStatus}`;
+        if (incomingStatus === PaykuPaymentStatus.PAID) {
+          payment.transactionId =
+            scalarToString(
+              rawBody.transaction_id ?? rawBody.transactionId,
+            ).trim() || null;
+          payment.paidAt = new Date();
+        }
 
-      await manager.query(
-        `
+        const fraud = await this.detectFraudSignals(
+          manager,
+          payment,
+          webhookIp,
+        );
+        payment.fraudFlag = fraud.fraudFlag;
+        payment.riskScore = fraud.riskScore;
+        payment.fraudReason = fraud.fraudReason;
+        payment.metadata = withFraudActionMetadata(payment.metadata, fraud);
+
+        await repo.save(payment);
+        this.enqueueFraudResponseLogs(postCommitActions, payment, fraud);
+        if (fraud.fraudFlag) {
+          postCommitActions.push(() => {
+            this.logger.warn('payku_fraud_flagged', {
+              paymentId,
+              userId: payment.userId,
+              clinicId: payment.clinicId,
+              riskScore: fraud.riskScore,
+              reason: fraud.fraudReason,
+            });
+          });
+        }
+
+        const outboxType =
+          incomingStatus === PaykuPaymentStatus.PAID
+            ? EventOutboxType.PAYMENT_SUCCEEDED
+            : incomingStatus === PaykuPaymentStatus.FAILED
+              ? EventOutboxType.PAYMENT_FAILED
+              : EventOutboxType.PAYMENT_STATUS_UPDATED;
+        const outboxKey =
+          incomingStatus === PaykuPaymentStatus.PAID
+            ? `payku:${paymentId}:payment_succeeded`
+            : incomingStatus === PaykuPaymentStatus.FAILED
+              ? `payku:${paymentId}:payment_failed`
+              : `payku:${paymentId}:status:${incomingStatus}`;
+
+        await manager.query(
+          `
           INSERT INTO event_outbox (type, idempotency_key, payload)
           VALUES ($1, $2, $3::jsonb)
           ON CONFLICT DO NOTHING
         `,
-        [
-          outboxType,
-          outboxKey,
-          JSON.stringify({
-            userId: payment.userId,
-            clinicId: payment.clinicId,
-            paymentId,
-            consultationId: payment.consultationId,
-            amount: payment.amount,
-            transactionId: payment.transactionId ?? null,
-            incomingPaymentStatus: incomingStatus,
-          }),
-        ],
-      );
+          [
+            outboxType,
+            outboxKey,
+            JSON.stringify({
+              userId: payment.userId,
+              clinicId: payment.clinicId,
+              paymentId,
+              consultationId: payment.consultationId,
+              amount: payment.amount,
+              transactionId: payment.transactionId ?? null,
+              incomingPaymentStatus: incomingStatus,
+            }),
+          ],
+        );
 
-      postCommitActions.push(() => {
-        void this.auditService.logSuccess({
-          action: 'PAYMENT_STATUS_UPDATED',
-          resource: 'payment',
-          resourceId: paymentId,
-          userId: payment.userId,
-          clinicId: payment.clinicId,
-          httpStatus: 200,
-          metadata: {
-            amount: payment.amount,
-            statusBefore,
-            statusAfter: incomingStatus,
-            transactionId: payment.transactionId,
-            duplicate: false,
-            reason: 'webhook_processed',
-          },
-        });
-      });
-
-      if (incomingStatus === PaykuPaymentStatus.PAID) {
-        postCommitActions.push(() => {
-          this.logger.log('payku_payment_confirmed', {
-            event: 'payku_payment_confirmed',
-            paymentId,
-            consultationId: payment.consultationId,
-            clinicId: payment.clinicId,
-            amount: payment.amount,
-          });
-        });
         postCommitActions.push(() => {
           void this.auditService.logSuccess({
-            action: 'PAYMENT_CONFIRMED',
+            action: 'PAYMENT_STATUS_UPDATED',
             resource: 'payment',
             resourceId: paymentId,
             userId: payment.userId,
             clinicId: payment.clinicId,
             httpStatus: 200,
             metadata: {
-              consultationId: payment.consultationId,
               amount: payment.amount,
+              statusBefore,
+              statusAfter: incomingStatus,
               transactionId: payment.transactionId,
+              duplicate: false,
+              reason: 'webhook_processed',
             },
           });
         });
-      }
 
-      if (incomingStatus === PaykuPaymentStatus.FAILED) {
-        const meta = {
-          event: 'payku_payment_failed',
-          paymentId,
-          consultationId: payment.consultationId,
-          clinicId: payment.clinicId,
-        };
-        postCommitActions.push(() => {
-          this.logger.error(
-            'payku_payment_failed',
-            new Error('Payku payment failed'),
-            meta,
-          );
-        });
-      }
+        if (incomingStatus === PaykuPaymentStatus.PAID) {
+          postCommitActions.push(() => {
+            this.logger.log('payku_payment_confirmed', {
+              event: 'payku_payment_confirmed',
+              paymentId,
+              consultationId: payment.consultationId,
+              clinicId: payment.clinicId,
+              amount: payment.amount,
+            });
+          });
+          postCommitActions.push(() => {
+            void this.auditService.logSuccess({
+              action: 'PAYMENT_CONFIRMED',
+              resource: 'payment',
+              resourceId: paymentId,
+              userId: payment.userId,
+              clinicId: payment.clinicId,
+              httpStatus: 200,
+              metadata: {
+                consultationId: payment.consultationId,
+                amount: payment.amount,
+                transactionId: payment.transactionId,
+              },
+            });
+          });
+        }
 
-      return { action: 'processed', paymentId };
+        if (incomingStatus === PaykuPaymentStatus.FAILED) {
+          const meta = {
+            event: 'payku_payment_failed',
+            paymentId,
+            consultationId: payment.consultationId,
+            clinicId: payment.clinicId,
+          };
+          postCommitActions.push(() => {
+            this.logger.error(
+              'payku_payment_failed',
+              new Error('Payku payment failed'),
+              meta,
+            );
+          });
+        }
+
+        return { action: 'processed', paymentId };
       },
     );
     await this.runPostCommitActions(postCommitActions);
@@ -1060,18 +1069,18 @@ export class PaykuService {
     const logs: PostCommitAction[] = [];
 
     if (actions.critical) {
-      logs.push(() =>
-        this.logger.error('fraud_critical', new Error('fraud_critical'), base),
-      );
+      logs.push(() => {
+        this.logger.error('fraud_critical', new Error('fraud_critical'), base);
+      });
     }
 
     if (actions.highRisk) {
-      logs.push(() =>
+      logs.push(() => {
         this.logger.warn('fraud_high_risk', {
           ...base,
           userRiskStatus: 'high_risk',
-        }),
-      );
+        });
+      });
     }
 
     return logs;
@@ -1083,22 +1092,22 @@ export class PaykuService {
     parameters: unknown[],
   ): Promise<T[]> {
     if (manager) {
-      return manager.query<T[]>(sql, parameters);
+      const rows = (await manager.query(sql, parameters)) as unknown;
+      return rows as T[];
     }
 
-    return this.paymentsRepository.query<T[]>(sql, parameters);
+    const rows = (await this.paymentsRepository.query(
+      sql,
+      parameters,
+    )) as unknown;
+    return rows as T[];
   }
 
   private async detectFraudSignals(
     manager: EntityManager | null,
     payment: Pick<
       PaykuPayment,
-      | 'id'
-      | 'userId'
-      | 'status'
-      | 'fraudFlag'
-      | 'riskScore'
-      | 'fraudReason'
+      'id' | 'userId' | 'status' | 'fraudFlag' | 'riskScore' | 'fraudReason'
     >,
     ip: string | null,
   ): Promise<FraudCheckResult> {
@@ -1175,10 +1184,10 @@ export class PaykuService {
 
     const fraudReason = Array.from(
       new Set([
-        ...((payment.fraudReason ?? '')
+        ...(payment.fraudReason ?? '')
           .split(',')
           .map((reason) => reason.trim())
-          .filter((reason): reason is string => reason.length > 0)),
+          .filter((reason): reason is string => reason.length > 0),
         ...reasons,
       ]),
     ).join(',');
