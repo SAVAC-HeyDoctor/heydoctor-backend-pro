@@ -15,6 +15,10 @@ import { DoctorProfile } from './doctor-profile.entity';
 import { DoctorRating } from './doctor-rating.entity';
 import { CreateRatingDto } from './dto/create-rating.dto';
 
+type DoctorRatingAverageRow = {
+  avg: string | null;
+};
+
 @Injectable()
 export class DoctorProfilesService {
   constructor(
@@ -108,17 +112,17 @@ export class DoctorProfilesService {
     assignClinic(entity, profile.clinicId);
     const saved = await this.ratingRepo.save(entity);
 
-    const { avg } = await this.ratingRepo
+    const averageRow = await this.ratingRepo
       .createQueryBuilder('r')
       .select('AVG(r.rating)', 'avg')
       .where('r.doctor_profile_id = :id', { id: profile.id })
-      .getRawOne();
+      .getRawOne<DoctorRatingAverageRow>();
 
     const totalCount = await this.ratingRepo.count({
       where: { doctorProfileId: profile.id },
     });
 
-    profile.rating = Number(avg) || 0;
+    profile.rating = Number(averageRow?.avg ?? 0) || 0;
     profile.ratingCount = totalCount;
     await this.profileRepo.save(profile);
 

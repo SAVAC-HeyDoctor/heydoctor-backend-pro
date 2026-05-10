@@ -3,6 +3,7 @@ import {
   ExecutionContext,
   Inject,
   Injectable,
+  type LoggerService,
   NestInterceptor,
 } from '@nestjs/common';
 import { Observable, tap } from 'rxjs';
@@ -38,7 +39,7 @@ export class PhiAccessLogInterceptorV2 implements NestInterceptor {
     private readonly config: ComplianceConfig,
     private readonly auditService: AuditService,
     @Inject(APP_LOGGER)
-    private readonly logger: any,
+    private readonly logger: LoggerService,
   ) {}
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {

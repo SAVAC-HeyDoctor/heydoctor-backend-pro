@@ -18,6 +18,11 @@ type MissingSubscriptionRow = {
   payment_id: string;
 };
 
+type ActiveSubscriptionsRevenueRow = {
+  total: string;
+  count: string;
+};
+
 function previousUtcDate(): string {
   const now = new Date();
   const previous = new Date(
@@ -72,7 +77,9 @@ export class PaykuReconciliationService {
       .andWhere('payment.paidAt < :end', { end })
       .getRawOne<RevenueRow>();
 
-    const activeSubscriptions = await this.dataSource.query(
+    const activeSubscriptions = await this.dataSource.query<
+      ActiveSubscriptionsRevenueRow[]
+    >(
       `
         SELECT COALESCE(SUM(price), 0)::text AS total,
                COUNT(*)::text AS count
@@ -83,7 +90,9 @@ export class PaykuReconciliationService {
       [SubscriptionPlan.PRO, SubscriptionStatus.ACTIVE],
     );
 
-    const missingSubscriptions = (await this.dataSource.query(
+    const missingSubscriptions = await this.dataSource.query<
+      MissingSubscriptionRow[]
+    >(
       `
         SELECT p.id AS payment_id
         FROM payku_payments p
@@ -105,7 +114,7 @@ export class PaykuReconciliationService {
         SubscriptionPlan.PRO,
         SubscriptionStatus.ACTIVE,
       ],
-    )) as MissingSubscriptionRow[];
+    );
 
     const paymentSucceededAmount = String(paymentRevenue?.total ?? '0');
     const activeSubscriptionsRevenue = String(
@@ -119,7 +128,7 @@ export class PaykuReconciliationService {
       (row) => row.payment_id,
     );
 
-    const rows = (await this.repo.query(
+    const rows = await this.repo.query<PaykuFinancialReconciliation[]>(
       `
         INSERT INTO payku_financial_reconciliations (
           reconciliation_date,
@@ -154,7 +163,7 @@ export class PaykuReconciliationService {
           activeSubscriptionCount: Number(activeSubscriptions[0]?.count ?? 0),
         }),
       ],
-    )) as PaykuFinancialReconciliation[];
+    );
 
     if (mismatchAmount !== '0.00' || missingSubscriptionPaymentIds.length > 0) {
       this.logger.warn('payku_reconciliation_mismatch', {

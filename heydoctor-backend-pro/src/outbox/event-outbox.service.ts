@@ -180,7 +180,7 @@ export class EventOutboxService {
   }
 
   async enqueue(event: EnqueueOutboxEvent): Promise<EventOutbox | null> {
-    const rows = (await this.repo.query(
+    const rows = await this.repo.query<ClaimedOutboxRow[]>(
       `
         INSERT INTO event_outbox (type, idempotency_key, payload)
         VALUES ($1, $2, $3::jsonb)
@@ -188,7 +188,7 @@ export class EventOutboxService {
         RETURNING *
       `,
       [event.type, event.idempotencyKey ?? null, JSON.stringify(event.payload)],
-    )) as ClaimedOutboxRow[];
+    );
 
     if (rows[0]) {
       return this.toEntity(rows[0]);
@@ -205,7 +205,7 @@ export class EventOutboxService {
 
   async processBatch(): Promise<number> {
     const rows = await this.dataSource.transaction(async (manager) => {
-      return (await manager.query(
+      return manager.query<ClaimedOutboxRow[]>(
         `
           SELECT *
           FROM event_outbox
@@ -218,7 +218,7 @@ export class EventOutboxService {
           FOR UPDATE SKIP LOCKED
         `,
         [OUTBOX_MAX_ATTEMPTS, OUTBOX_BATCH_SIZE],
-      )) as ClaimedOutboxRow[];
+      );
     });
 
     if (rows.length > 0) {
@@ -260,7 +260,7 @@ export class EventOutboxService {
 
   async processEvent(row: EventOutbox): Promise<void> {
     await this.dataSource.transaction(async (manager) => {
-      const claimedRows = (await manager.query(
+      const claimedRows = await manager.query<ClaimedOutboxRow[]>(
         `
           SELECT *
           FROM event_outbox
@@ -272,7 +272,7 @@ export class EventOutboxService {
           FOR UPDATE SKIP LOCKED
         `,
         [row.id, OUTBOX_MAX_ATTEMPTS],
-      )) as ClaimedOutboxRow[];
+      );
 
       const claimed = claimedRows[0];
       if (!claimed) {
@@ -286,7 +286,7 @@ export class EventOutboxService {
 
       try {
         await this.dispatch(event);
-        const markedRows = (await manager.query(
+        const markedRows = await manager.query<ClaimedOutboxRow[]>(
           `
             UPDATE event_outbox
             SET processed = true,
@@ -296,7 +296,7 @@ export class EventOutboxService {
             RETURNING *
           `,
           [event.id],
-        )) as ClaimedOutboxRow[];
+        );
         if (markedRows.length === 0) {
           this.logger.log('event_outbox_mark_processed_skipped', {
             eventId: event.id,

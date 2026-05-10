@@ -49,7 +49,10 @@ export class CsrfGuard implements CanActivate {
       }
     }
 
-    const cookieVal = req.cookies?.[CSRF_COOKIE];
+    const cookieRaw = (req as { cookies?: Record<string, unknown> }).cookies?.[
+      CSRF_COOKIE
+    ];
+    const cookieVal = typeof cookieRaw === 'string' ? cookieRaw : undefined;
     const headerVal = headerValue(req, CSRF_HEADER);
     if (
       !cookieVal ||

@@ -21,6 +21,25 @@ type DailyMetricsTotals = {
   doctorApplications: number;
 };
 
+type DailyMetricsQueryRow = {
+  upgrades_total: string | number;
+  upgrades_sales: string | number;
+  upgrades_support: string | number;
+  downgrades_refund: string | number;
+  consultations_created: string | number;
+  consultations_paid: string | number;
+  consultations_started: string | number;
+  consultations_completed: string | number;
+  doctor_applications: string | number;
+};
+
+type RollingMetricsQueryRow = {
+  upgrades_7d: string | number;
+  upgrades_30d: string | number;
+  sales_30d: string | number;
+  support_30d: string | number;
+};
+
 @Injectable()
 export class MetricsService {
   private readonly logger = new Logger(MetricsService.name);
@@ -44,7 +63,9 @@ export class MetricsService {
     const clinics = await this.clinicRepository.find({ select: ['id'] });
 
     for (const { id: clinicId } of clinics) {
-      const [row] = await this.auditLogsRepository.query(
+      const [row] = await this.auditLogsRepository.query<
+        DailyMetricsQueryRow[]
+      >(
         `
         SELECT
           COUNT(*) FILTER (WHERE action = 'SUBSCRIPTION_PLAN_CHANGED' AND metadata->>'to' = 'pro') AS upgrades_total,
@@ -120,7 +141,9 @@ export class MetricsService {
       throw new ForbiddenException('User has no clinic assigned');
     }
 
-    const [row] = await this.dailyMetricsRepository.query(
+    const [row] = await this.dailyMetricsRepository.query<
+      RollingMetricsQueryRow[]
+    >(
       `
       SELECT
         COALESCE(SUM(upgrades_total) FILTER (WHERE date >= CURRENT_DATE - INTERVAL '7 days'), 0)  AS upgrades_7d,

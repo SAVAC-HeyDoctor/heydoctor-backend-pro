@@ -31,7 +31,8 @@ export class GrowthCheckoutService {
   ) {}
 
   private readAccessCookie(req: Request): string | undefined {
-    const v = req.cookies?.[ACCESS_TOKEN_COOKIE];
+    const cookies = (req as { cookies?: Record<string, unknown> }).cookies;
+    const v = cookies?.[ACCESS_TOKEN_COOKIE];
     return typeof v === 'string' ? v : undefined;
   }
 
