@@ -13,16 +13,38 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
 export class MultiTenantClinicIdCoreEntities1746300000000 implements MigrationInterface {
   name = 'MultiTenantClinicIdCoreEntities1746300000000';
 
-  public async up(queryRunner: QueryRunner): Promise<void> {
+  private async getDefaultClinicId(
+    queryRunner: QueryRunner,
+  ): Promise<string | null> {
     const defaultClinic = await queryRunner.query(`
-      SELECT id FROM clinics ORDER BY created_at ASC LIMIT 1
+      SELECT id FROM clinics ORDER BY created_at ASC, id ASC LIMIT 1
     `);
-    if (!defaultClinic?.length) {
-      throw new Error(
-        'MultiTenantClinicId: no hay filas en clinics; crear al menos una clínica antes.',
-      );
+    if (defaultClinic?.length) {
+      return defaultClinic[0].id;
     }
-    const defaultClinicId: string = defaultClinic[0].id;
+
+    return null;
+  }
+
+  private async backfillDefaultClinicId(
+    queryRunner: QueryRunner,
+    tableName: string,
+    defaultClinicId: string | null,
+  ): Promise<void> {
+    if (defaultClinicId === null) {
+      return;
+    }
+
+    await queryRunner.query(
+      `
+      UPDATE ${tableName} SET clinic_id = $1 WHERE clinic_id IS NULL
+    `,
+      [defaultClinicId],
+    );
+  }
+
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    const defaultClinicId = await this.getDefaultClinicId(queryRunner);
 
     // ── doctor_profiles ─────────────────────────────────────────
     await queryRunner.query(`
@@ -35,11 +57,10 @@ export class MultiTenantClinicIdCoreEntities1746300000000 implements MigrationIn
       FROM users u
       WHERE dp.user_id = u.id AND dp.clinic_id IS NULL
     `);
-    await queryRunner.query(
-      `
-      UPDATE doctor_profiles SET clinic_id = $1 WHERE clinic_id IS NULL
-    `,
-      [defaultClinicId],
+    await this.backfillDefaultClinicId(
+      queryRunner,
+      'doctor_profiles',
+      defaultClinicId,
     );
     await queryRunner.query(`
       ALTER TABLE doctor_profiles ALTER COLUMN clinic_id SET NOT NULL
@@ -69,11 +90,10 @@ export class MultiTenantClinicIdCoreEntities1746300000000 implements MigrationIn
       FROM doctor_profiles dp
       WHERE dr.doctor_profile_id = dp.id AND dr.clinic_id IS NULL
     `);
-    await queryRunner.query(
-      `
-      UPDATE doctor_ratings SET clinic_id = $1 WHERE clinic_id IS NULL
-    `,
-      [defaultClinicId],
+    await this.backfillDefaultClinicId(
+      queryRunner,
+      'doctor_ratings',
+      defaultClinicId,
     );
     await queryRunner.query(`
       ALTER TABLE doctor_ratings ALTER COLUMN clinic_id SET NOT NULL
@@ -103,11 +123,10 @@ export class MultiTenantClinicIdCoreEntities1746300000000 implements MigrationIn
       FROM users u
       WHERE s.user_id = u.id AND s.clinic_id IS NULL
     `);
-    await queryRunner.query(
-      `
-      UPDATE subscriptions SET clinic_id = $1 WHERE clinic_id IS NULL
-    `,
-      [defaultClinicId],
+    await this.backfillDefaultClinicId(
+      queryRunner,
+      'subscriptions',
+      defaultClinicId,
     );
     await queryRunner.query(`
       ALTER TABLE subscriptions ALTER COLUMN clinic_id SET NOT NULL
@@ -144,11 +163,10 @@ export class MultiTenantClinicIdCoreEntities1746300000000 implements MigrationIn
       ) sub
       WHERE p.id = sub.id AND sub.cid IS NOT NULL AND p.clinic_id IS NULL
     `);
-    await queryRunner.query(
-      `
-      UPDATE payku_payments SET clinic_id = $1 WHERE clinic_id IS NULL
-    `,
-      [defaultClinicId],
+    await this.backfillDefaultClinicId(
+      queryRunner,
+      'payku_payments',
+      defaultClinicId,
     );
     await queryRunner.query(`
       ALTER TABLE payku_payments ALTER COLUMN clinic_id SET NOT NULL
@@ -172,11 +190,10 @@ export class MultiTenantClinicIdCoreEntities1746300000000 implements MigrationIn
       ALTER TABLE doctor_applications
       ADD COLUMN IF NOT EXISTS clinic_id uuid
     `);
-    await queryRunner.query(
-      `
-      UPDATE doctor_applications SET clinic_id = $1 WHERE clinic_id IS NULL
-    `,
-      [defaultClinicId],
+    await this.backfillDefaultClinicId(
+      queryRunner,
+      'doctor_applications',
+      defaultClinicId,
     );
     await queryRunner.query(`
       ALTER TABLE doctor_applications ALTER COLUMN clinic_id SET NOT NULL
@@ -202,11 +219,10 @@ export class MultiTenantClinicIdCoreEntities1746300000000 implements MigrationIn
       FROM users u
       WHERE al.user_id = u.id AND al.clinic_id IS NULL
     `);
-    await queryRunner.query(
-      `
-      UPDATE audit_logs SET clinic_id = $1 WHERE clinic_id IS NULL
-    `,
-      [defaultClinicId],
+    await this.backfillDefaultClinicId(
+      queryRunner,
+      'audit_logs',
+      defaultClinicId,
     );
     await queryRunner.query(`
       ALTER TABLE audit_logs ALTER COLUMN clinic_id SET NOT NULL
@@ -232,11 +248,10 @@ export class MultiTenantClinicIdCoreEntities1746300000000 implements MigrationIn
       FROM users u
       WHERE g.user_id = u.id AND g.clinic_id IS NULL
     `);
-    await queryRunner.query(
-      `
-      UPDATE gdpr_deletion_requests SET clinic_id = $1 WHERE clinic_id IS NULL
-    `,
-      [defaultClinicId],
+    await this.backfillDefaultClinicId(
+      queryRunner,
+      'gdpr_deletion_requests',
+      defaultClinicId,
     );
     await queryRunner.query(`
       ALTER TABLE gdpr_deletion_requests ALTER COLUMN clinic_id SET NOT NULL
@@ -266,11 +281,10 @@ export class MultiTenantClinicIdCoreEntities1746300000000 implements MigrationIn
       FROM users u
       WHERE r.user_id = u.id AND r.clinic_id IS NULL
     `);
-    await queryRunner.query(
-      `
-      UPDATE refresh_tokens SET clinic_id = $1 WHERE clinic_id IS NULL
-    `,
-      [defaultClinicId],
+    await this.backfillDefaultClinicId(
+      queryRunner,
+      'refresh_tokens',
+      defaultClinicId,
     );
     await queryRunner.query(`
       ALTER TABLE refresh_tokens ALTER COLUMN clinic_id SET NOT NULL
@@ -305,11 +319,10 @@ export class MultiTenantClinicIdCoreEntities1746300000000 implements MigrationIn
       ALTER TABLE daily_metrics
       ADD COLUMN IF NOT EXISTS clinic_id uuid
     `);
-    await queryRunner.query(
-      `
-      UPDATE daily_metrics SET clinic_id = $1 WHERE clinic_id IS NULL
-    `,
-      [defaultClinicId],
+    await this.backfillDefaultClinicId(
+      queryRunner,
+      'daily_metrics',
+      defaultClinicId,
     );
     await queryRunner.query(`
       DROP INDEX IF EXISTS "UQ_daily_metrics_date"
@@ -353,127 +366,8 @@ export class MultiTenantClinicIdCoreEntities1746300000000 implements MigrationIn
     `);
   }
 
-  public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`
-      ALTER TABLE appointments
-      DROP CONSTRAINT IF EXISTS "FK_appointments_clinic"
-    `);
-    await queryRunner.query(`
-      ALTER TABLE appointments
-      ADD CONSTRAINT "FK_appointments_clinic"
-      FOREIGN KEY ("clinic_id") REFERENCES "clinics"("id") ON DELETE CASCADE
-    `);
-
-    await queryRunner.query(`
-      ALTER TABLE consultations
-      DROP CONSTRAINT IF EXISTS "FK_consultations_clinic"
-    `);
-    await queryRunner.query(`
-      ALTER TABLE consultations
-      ADD CONSTRAINT "FK_consultations_clinic"
-      FOREIGN KEY ("clinic_id") REFERENCES "clinics"("id") ON DELETE CASCADE
-    `);
-
-    await queryRunner.query(`
-      ALTER TABLE telemedicine_consents
-      DROP CONSTRAINT IF EXISTS "FK_telemedicine_consents_clinic"
-    `);
-
-    await queryRunner.query(`
-      ALTER TABLE daily_metrics DROP CONSTRAINT IF EXISTS "FK_daily_metrics_clinic"
-    `);
-    await queryRunner.query(`
-      DROP INDEX IF EXISTS "UQ_daily_metrics_clinic_date"
-    `);
-    await queryRunner.query(`
-      DELETE FROM daily_metrics
-    `);
-    await queryRunner.query(`
-      ALTER TABLE daily_metrics DROP COLUMN IF EXISTS clinic_id
-    `);
-    await queryRunner.query(`
-      CREATE UNIQUE INDEX IF NOT EXISTS "UQ_daily_metrics_date"
-      ON daily_metrics ("date")
-    `);
-
-    await queryRunner.query(`
-      ALTER TABLE refresh_tokens
-      DROP CONSTRAINT IF EXISTS "FK_refresh_tokens_clinic"
-    `);
-    await queryRunner.query(`
-      DROP INDEX IF EXISTS "IDX_refresh_tokens_clinic_id"
-    `);
-    await queryRunner.query(`
-      ALTER TABLE refresh_tokens DROP COLUMN IF EXISTS clinic_id
-    `);
-
-    await queryRunner.query(`
-      ALTER TABLE gdpr_deletion_requests
-      DROP CONSTRAINT IF EXISTS "FK_gdpr_deletion_clinic"
-    `);
-    await queryRunner.query(`
-      DROP INDEX IF EXISTS "IDX_gdpr_clinic_id"
-    `);
-    await queryRunner.query(`
-      ALTER TABLE gdpr_deletion_requests DROP COLUMN IF EXISTS clinic_id
-    `);
-
-    await queryRunner.query(`
-      ALTER TABLE audit_logs DROP CONSTRAINT IF EXISTS "FK_audit_logs_clinic"
-    `);
-    await queryRunner.query(`
-      ALTER TABLE audit_logs ALTER COLUMN clinic_id DROP NOT NULL
-    `);
-
-    await queryRunner.query(`
-      ALTER TABLE doctor_applications
-      DROP CONSTRAINT IF EXISTS "FK_doctor_applications_clinic"
-    `);
-    await queryRunner.query(`
-      DROP INDEX IF EXISTS "IDX_doctor_applications_clinic_id"
-    `);
-    await queryRunner.query(`
-      ALTER TABLE doctor_applications DROP COLUMN IF EXISTS clinic_id
-    `);
-
-    await queryRunner.query(`
-      ALTER TABLE payku_payments DROP CONSTRAINT IF EXISTS "FK_payku_payments_clinic"
-    `);
-    await queryRunner.query(`
-      DROP INDEX IF EXISTS "IDX_payku_clinic_id"
-    `);
-    await queryRunner.query(`
-      ALTER TABLE payku_payments DROP COLUMN IF EXISTS clinic_id
-    `);
-
-    await queryRunner.query(`
-      ALTER TABLE subscriptions DROP CONSTRAINT IF EXISTS "FK_subscriptions_clinic"
-    `);
-    await queryRunner.query(`
-      DROP INDEX IF EXISTS "IDX_subscriptions_clinic_id"
-    `);
-    await queryRunner.query(`
-      ALTER TABLE subscriptions DROP COLUMN IF EXISTS clinic_id
-    `);
-
-    await queryRunner.query(`
-      ALTER TABLE doctor_ratings DROP CONSTRAINT IF EXISTS "FK_doctor_ratings_clinic"
-    `);
-    await queryRunner.query(`
-      DROP INDEX IF EXISTS "IDX_doctor_ratings_clinic_id"
-    `);
-    await queryRunner.query(`
-      ALTER TABLE doctor_ratings DROP COLUMN IF EXISTS clinic_id
-    `);
-
-    await queryRunner.query(`
-      ALTER TABLE doctor_profiles DROP CONSTRAINT IF EXISTS "FK_doctor_profiles_clinic"
-    `);
-    await queryRunner.query(`
-      DROP INDEX IF EXISTS "IDX_doctor_profiles_clinic_id"
-    `);
-    await queryRunner.query(`
-      ALTER TABLE doctor_profiles DROP COLUMN IF EXISTS clinic_id
-    `);
+  public async down(): Promise<void> {
+    // Intentionally no-op: reversing this migration would drop tenant columns and
+    // destroy tenant-scoped metrics. Roll back with an explicit forward fix.
   }
 }

@@ -6,13 +6,19 @@ import { Consultation } from '../consultations/consultation.entity';
 import { GrowthModule } from '../growth/growth.module';
 import { SubscriptionEventsModule } from '../subscriptions/subscription-events.module';
 import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
+import { PaykuFinancialReconciliation } from './payku-financial-reconciliation.entity';
 import { PaykuPayment } from './payku-payment.entity';
 import { PaykuController } from './payku.controller';
+import { PaykuReconciliationService } from './payku-reconciliation.service';
 import { PaykuService } from './payku.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([PaykuPayment, Consultation]),
+    TypeOrmModule.forFeature([
+      PaykuPayment,
+      PaykuFinancialReconciliation,
+      Consultation,
+    ]),
     AuditModule,
     AuthorizationModule,
     SubscriptionEventsModule,
@@ -20,7 +26,7 @@ import { PaykuService } from './payku.service';
     forwardRef(() => GrowthModule),
   ],
   controllers: [PaykuController],
-  providers: [PaykuService],
+  providers: [PaykuService, PaykuReconciliationService],
   exports: [PaykuService],
 })
 export class PaykuModule {}

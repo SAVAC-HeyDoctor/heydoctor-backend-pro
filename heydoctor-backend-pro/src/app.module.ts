@@ -33,6 +33,7 @@ import { LegalPdfModule } from './legal-pdf/legal-pdf.module';
 import { LegalModule } from './legal/legal.module';
 import { MetricsModule } from './metrics/metrics.module';
 import { OpsModule } from './ops/ops.module';
+import { OutboxModule } from './outbox/outbox.module';
 import { PaykuModule } from './payku/payku.module';
 import { PatientsModule } from './patients/patients.module';
 import { PublicModule } from './public/public.module';
@@ -51,6 +52,7 @@ import { HttpRequestLoggingInterceptor } from './common/interceptors/http-reques
 import { CsrfCookieInterceptor } from './common/csrf/csrf-cookie.interceptor';
 import { CsrfGuard } from './common/csrf/csrf.guard';
 import { buildTypeOrmSslConfig } from './config/typeorm-ssl';
+import { assertRedisConfiguredForMultiInstanceProduction } from './config/redis-requirement';
 
 const dbUrl = process.env.DATABASE_PUBLIC_URL || process.env.DATABASE_URL;
 
@@ -79,11 +81,12 @@ const ormLogging: boolean | ('query' | 'error')[] =
       synchronize: false,
       logging: ormLogging,
       migrations: [join(__dirname, 'migrations', '*.{js,ts}')],
-      migrationsRun: true,
+      migrationsRun: process.env.NODE_ENV !== 'production',
     }),
     ScheduleModule.forRoot(),
     ThrottlerModule.forRootAsync({
       useFactory: () => {
+        assertRedisConfiguredForMultiInstanceProduction();
         const redisRaw = process.env.REDIS_URL ?? null;
         const redisUrl =
           typeof redisRaw === 'string' && redisRaw.trim().length > 0
@@ -118,6 +121,7 @@ const ormLogging: boolean | ('query' | 'error')[] =
     LegalModule,
     MetricsModule,
     OpsModule,
+    OutboxModule,
     PaykuModule,
     SubscriptionsModule,
     AiModule,

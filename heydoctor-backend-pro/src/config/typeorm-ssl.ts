@@ -8,11 +8,8 @@
  *
  * Overrides:
  * - `DATABASE_SSL_CA` (PEM): verificación estricta con esa CA.
- * - `DATABASE_SSL_REJECT_UNAUTHORIZED=false`: confiar sin verificar cadena (último recurso).
+ * - `DATABASE_SSL_REJECT_UNAUTHORIZED=false`: confiar sin verificar cadena solo fuera de producción.
  * - `DATABASE_SSL_REJECT_UNAUTHORIZED=true`: forzar verificación estricta (requiere CA pública o `DATABASE_SSL_CA`).
- *
- * TEMPORAL: en producción sin `DATABASE_SSL_CA` (y sin `DATABASE_SSL_REJECT_UNAUTHORIZED=true`),
- * se usa `rejectUnauthorized: false` para desbloquear Railway hasta montar la CA.
  */
 
 export type TypeOrmSslConfig =
@@ -26,38 +23,6 @@ function isLocalDatabaseUrl(url: string): boolean {
     url.includes('127.0.0.1') ||
     url.includes('@host.docker.internal')
   );
-}
-
-function databaseUrlHost(url: string): string | null {
-  try {
-    const normalized = url.replace(/^postgresql:\/\//i, 'postgres://');
-    return new URL(normalized).hostname.toLowerCase();
-  } catch {
-    const m = /@([^/:?]+)/.exec(url);
-    return m ? m[1].toLowerCase() : null;
-  }
-}
-
-/** Deploy en Railway (variables de sistema del proveedor). */
-function isRailwayRuntime(): boolean {
-  return Boolean(
-    process.env.RAILWAY_PROJECT_ID ||
-    process.env.RAILWAY_ENVIRONMENT_ID ||
-    process.env.RAILWAY_SERVICE_ID,
-  );
-}
-
-/** Host típico del proxy TCP / red privada de Postgres en Railway. */
-function isLikelyRailwayPostgresHost(url: string): boolean {
-  const host = databaseUrlHost(url);
-  if (host) {
-    return host.endsWith('.rlwy.net') || host.endsWith('.railway.internal');
-  }
-  return /\.rlwy\.net|railway\.internal/i.test(url);
-}
-
-function needsRailwayStyleTlsRelief(url: string): boolean {
-  return isRailwayRuntime() || isLikelyRailwayPostgresHost(url);
 }
 
 export function buildTypeOrmSslConfig(databaseUrl: string): TypeOrmSslConfig {
@@ -75,18 +40,14 @@ export function buildTypeOrmSslConfig(databaseUrl: string): TypeOrmSslConfig {
 
   const rejectRaw = process.env.DATABASE_SSL_REJECT_UNAUTHORIZED?.trim();
   if (rejectRaw === 'false') {
-    return { rejectUnauthorized: false };
+    return { rejectUnauthorized: isProd };
   }
   if (rejectRaw === 'true') {
     return { rejectUnauthorized: true };
   }
 
   if (isProd) {
-    if (needsRailwayStyleTlsRelief(databaseUrl)) {
-      return { rejectUnauthorized: false };
-    }
-    // TEMPORAL: mismo tratamiento que Railway — sin CA, Node rechaza la cadena del proxy.
-    return { rejectUnauthorized: false };
+    return { rejectUnauthorized: true };
   }
 
   return { rejectUnauthorized: false };

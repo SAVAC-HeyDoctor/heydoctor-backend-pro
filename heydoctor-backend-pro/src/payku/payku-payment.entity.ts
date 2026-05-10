@@ -101,6 +101,15 @@ export class PaykuPayment {
   @Column({ name: 'raw_response', type: 'jsonb', nullable: true })
   rawResponse: Record<string, unknown> | null;
 
+  @Column({ name: 'fraud_flag', type: 'boolean', default: false })
+  fraudFlag: boolean;
+
+  @Column({ name: 'risk_score', type: 'int', default: 0 })
+  riskScore: number;
+
+  @Column({ name: 'fraud_reason', type: 'text', nullable: true })
+  fraudReason: string | null;
+
   @VersionColumn()
   version: number;
 

@@ -10,6 +10,10 @@ import { validateAndLogEnv } from './config/env-startup-check';
 import { EnvConfig, ENV_CONFIG_TOKEN } from './config/env.config';
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
 import { AppModule } from './app.module';
+import {
+  assertRedisConfiguredForMultiInstanceProduction,
+  productionReplicaCount,
+} from './config/redis-requirement';
 import type { Request, Response } from 'express';
 
 const bootstrapLogger = new Logger('Bootstrap');
@@ -29,28 +33,30 @@ function sanitizeDatabaseUrlForLog(raw?: string): string {
 }
 
 /**
- * Producción: `app.heydoctor.health` + previews Vercel (`credentials: true`, sin `*`).
- * Desarrollo: añade marketing, `CORS_ORIGIN` y localhost.
+ * Producción: dominios explícitos (`credentials: true`, sin wildcard).
+ * Desarrollo: añade `CORS_ORIGIN` y localhost.
  */
-const PRODUCTION_CORS_ORIGINS: (string | RegExp)[] = [
-  'https://app.heydoctor.health',
-  /^https:\/\/.*\.vercel\.app$/i,
+const PRODUCTION_CORS_ORIGINS: string[] = [
+  'https://heydoctor.cl',
+  'https://app.heydoctor.cl',
 ];
 
-function corsOriginList(): (string | RegExp)[] {
-  if (process.env.NODE_ENV === 'production') {
-    return PRODUCTION_CORS_ORIGINS;
-  }
-
-  const envOrigins = (process.env.CORS_ORIGIN ?? '')
+function configuredCorsOrigins(): string[] {
+  return (process.env.CORS_ORIGIN ?? '')
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean);
+}
+
+function corsOriginList(): string[] {
+  const envOrigins = configuredCorsOrigins();
+
+  if (process.env.NODE_ENV === 'production') {
+    return [...PRODUCTION_CORS_ORIGINS, ...envOrigins];
+  }
 
   return [
     ...PRODUCTION_CORS_ORIGINS,
-    'https://heydoctor.health',
-    'https://www.heydoctor.health',
     ...envOrigins,
     'http://localhost:3000',
     'http://127.0.0.1:3000',
@@ -79,9 +85,14 @@ async function bootstrap() {
     NODE_ENV: process.env.NODE_ENV,
   });
 
-  if (process.env.NODE_ENV === 'production' && !process.env.REDIS_URL?.trim()) {
+  assertRedisConfiguredForMultiInstanceProduction();
+  if (
+    process.env.NODE_ENV === 'production' &&
+    productionReplicaCount() === 1 &&
+    !process.env.REDIS_URL?.trim()
+  ) {
     bootstrapLogger.warn(
-      'REDIS_URL is not set: throttling uses in-memory storage per instance (not shared across replicas). Incident correlation and Ops HTTP metrics aggregation are also per-instance. Add Redis for distributed rate limits, deduplicated alerts, and a unified /admin/ops traffic view in multi-instance production.',
+      'REDIS_URL is not set: throttling uses in-memory storage. Add Redis before scaling beyond one production instance.',
     );
   }
 
@@ -127,11 +138,7 @@ async function bootstrap() {
     );
   }
 
-  bootstrapLogger.log(
-    `CORS origins: ${corsOriginList()
-      .map((o) => (o instanceof RegExp ? o.source : o))
-      .join(', ')}`,
-  );
+  bootstrapLogger.log(`CORS origins: ${corsOriginList().join(', ')}`);
 
   app.enableCors({
     origin: corsOriginList(),

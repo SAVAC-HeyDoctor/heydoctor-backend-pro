@@ -4,12 +4,13 @@ import {
   forwardRef,
   Inject,
   Injectable,
+  InternalServerErrorException,
   NotFoundException,
   type LoggerService,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { QueryFailedError, Repository } from 'typeorm';
+import { EntityManager, QueryFailedError, Repository } from 'typeorm';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import { AiService } from '../ai/ai.service';
 import { AuditService } from '../audit/audit.service';
@@ -55,6 +56,31 @@ function normalizeSignature(signature: string): string {
     throw new BadRequestException('signature is empty');
   }
   return base64;
+}
+
+export async function lockSignedConsultationAfterPaymentWithManager(
+  manager: EntityManager,
+  consultationId: string,
+): Promise<Consultation | null> {
+  const repo = manager.getRepository(Consultation);
+  const consultation = await repo.findOne({
+    where: { id: consultationId },
+    lock: { mode: 'pessimistic_write' },
+  });
+
+  if (!consultation) {
+    return null;
+  }
+
+  if (
+    (consultation.status as string) === 'paid' ||
+    consultation.status !== ConsultationStatus.SIGNED
+  ) {
+    return null;
+  }
+
+  consultation.status = ConsultationStatus.LOCKED;
+  return repo.save(consultation);
 }
 
 @Injectable()
@@ -234,23 +260,35 @@ export class ConsultationsService {
     const { clinicId } =
       await this.authorizationService.getUserWithClinic(authUser);
 
-    /** Admin: todas las consultas de la clínica. Médico con perfil: solo las suyas. */
+    /** Admin: todas las consultas de la clínica. Médico: solo las suyas. */
     let restrictToDoctorId: string | undefined;
     if (authUser.role !== UserRole.ADMIN) {
+      restrictToDoctorId = authUser.sub;
       try {
         const profile = await this.doctorProfilesService.findByUserId(
           authUser.sub,
         );
-        if (profile) {
-          restrictToDoctorId = authUser.sub;
+        if (!profile) {
+          this.logger.warn('findAll: doctor profile not found; refusing list', {
+            userId: authUser.sub,
+            clinicId,
+          });
+          throw new ForbiddenException('Doctor profile required');
         }
       } catch (err) {
+        if (err instanceof ForbiddenException) {
+          throw err;
+        }
         this.logger.warn(
-          'findAll: could not resolve doctor profile; listing without doctorId filter',
+          'findAll: could not resolve doctor profile; refusing list',
           {
             userId: authUser.sub,
+            clinicId,
             detail: err instanceof Error ? err.message : String(err),
           },
+        );
+        throw new InternalServerErrorException(
+          'Could not resolve doctor access scope',
         );
       }
     }

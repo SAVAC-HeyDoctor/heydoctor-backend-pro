@@ -2,6 +2,7 @@ import { Logger, Module } from '@nestjs/common';
 import { CacheModule as NestCacheModule } from '@nestjs/cache-manager';
 import KeyvRedis from '@keyv/redis';
 import { Keyv } from 'keyv';
+import { assertRedisConfiguredForMultiInstanceProduction } from '../config/redis-requirement';
 
 const logger = new Logger('CacheModule');
 
@@ -10,6 +11,7 @@ const logger = new Logger('CacheModule');
     NestCacheModule.registerAsync({
       isGlobal: true,
       useFactory: async () => {
+        assertRedisConfiguredForMultiInstanceProduction();
         const redisRaw = process.env.REDIS_URL ?? null;
         const redisUrl =
           typeof redisRaw === 'string' && redisRaw.trim().length > 0

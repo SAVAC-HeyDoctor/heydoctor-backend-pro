@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Inject,
   Injectable,
@@ -108,68 +109,39 @@ export class AppointmentsService {
       };
     }
 
-    const row = await this.appointmentsRepository.findOne({
-      where: { confirmationToken: rawToken },
-    });
+    const rows: Array<{ id: string; clinic_id: string }> =
+      await this.appointmentsRepository.query(
+        `
+        UPDATE appointments
+        SET
+          status = $2,
+          confirmation_token = NULL,
+          confirmation_token_expires_at = NULL,
+          updated_at = now()
+        WHERE confirmation_token = $1
+          AND status = $3
+          AND (
+            confirmation_token_expires_at IS NULL
+            OR confirmation_token_expires_at >= now()
+          )
+        RETURNING id, clinic_id
+      `,
+        [rawToken, AppointmentStatus.CONFIRMED, AppointmentStatus.PENDING],
+      );
 
+    const row = rows[0];
     if (!row) {
       this.logger.warn('Invalid appointment confirmation attempt', {
-        reason: 'token_not_found',
+        reason: 'token_conflict',
       });
-      return {
-        success: false,
-        message: 'El enlace no es válido o ha expirado',
-      };
+      throw new ConflictException(
+        'Appointment token is invalid, expired, or already used',
+      );
     }
-
-    const now = new Date();
-    if (
-      row.confirmationTokenExpiresAt &&
-      row.confirmationTokenExpiresAt.getTime() < now.getTime()
-    ) {
-      this.logger.warn('Invalid appointment confirmation attempt', {
-        reason: 'token_expired',
-        appointmentId: row.id,
-        clinicId: row.clinicId,
-      });
-      return {
-        success: false,
-        message: 'El enlace no es válido o ha expirado',
-      };
-    }
-
-    if (row.status === AppointmentStatus.CANCELLED) {
-      this.logger.warn('Invalid appointment confirmation attempt', {
-        reason: 'already_cancelled',
-        appointmentId: row.id,
-        clinicId: row.clinicId,
-      });
-      return {
-        success: false,
-        message: 'El enlace no es válido o ha expirado',
-      };
-    }
-
-    if (row.status === AppointmentStatus.CONFIRMED) {
-      this.logger.log('Appointment confirmed', {
-        appointmentId: row.id,
-        clinicId: row.clinicId,
-      });
-      return {
-        success: true,
-        status: 'confirmed',
-        message: 'Su cita ya estaba confirmada',
-      };
-    }
-
-    row.status = AppointmentStatus.CONFIRMED;
-    row.confirmationToken = null;
-    row.confirmationTokenExpiresAt = null;
-    await this.appointmentsRepository.save(row);
 
     this.logger.log('Appointment confirmed', {
       appointmentId: row.id,
-      clinicId: row.clinicId,
+      clinicId: row.clinic_id,
     });
 
     return {
@@ -192,56 +164,39 @@ export class AppointmentsService {
       };
     }
 
-    const row = await this.appointmentsRepository.findOne({
-      where: { confirmationToken: rawToken },
-    });
+    const rows: Array<{ id: string; clinic_id: string }> =
+      await this.appointmentsRepository.query(
+        `
+        UPDATE appointments
+        SET
+          status = $2,
+          confirmation_token = NULL,
+          confirmation_token_expires_at = NULL,
+          updated_at = now()
+        WHERE confirmation_token = $1
+          AND status = $3
+          AND (
+            confirmation_token_expires_at IS NULL
+            OR confirmation_token_expires_at >= now()
+          )
+        RETURNING id, clinic_id
+      `,
+        [rawToken, AppointmentStatus.CANCELLED, AppointmentStatus.PENDING],
+      );
 
+    const row = rows[0];
     if (!row) {
       this.logger.warn('Invalid appointment confirmation attempt', {
-        reason: 'token_not_found_cancel',
+        reason: 'token_conflict_cancel',
       });
-      return {
-        success: false,
-        message: 'El enlace no es válido o ha expirado',
-      };
+      throw new ConflictException(
+        'Appointment token is invalid, expired, or already used',
+      );
     }
-
-    const now = new Date();
-    if (
-      row.confirmationTokenExpiresAt &&
-      row.confirmationTokenExpiresAt.getTime() < now.getTime()
-    ) {
-      this.logger.warn('Invalid appointment confirmation attempt', {
-        reason: 'token_expired_cancel',
-        appointmentId: row.id,
-        clinicId: row.clinicId,
-      });
-      return {
-        success: false,
-        message: 'El enlace no es válido o ha expirado',
-      };
-    }
-
-    if (row.status === AppointmentStatus.CANCELLED) {
-      this.logger.log('Appointment cancelled', {
-        appointmentId: row.id,
-        clinicId: row.clinicId,
-      });
-      return {
-        success: true,
-        status: 'cancelled',
-        message: 'Su cita ya estaba cancelada',
-      };
-    }
-
-    row.status = AppointmentStatus.CANCELLED;
-    row.confirmationToken = null;
-    row.confirmationTokenExpiresAt = null;
-    await this.appointmentsRepository.save(row);
 
     this.logger.log('Appointment cancelled', {
       appointmentId: row.id,
-      clinicId: row.clinicId,
+      clinicId: row.clinic_id,
     });
 
     return {

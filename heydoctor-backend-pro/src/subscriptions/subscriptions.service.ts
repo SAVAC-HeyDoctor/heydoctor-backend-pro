@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import { AuditService } from '../audit/audit.service';
-import { QueryFailedError, Repository } from 'typeorm';
+import { EntityManager, QueryFailedError, Repository } from 'typeorm';
 import {
   SubscriptionChangeSource,
   SubscriptionChangeReasonCode,
@@ -18,6 +18,7 @@ import {
 } from './subscription-event.entity';
 import { SubscriptionEventsService } from './subscription-events.service';
 import { assignClinic } from '../common/entity-clinic.util';
+import { User } from '../users/user.entity';
 import { UsersService } from '../users/users.service';
 import { normalizeReasonCode } from './reason-normalizer';
 
@@ -155,8 +156,72 @@ export class SubscriptionsService {
     }
   }
 
+  async getOrCreateForUserWithManager(
+    manager: EntityManager,
+    userId: string,
+  ): Promise<Subscription> {
+    const repo = manager.getRepository(Subscription);
+    const existing = await repo.findOne({
+      where: { userId },
+      lock: { mode: 'pessimistic_write' },
+    });
+    if (existing) return existing;
+
+    const user = await manager.getRepository(User).findOne({
+      where: { id: userId },
+    });
+    if (!user?.clinicId) {
+      throw new BadRequestException(
+        'User has no clinic assigned; cannot create subscription',
+      );
+    }
+
+    const created = repo.create({
+      userId,
+      plan: SubscriptionPlan.FREE,
+      status: SubscriptionStatus.ACTIVE,
+    });
+    assignClinic(created, user.clinicId);
+
+    try {
+      const saved = await repo.save(created);
+      await this.subscriptionEventsService.appendWithManager(manager, {
+        userId,
+        clinicId: user.clinicId,
+        eventType: SubscriptionEventType.SUBSCRIPTION_CREATED,
+        newPlan: SubscriptionPlan.FREE,
+        newStatus: SubscriptionStatus.ACTIVE,
+        source: SubscriptionEventSource.SYSTEM,
+        metadata: { reason: 'first_subscription_row' },
+      });
+      return saved;
+    } catch (e) {
+      if (
+        e instanceof QueryFailedError &&
+        (e as { driverError?: { code?: string } }).driverError?.code === '23505'
+      ) {
+        const raced = await repo.findOne({
+          where: { userId },
+          lock: { mode: 'pessimistic_write' },
+        });
+        if (raced) return raced;
+      }
+      throw e;
+    }
+  }
+
   async findExistingByUserId(userId: string): Promise<Subscription | null> {
     return this.subscriptionsRepository.findOne({ where: { userId } });
+  }
+
+  async findExistingByUserIdWithManager(
+    manager: EntityManager,
+    userId: string,
+  ): Promise<Subscription | null> {
+    return manager.getRepository(Subscription).findOne({
+      where: { userId },
+      lock: { mode: 'pessimistic_write' },
+    });
   }
 
   async hasRequiredPlan(
@@ -270,6 +335,75 @@ export class SubscriptionsService {
           err instanceof Error ? err : new Error(String(err)),
         );
       }
+    }
+
+    return saved;
+  }
+
+  async updatePlanWithManager(
+    manager: EntityManager,
+    userId: string,
+    plan: SubscriptionPlan,
+    authUser: AuthenticatedUser,
+    source: SubscriptionChangeSource = SubscriptionChangeSource.ADMIN_PANEL,
+    reason?: string,
+    reasonCode?: SubscriptionChangeReasonCode,
+    reasonText?: string,
+  ): Promise<Subscription> {
+    const repo = manager.getRepository(Subscription);
+    const existing = await this.getOrCreateForUserWithManager(manager, userId);
+    const previousPlan = existing.plan;
+
+    if (previousPlan === plan) {
+      return existing;
+    }
+
+    existing.plan = plan;
+    applySubscriptionBillingCycle(existing, plan, this.configService);
+
+    const saved = await repo.save(existing);
+    const auditReason = sanitizeReason(reason);
+    const auditReasonText = sanitizeReason(reasonText);
+    const effectiveReasonCode =
+      reasonCode ?? normalizeReasonCode(auditReasonText);
+
+    if (source === SubscriptionChangeSource.ADMIN_PANEL) {
+      await this.subscriptionEventsService.appendWithManager(manager, {
+        userId,
+        clinicId: saved.clinicId,
+        eventType: SubscriptionEventType.ADMIN_UPDATED,
+        previousPlan,
+        newPlan: plan,
+        previousStatus: existing.status,
+        newStatus: saved.status,
+        source: SubscriptionEventSource.ADMIN,
+        metadata: {
+          changedBy: authUser.sub,
+          ...(auditReason ? { reason: auditReason } : {}),
+          ...(effectiveReasonCode ? { reasonCode: effectiveReasonCode } : {}),
+          ...(auditReasonText ? { reasonText: auditReasonText } : {}),
+        },
+      });
+    }
+
+    if (
+      previousPlan !== plan &&
+      source !== SubscriptionChangeSource.ADMIN_PANEL
+    ) {
+      const upgraded = PLAN_RANK[plan] > PLAN_RANK[previousPlan];
+      await this.subscriptionEventsService.appendWithManager(manager, {
+        userId,
+        clinicId: saved.clinicId,
+        eventType: upgraded
+          ? SubscriptionEventType.PLAN_UPGRADED
+          : SubscriptionEventType.PLAN_DOWNGRADED,
+        previousPlan,
+        newPlan: plan,
+        previousStatus: existing.status,
+        newStatus: saved.status,
+        source: subscriptionEventSourceFromChangeSource(source),
+        metadata: auditReason ? { reason: auditReason } : {},
+      });
     }
 
     return saved;

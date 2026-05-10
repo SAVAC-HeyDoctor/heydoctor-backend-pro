@@ -1,4 +1,8 @@
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -100,6 +104,7 @@ describe('Multi-tenant IDOR guards (unit)', () => {
       getUserWithClinic: jest.Mock;
       assertUserInClinic: jest.Mock;
     };
+    let doctorProfiles: { findByUserId: jest.Mock };
 
     beforeEach(async () => {
       consultationsRepo = { findOne: jest.fn() };
@@ -108,6 +113,13 @@ describe('Multi-tenant IDOR guards (unit)', () => {
           .fn()
           .mockResolvedValue({ clinicId: 'clinic-a', user: {} }),
         assertUserInClinic: jest.fn().mockResolvedValue(undefined),
+      };
+      doctorProfiles = {
+        findByUserId: jest.fn().mockResolvedValue({
+          id: 'profile-a',
+          userId: 'user-a',
+          clinicId: 'clinic-a',
+        }),
       };
       const module: TestingModule = await createTestingModuleWithMocks({
         subjects: [ConsultationsService],
@@ -119,14 +131,14 @@ describe('Multi-tenant IDOR guards (unit)', () => {
           },
           { provide: AuthorizationService, useValue: authz },
           ConsentService,
-          DoctorProfilesService,
+          { provide: DoctorProfilesService, useValue: doctorProfiles },
           AuditService,
           AiService,
           ConfigService,
           ProductEventsService,
           {
             provide: APP_LOGGER,
-            useValue: { log: jest.fn(), error: jest.fn() },
+            useValue: { log: jest.fn(), warn: jest.fn(), error: jest.fn() },
           },
         ],
       });
@@ -152,6 +164,41 @@ describe('Multi-tenant IDOR guards (unit)', () => {
       await expect(service.findOne('c-other', userA)).rejects.toBeInstanceOf(
         NotFoundException,
       );
+    });
+
+    it('lists doctor consultations with clinic and doctor filters', async () => {
+      const findAllForClinic = jest
+        .spyOn(service, 'findAllForClinic')
+        .mockResolvedValue({ data: [], total: 0 });
+
+      await service.findAll(userA);
+
+      expect(doctorProfiles.findByUserId).toHaveBeenCalledWith('user-a');
+      expect(findAllForClinic).toHaveBeenCalledWith(
+        'clinic-a',
+        expect.any(Object),
+        { restrictToDoctorId: 'user-a' },
+      );
+    });
+
+    it('fails closed when doctor profile lookup fails', async () => {
+      doctorProfiles.findByUserId.mockRejectedValue(new Error('db timeout'));
+      const findAllForClinic = jest.spyOn(service, 'findAllForClinic');
+
+      await expect(service.findAll(userA)).rejects.toBeInstanceOf(
+        InternalServerErrorException,
+      );
+      expect(findAllForClinic).not.toHaveBeenCalled();
+    });
+
+    it('fails closed when doctor profile is missing', async () => {
+      doctorProfiles.findByUserId.mockResolvedValue(null);
+      const findAllForClinic = jest.spyOn(service, 'findAllForClinic');
+
+      await expect(service.findAll(userA)).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
+      expect(findAllForClinic).not.toHaveBeenCalled();
     });
   });
 
