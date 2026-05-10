@@ -4,13 +4,20 @@
   "version": "2.0.0",
   "description": "HeyDoctor Backend (NestJS)",
   "scripts": {
+    "dev": "cd heydoctor-backend-pro && npm run start:dev",
+    "build": "cd heydoctor-backend-pro && npm install && npm run build",
+    "start": "cd heydoctor-backend-pro && npm run start",
+    "start:prod": "cd heydoctor-backend-pro && npm run start:prod",
+
+    "migration:run": "cd heydoctor-backend-pro && npm run typeorm migration:run",
+    "migration:revert": "cd heydoctor-backend-pro && npm run typeorm migration:revert",
+
     "sync:frontend": "bash scripts/sync-frontend.sh",
     "sync:frontend:safe": "bash scripts/sync-frontend-safe.sh",
     "sync:frontend:check": "cd frontend && npm run lint && npm run build",
+
     "release:tag": "bash scripts/release-tag.sh",
-    "build": "cd heydoctor-backend-pro && npm ci && npm run build",
-    "start": "cd heydoctor-backend-pro && npm run start:prod",
-    "start:prod": "cd heydoctor-backend-pro && npm run start:prod",
+
     "strapi:start": "strapi start",
     "strapi:build": "strapi build",
     "strapi:develop": "strapi develop"
@@ -39,23 +46,9 @@
     "pg": "8.11.5",
     "qrcode": "^1.5.4",
     "rate-limiter-flexible": "^5.0.0",
-    "react": "^18.0.0",
-    "react-dom": "^18.0.0",
-    "react-router-dom": "5.3.4",
     "socket.io": "^4.7.5",
-    "strapi-content-type-explorer": "^0.2.2",
-    "strapi-plugin-graphs-builder": "^1.0.0",
-    "strapi-plugin-import-export-entries": "^1.23.1",
-    "strapi-plugin-transformer": "^3.1.2",
-    "styled-components": "5.3.3",
     "uuid": "^9.0.1",
     "web-push": "^3.6.7"
-  },
-  "author": {
-    "name": "A Strapi developer"
-  },
-  "strapi": {
-    "uuid": "a67ebc51-045c-4ac9-aad3-a5b33bb71173"
   },
   "engines": {
     "node": ">=18.0.0",
