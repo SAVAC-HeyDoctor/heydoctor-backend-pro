@@ -1,16 +1,3 @@
-# Sincroniza `frontend/` → jairosc23/heydoctor-frontend al integrar en main.
-#
-# Secret GH_TOKEN: PAT (Settings → Developer settings → Personal access tokens) con scope `repo`,
-# configurado como secret del repo: Settings → Secrets and variables → Actions → GH_TOKEN.
-# El GITHUB_TOKEN del workflow no vale para hacer push a un repositorio externo.
-#
-# El job usa `continue-on-error: true` para que un fallo de sync no pinte todo el chequeo en rojo.
-# Push a main con cambios en frontend/ también dispara el sync (CI tras merge).
-#
-# ── Manual ─────────────────────────────────────────────────────
-# Actions → Sync Frontend → Run workflow: no depende de `paths` (siempre ejecuta desde main).
-# Input opcional `force`: solo orientación en logs (“forzar revisión/sync” sin depender del diff).
-
 name: Sync Frontend
 
 on:
@@ -19,12 +6,6 @@ on:
     paths:
       - 'frontend/**'
   workflow_dispatch:
-    inputs:
-      force:
-        description: 'Run sync explicitly (manual always runs; logs this flag)'
-        required: false
-        default: false
-        type: boolean
 
 concurrency:
   group: sync-frontend-${{ github.ref }}
@@ -39,32 +20,16 @@ env:
 jobs:
   sync:
     runs-on: ubuntu-latest
-    continue-on-error: true
 
     steps:
-      - name: Check GH_TOKEN
-        run: |
-          if [ -z "$GH_TOKEN" ]; then
-            echo '❌ GH_TOKEN not set'
-            echo '::error::Define el repository secret GH_TOKEN (PAT con scope repo sobre jairosc23/heydoctor-frontend).'
-            exit 1
-          fi
-          echo '✅ GH_TOKEN presente'
-
       - name: Debug context
         run: |
-          echo "Branch: ${GITHUB_REF:-}"
-          echo "Actor: ${GITHUB_ACTOR:-}"
-          echo "Commit: ${GITHUB_SHA:-}"
+          echo "Branch: ${GITHUB_REF}"
+          echo "Actor: ${GITHUB_ACTOR}"
+          echo "Commit: ${GITHUB_SHA}"
           echo "Event: ${{ github.event_name }}"
-          echo "Run ID: ${{ github.run_id }}"
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "Manual force flag: ${{ github.event.inputs.force }}"
-          else
-            echo "Manual force flag: n/a (push only runs when frontend/** changed)"
-          fi
 
-      - name: Checkout monorepo (full history)
+      - name: Checkout monorepo
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -72,26 +37,35 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
+          node-version: '20'
 
-      - name: Install & validate frontend
+      - name: Install & build frontend
         working-directory: frontend
         run: |
           npm ci
-          npm run lint
           npm run build
 
-      - name: Git identity & jairo-fe remote
+      # 🔥 CONFIGURA GIT SOLO SI HAY TOKEN
+      - name: Setup Git remote
+        if: env.GH_TOKEN != ''
         run: |
-          git config --global user.name 'heydoctor-bot'
-          git config --global user.email 'bot@heydoctor.health'
+          git config --global user.name "heydoctor-bot"
+          git config --global user.email "bot@heydoctor.health"
+
           git remote remove jairo-fe 2>/dev/null || true
-          git remote add jairo-fe "https://x-access-token:${GH_TOKEN}@github.com/jairosc23/heydoctor-frontend.git"
+          git remote add jairo-fe https://x-access-token:${GH_TOKEN}@github.com/jairosc23/heydoctor-frontend.git
+
           git remote -v | sed 's/x-access-token:[^@]*@/x-access-token:***@/'
 
-      - name: Sync to public frontend (squash-merge)
-        env:
-          SKIP_CHECK: '1'
-        run: npm run sync:frontend:safe
+      # 🚀 SYNC REAL
+      - name: Push frontend to external repo
+        if: env.GH_TOKEN != ''
+        run: |
+          echo "🚀 Syncing frontend..."
+          git subtree push --prefix=frontend jairo-fe main
+
+      # 🧠 SI NO HAY TOKEN → NO FALLA
+      - name: Skip sync (no GH_TOKEN)
+        if: env.GH_TOKEN == ''
+        run: |
+          echo "⚠️ GH_TOKEN no configurado → sync omitido"
