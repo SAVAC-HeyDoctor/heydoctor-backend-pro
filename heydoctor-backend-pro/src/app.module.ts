@@ -51,7 +51,10 @@ import { WebrtcModule } from './webrtc/webrtc.module';
 import { HttpRequestLoggingInterceptor } from './common/interceptors/http-request-logging.interceptor';
 import { CsrfCookieInterceptor } from './common/csrf/csrf-cookie.interceptor';
 import { CsrfGuard } from './common/csrf/csrf.guard';
-import { buildTypeOrmSslConfig } from './config/typeorm-ssl';
+import {
+  buildTypeOrmExtraConfig,
+  buildTypeOrmSslConfig,
+} from './config/typeorm-ssl';
 import { assertRedisConfiguredForMultiInstanceProduction } from './config/redis-requirement';
 
 const dbUrl = process.env.DATABASE_PUBLIC_URL || process.env.DATABASE_URL;
@@ -77,6 +80,7 @@ const ormLogging: boolean | ('query' | 'error')[] =
       type: 'postgres',
       url: dbUrl,
       ssl: buildTypeOrmSslConfig(dbUrl ?? ''),
+      extra: buildTypeOrmExtraConfig(),
       autoLoadEntities: true,
       synchronize: false,
       logging: ormLogging,

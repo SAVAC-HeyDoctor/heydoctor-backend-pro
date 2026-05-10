@@ -16,6 +16,14 @@ export type TypeOrmSslConfig =
   | boolean
   | { rejectUnauthorized: boolean; ca?: string };
 
+export type TypeOrmExtraConfig =
+  | {
+      ssl: {
+        rejectUnauthorized: boolean;
+      };
+    }
+  | undefined;
+
 function isLocalDatabaseUrl(url: string): boolean {
   return (
     !url ||
@@ -28,6 +36,12 @@ function isLocalDatabaseUrl(url: string): boolean {
 export function buildTypeOrmSslConfig(databaseUrl: string): TypeOrmSslConfig {
   const nodeEnv = process.env.NODE_ENV ?? 'development';
   const isProd = nodeEnv === 'production';
+
+  if (isProd) {
+    return {
+      rejectUnauthorized: false,
+    };
+  }
 
   if (isLocalDatabaseUrl(databaseUrl)) {
     return false;
@@ -46,9 +60,15 @@ export function buildTypeOrmSslConfig(databaseUrl: string): TypeOrmSslConfig {
     return { rejectUnauthorized: true };
   }
 
-  if (isProd) {
-    return { rejectUnauthorized: true };
-  }
-
   return { rejectUnauthorized: false };
+}
+
+export function buildTypeOrmExtraConfig(): TypeOrmExtraConfig {
+  return process.env.NODE_ENV === 'production'
+    ? {
+        ssl: {
+          rejectUnauthorized: false,
+        },
+      }
+    : undefined;
 }
