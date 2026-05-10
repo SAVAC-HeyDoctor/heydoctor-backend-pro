@@ -58,9 +58,10 @@ export class EnvConfig {
     this.port = Number.parseInt(config.get<string>('PORT') ?? '3001', 10);
 
     const dbUrl =
-      config.get<string>('DATABASE_PUBLIC_URL') ??
       config.get<string>('DATABASE_URL') ??
-      '';
+      (this.nodeEnv === 'production'
+        ? ''
+        : 'postgres://postgres:postgres@localhost:5432/heydoctor');
     this.databaseUrl = dbUrl;
 
     this.jwtSecret = config.get<string>('JWT_SECRET') ?? '';

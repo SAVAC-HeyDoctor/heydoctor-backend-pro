@@ -68,9 +68,7 @@ async function bootstrap() {
 
   bootstrapLogger.log('bootstrap_context', {
     NODE_ENV: process.env.NODE_ENV ?? 'undefined',
-    DATABASE_URL_HINT: sanitizeDatabaseUrlForLog(
-      process.env.DATABASE_URL ?? process.env.DATABASE_PUBLIC_URL,
-    ),
+    DATABASE_URL_HINT: sanitizeDatabaseUrlForLog(process.env.DATABASE_URL),
     REDIS_URL_CONFIGURED: Boolean(process.env.REDIS_URL?.trim()),
     E2E_SEED_APPLIED: process.env.E2E_SEED_APPLIED ?? 'not reported',
   });

@@ -36,12 +36,12 @@ describe('production hardening config', () => {
     ).not.toThrow();
   });
 
-  it('does not disable Postgres TLS verification in production', () => {
+  it('allows Railway-style self-signed Postgres TLS in production', () => {
     process.env.NODE_ENV = 'production';
     process.env.DATABASE_SSL_REJECT_UNAUTHORIZED = 'false';
 
-    expect(buildTypeOrmSslConfig('postgres://db.example.com/app')).toEqual({
-      rejectUnauthorized: true,
+    expect(buildTypeOrmSslConfig()).toEqual({
+      rejectUnauthorized: false,
     });
   });
 });

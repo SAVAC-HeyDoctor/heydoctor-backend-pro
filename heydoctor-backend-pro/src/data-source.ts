@@ -1,25 +1,38 @@
 import 'reflect-metadata';
 import { config } from 'dotenv';
-import { join } from 'path';
 import { DataSource } from 'typeorm';
-import { buildTypeOrmSslConfig } from './config/typeorm-ssl';
 
 config({ path: ['.env.local', '.env'] });
 
-const url = process.env.DATABASE_PUBLIC_URL || process.env.DATABASE_URL;
+const DEFAULT_DEV_DATABASE_URL =
+  'postgres://postgres:postgres@localhost:5432/heydoctor';
 
-if (!url) {
-  throw new Error(
-    'DATABASE_URL or DATABASE_PUBLIC_URL is required (TypeORM CLI / migrations)',
-  );
+function resolveDatabaseUrl(): string {
+  console.log('DATABASE_URL:', process.env.DATABASE_URL);
+
+  const url = process.env.DATABASE_URL?.trim();
+  if (url) {
+    return url;
+  }
+
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('DATABASE_URL is required (TypeORM CLI / migrations)');
+  }
+
+  return DEFAULT_DEV_DATABASE_URL;
 }
 
 export default new DataSource({
   type: 'postgres',
-  url,
-  ssl: buildTypeOrmSslConfig(url),
-  entities: [join(__dirname, '**', '*.entity.{ts,js}')],
-  migrations: [join(__dirname, 'migrations', '*.{ts,js}')],
+  url: resolveDatabaseUrl(),
+  ssl:
+    process.env.NODE_ENV === 'production'
+      ? {
+          rejectUnauthorized: false,
+        }
+      : false,
   synchronize: false,
   logging: false,
+  entities: [__dirname + '/**/*.entity.{ts,js}'],
+  migrations: [__dirname + '/migrations/*.{ts,js}'],
 });

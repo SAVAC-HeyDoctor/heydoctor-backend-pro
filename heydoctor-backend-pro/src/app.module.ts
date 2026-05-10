@@ -57,7 +57,23 @@ import {
 } from './config/typeorm-ssl';
 import { assertRedisConfiguredForMultiInstanceProduction } from './config/redis-requirement';
 
-const dbUrl = process.env.DATABASE_PUBLIC_URL || process.env.DATABASE_URL;
+const DEFAULT_DEV_DATABASE_URL =
+  'postgres://postgres:postgres@localhost:5432/heydoctor';
+
+function resolveDatabaseUrl(): string {
+  console.log('DATABASE_URL:', process.env.DATABASE_URL);
+
+  const url = process.env.DATABASE_URL?.trim();
+  if (url) {
+    return url;
+  }
+
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('DATABASE_URL is required');
+  }
+
+  return DEFAULT_DEV_DATABASE_URL;
+}
 
 const ormLogging: boolean | ('query' | 'error')[] =
   process.env.TYPEORM_LOG_QUERIES === 'true'
@@ -78,8 +94,8 @@ const ormLogging: boolean | ('query' | 'error')[] =
     JwtUserCacheModule,
     TypeOrmModule.forRoot({
       type: 'postgres',
-      url: dbUrl,
-      ssl: buildTypeOrmSslConfig(dbUrl ?? ''),
+      url: resolveDatabaseUrl(),
+      ssl: buildTypeOrmSslConfig(),
       extra: buildTypeOrmExtraConfig(),
       autoLoadEntities: true,
       synchronize: false,
