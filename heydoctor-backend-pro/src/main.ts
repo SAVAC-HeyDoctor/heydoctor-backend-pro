@@ -1,6 +1,7 @@
 import { Logger, RequestMethod, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { IoAdapter } from '@nestjs/platform-socket.io';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import cookieParser from 'cookie-parser';
@@ -17,6 +18,13 @@ import {
 import type { Request, Response } from 'express';
 
 const bootstrapLogger = new Logger('Bootstrap');
+
+function isSwaggerEnabled(): boolean {
+  return (
+    process.env.NODE_ENV !== 'production' ||
+    process.env.ENABLE_SWAGGER === 'true'
+  );
+}
 
 function sanitizeDatabaseUrlForLog(raw?: string): string {
   const s = typeof raw === 'string' ? raw.trim() : '';
@@ -97,6 +105,27 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     rawBody: true,
   });
+
+  if (isSwaggerEnabled()) {
+    const swaggerConfig = new DocumentBuilder()
+      .setTitle('HeyDoctor API')
+      .setDescription('HeyDoctor backend API')
+      .setVersion('1.0')
+      .addBearerAuth()
+      .build();
+
+    const documentFactory = () =>
+      SwaggerModule.createDocument(app, swaggerConfig);
+
+    SwaggerModule.setup('docs', app, documentFactory, {
+      swaggerOptions: {
+        persistAuthorization: true,
+      },
+    });
+    bootstrapLogger.log('Swagger UI enabled at /docs');
+  } else {
+    bootstrapLogger.log('Swagger UI disabled in production');
+  }
 
   /** Railway/proxy: `X-Forwarded-Proto` → `req.secure`; cookies `Secure` no se descartan. */
   app.set('trust proxy', 1);
