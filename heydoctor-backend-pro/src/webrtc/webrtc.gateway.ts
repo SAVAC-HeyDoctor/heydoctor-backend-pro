@@ -15,6 +15,7 @@ import type { Server, Socket } from 'socket.io';
 import type { JwtPayload } from '../auth/types/jwt-payload.interface';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import { ACCESS_TOKEN_COOKIE } from '../auth/auth-cookies';
+import { corsOrigin } from '../config/origin-allowlist';
 import { ConsultationsService } from '../consultations/consultations.service';
 import { SubscriptionPlan } from '../subscriptions/subscription.entity';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
@@ -39,7 +40,7 @@ type IceCandidatePayload = SignalingPayload & {
 @WebSocketGateway({
   namespace: '/webrtc',
   cors: {
-    origin: true,
+    origin: corsOrigin,
     credentials: true,
   },
 })

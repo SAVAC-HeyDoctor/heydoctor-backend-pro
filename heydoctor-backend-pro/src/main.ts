@@ -15,6 +15,7 @@ import {
   assertRedisConfiguredForMultiInstanceProduction,
   productionReplicaCount,
 } from './config/redis-requirement';
+import { allowedOrigins, corsOrigin } from './config/origin-allowlist';
 import type { Request, Response } from 'express';
 
 const bootstrapLogger = new Logger('Bootstrap');
@@ -38,37 +39,6 @@ function sanitizeDatabaseUrlForLog(raw?: string): string {
   } catch {
     return '(unparseable)';
   }
-}
-
-/**
- * Producción: dominios explícitos (`credentials: true`, sin wildcard).
- * Desarrollo: añade `CORS_ORIGIN` y localhost.
- */
-const PRODUCTION_CORS_ORIGINS: string[] = [
-  'https://heydoctor.cl',
-  'https://app.heydoctor.cl',
-];
-
-function configuredCorsOrigins(): string[] {
-  return (process.env.CORS_ORIGIN ?? '')
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
-
-function corsOriginList(): string[] {
-  const envOrigins = configuredCorsOrigins();
-
-  if (process.env.NODE_ENV === 'production') {
-    return [...PRODUCTION_CORS_ORIGINS, ...envOrigins];
-  }
-
-  return [
-    ...PRODUCTION_CORS_ORIGINS,
-    ...envOrigins,
-    'http://localhost:3000',
-    'http://127.0.0.1:3000',
-  ];
 }
 
 async function bootstrap() {
@@ -165,10 +135,10 @@ async function bootstrap() {
     );
   }
 
-  bootstrapLogger.log(`CORS origins: ${corsOriginList().join(', ')}`);
+  bootstrapLogger.log(`CORS origins: ${allowedOrigins().join(', ')}`);
 
   app.enableCors({
-    origin: corsOriginList(),
+    origin: corsOrigin,
     credentials: true,
     methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
     allowedHeaders: [
