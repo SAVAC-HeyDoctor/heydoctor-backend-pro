@@ -94,20 +94,24 @@ export class AuthService {
    * (vía {@link UsersService.createUserForClinic}). Rol por defecto: admin.
    */
   async register(dto: RegisterDto) {
-    const clinic = await this.clinicService.findById(dto.clinicId);
+    const clinic = dto.clinicId
+  ? await this.clinicService.findById(dto.clinicId)
+  : null;
     if (!clinic) {
       throw new NotFoundException('Clinic not found');
     }
 
     const role = dto.role ?? UserRole.ADMIN;
-    const user = await this.usersService.createUserForClinic(dto.clinicId, {
+    const user = await this.usersService.createUserForClinic(
+  dto.clinicId ?? '',
+  {
       email: dto.email,
       password: dto.password,
       role,
     });
     void this.productEvents
       .track(user.id, GrowthFunnelEvents.SIGNUP_COMPLETED, {
-        clinicId: dto.clinicId,
+        clinicId: dto.clinicId ?? null,
       })
       .catch(() => undefined);
     return this.buildAuthResponse(user);
