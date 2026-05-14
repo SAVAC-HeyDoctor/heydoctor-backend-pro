@@ -91,14 +91,23 @@ export class SubscriptionEventsService {
           source,
           metadata
         )
-        SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb
+        SELECT
+          $1::uuid,
+          $2::uuid,
+          $3::varchar,
+          $4::subscriptions_plan_enum,
+          $5::subscriptions_plan_enum,
+          $6::subscriptions_status_enum,
+          $7::subscriptions_status_enum,
+          $8::varchar,
+          $9::jsonb
         WHERE NOT EXISTS (
           SELECT 1
           FROM subscription_events
-          WHERE clinic_id = $1
-            AND user_id = $2
-            AND event_type = $3
-            AND source = $8
+          WHERE clinic_id = $1::uuid
+            AND user_id = $2::uuid
+            AND event_type = $3::varchar
+            AND source = $8::varchar
             AND metadata @> $10::jsonb
         )
         ON CONFLICT DO NOTHING
@@ -137,10 +146,10 @@ export class SubscriptionEventsService {
         `
           SELECT *
           FROM subscription_events
-          WHERE clinic_id = $1
-            AND user_id = $2
-            AND event_type = $3
-            AND source = $4
+          WHERE clinic_id = $1::uuid
+            AND user_id = $2::uuid
+            AND event_type = $3::varchar
+            AND source = $4::varchar
             AND metadata @> $5::jsonb
           ORDER BY created_at DESC
           LIMIT 1

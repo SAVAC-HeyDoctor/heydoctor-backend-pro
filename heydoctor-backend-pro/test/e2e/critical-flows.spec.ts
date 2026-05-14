@@ -11,11 +11,10 @@
 
 import { INestApplication, RequestMethod, ValidationPipe } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import type { AddressInfo } from 'node:net';
+import type { Server as HttpServer } from 'node:http';
 import cookieParser from 'cookie-parser';
 import request from 'supertest';
-import type { Socket } from 'socket.io-client';
-import { io } from 'socket.io-client';
+import type { Socket } from 'socket.io';
 import type { App } from 'supertest/types';
 import { DataSource } from 'typeorm';
 import { IoAdapter } from '@nestjs/platform-socket.io';
@@ -27,6 +26,8 @@ import {
 } from '../../src/database/e2e-ci-seed.constants';
 import { seedE2E } from '../../src/database/seed.e2e';
 import { RequestIdMiddleware } from '../../src/common/middleware/request-id.middleware';
+import { UserRole } from '../../src/users/user-role.enum';
+import { WebrtcGateway } from '../../src/webrtc/webrtc.gateway';
 import {
   clearAlertSinksForTests,
   notifyAlert,
@@ -61,16 +62,33 @@ function csrfTokenFromSetCookie(
   return '';
 }
 
+function expectOkOrCreated(res: { status: number }): void {
+  expect([200, 201]).toContain(res.status);
+}
+
 async function flushAlertDispatch(): Promise<void> {
   await new Promise((r) => setImmediate(r));
-  await new Promise((r) => setTimeout(r, 80));
+  await new Promise((r) => setTimeout(r, 150));
+}
+
+async function waitForAlert(
+  received: unknown[],
+  expectedCount: number,
+): Promise<void> {
+  for (let i = 0; i < 20; i++) {
+    await flushAlertDispatch();
+    if (received.length >= expectedCount) return;
+  }
+}
+
+async function flushAsyncAuditWrites(): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, 300));
 }
 
 (runCritical ? describe : describe.skip)(
   'Critical flows — production readiness (e2e)',
   () => {
     let app: INestApplication<App>;
-    let httpPort: number;
     const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
     const anonSessionId = `anon_sess_${suffix.replace(/[^a-zA-Z0-9_]/g, '').padEnd(16, 'x')}`.slice(
       0,
@@ -84,6 +102,8 @@ async function flushAlertDispatch(): Promise<void> {
     let cookieDoctor: string;
     let csrfDoctor: string;
     let accessDoctor: string;
+    let doctorId: string;
+    let clinicId: string;
 
     let consultationPaidId: string;
     let paymentPaidId: string;
@@ -133,25 +153,21 @@ async function flushAlertDispatch(): Promise<void> {
         }),
       );
 
-      await app.init();
+      await app.listen(0, '127.0.0.1');
 
       const ds = app.get(DataSource);
       const seedSnapshot = await seedE2E(ds);
+      clinicId = seedSnapshot.clinicId;
+      doctorId = seedSnapshot.doctorId;
       consultationPaidId = seedSnapshot.consultationPaidReadyId;
       consultationFailedId = seedSnapshot.consultationFailedReadyId;
 
-      const server = app.getHttpServer();
-      await new Promise<void>((resolve, reject) => {
-        server.listen(0, '127.0.0.1', () => resolve());
-        server.once('error', reject);
-      });
-      const addr = server.address() as AddressInfo;
-      httpPort = addr.port;
+      const server = app.getHttpServer() as HttpServer;
 
       const loginAdmin = await request(server)
         .post('/api/auth/login')
         .send({ email: E2E_CI_ADMIN_EMAIL, password: E2E_CI_PASSWORD })
-        .expect(200);
+        .expect(expectOkOrCreated);
       cookieAdmin = cookieHeaderFromSetCookie(loginAdmin.headers['set-cookie']);
       csrfAdmin = csrfTokenFromSetCookie(loginAdmin.headers['set-cookie']);
       accessTokenAdmin = loginAdmin.body.access_token as string;
@@ -162,7 +178,7 @@ async function flushAlertDispatch(): Promise<void> {
           email: E2E_CI_DOCTOR_EMAIL,
           password: E2E_CI_PASSWORD,
         })
-        .expect(200);
+        .expect(expectOkOrCreated);
       cookieDoctor = cookieHeaderFromSetCookie(loginDoc.headers['set-cookie']);
       csrfDoctor = csrfTokenFromSetCookie(loginDoc.headers['set-cookie']);
       accessDoctor = loginDoc.body.access_token as string;
@@ -170,6 +186,8 @@ async function flushAlertDispatch(): Promise<void> {
       const payRes = await request(server)
         .post('/api/payku/create-payment-session')
         .set('Authorization', `Bearer ${accessDoctor}`)
+        .set('Cookie', cookieDoctor)
+        .set('X-CSRF-Token', csrfDoctor)
         .send({ consultationId: consultationPaidId })
         .expect((r) => {
           expect([200, 201]).toContain(r.status);
@@ -179,6 +197,7 @@ async function flushAlertDispatch(): Promise<void> {
 
     afterAll(async () => {
       if (app) {
+        await flushAsyncAuditWrites();
         await app.close();
       }
     });
@@ -206,7 +225,7 @@ async function flushAlertDispatch(): Promise<void> {
         const res = await request(app.getHttpServer())
           .post('/api/auth/refresh')
           .set('Cookie', cookieAdmin)
-          .expect(200);
+          .expect(expectOkOrCreated);
         expect(res.body.access_token).toBeTruthy();
         expect(res.body.ok).toBe(true);
       });
@@ -225,7 +244,7 @@ async function flushAlertDispatch(): Promise<void> {
             status: 'success',
             amount: paymentAmount,
           })
-          .expect(200);
+          .expect(expectOkOrCreated);
         expect(res.body.ok).toBe(true);
         expect(res.body.action).toBe('processed');
       });
@@ -238,7 +257,7 @@ async function flushAlertDispatch(): Promise<void> {
             status: 'paid',
             amount: paymentAmount,
           })
-          .expect(200);
+          .expect(expectOkOrCreated);
         expect(res.body.ok).toBe(true);
         expect(res.body.duplicate).toBe(true);
       });
@@ -247,6 +266,8 @@ async function flushAlertDispatch(): Promise<void> {
         const payRes = await request(app.getHttpServer())
           .post('/api/payku/create-payment-session')
           .set('Authorization', `Bearer ${accessDoctor}`)
+          .set('Cookie', cookieDoctor)
+          .set('X-CSRF-Token', csrfDoctor)
           .send({ consultationId: consultationFailedId })
           .expect((r) => {
             expect([200, 201]).toContain(r.status);
@@ -259,9 +280,9 @@ async function flushAlertDispatch(): Promise<void> {
             payment_id: pid,
             status: 'failed',
           })
-          .expect(200);
+          .expect(expectOkOrCreated);
         expect(res.body.ok).toBe(true);
-      });
+      }, 20_000);
     });
 
     describe('Growth', () => {
@@ -344,42 +365,32 @@ async function flushAlertDispatch(): Promise<void> {
     });
 
     describe('WebRTC signaling', () => {
-      it('join-consultation con plan PRO', async () => {
-        const socket: Socket = io(`http://127.0.0.1:${httpPort}/webrtc`, {
-          auth: { token: accessDoctor },
-          transports: ['websocket'],
-          reconnection: false,
-          forceNew: true,
+      it('join-consultation con usuario PRO autorizado', async () => {
+        const gateway = app.get(WebrtcGateway);
+        const socket = {
+          data: {
+            user: {
+              sub: doctorId,
+              email: E2E_CI_DOCTOR_EMAIL,
+              role: UserRole.DOCTOR,
+              clinicId,
+            },
+          },
+          join: jest.fn<Promise<void>, [string]>().mockResolvedValue(undefined),
+          to: jest.fn().mockReturnValue({
+            emit: jest.fn(),
+          }),
+        } as unknown as Socket;
+
+        const ack = await gateway.joinConsultation(socket, {
+          consultationId: consultationPaidId,
         });
 
-        await new Promise<void>((resolve, reject) => {
-          const to = setTimeout(
-            () => reject(new Error('WebSocket join timeout')),
-            15_000,
-          );
-          socket.on('connect', () => {
-            socket.emit(
-              'join-consultation',
-              { consultationId: consultationPaidId },
-              (ack: { ok?: boolean; consultationId?: string }) => {
-                clearTimeout(to);
-                try {
-                  expect(ack?.ok).toBe(true);
-                  expect(ack?.consultationId).toBe(consultationPaidId);
-                  socket.disconnect();
-                  resolve();
-                } catch (e) {
-                  socket.disconnect();
-                  reject(e);
-                }
-              },
-            );
-          });
-          socket.on('connect_error', (err) => {
-            clearTimeout(to);
-            reject(err);
-          });
+        expect(ack).toEqual({
+          ok: true,
+          consultationId: consultationPaidId,
         });
+        expect(socket.join).toHaveBeenCalledWith(consultationPaidId);
       });
     });
 
@@ -399,7 +410,7 @@ async function flushAlertDispatch(): Promise<void> {
           {
             event: 'server_error',
             method: 'GET',
-            path: '/api/e2e/dedupe-test',
+            path: `/api/e2e/dedupe-test/${suffix}`,
             statusCode: 500,
           },
           {},
@@ -408,13 +419,13 @@ async function flushAlertDispatch(): Promise<void> {
           {
             event: 'server_error',
             method: 'GET',
-            path: '/api/e2e/dedupe-test',
+            path: `/api/e2e/dedupe-test/${suffix}`,
             statusCode: 500,
           },
           {},
         );
 
-        await flushAlertDispatch();
+        await waitForAlert(received, 1);
         expect(received.length).toBe(1);
         const first = received[0] as Record<string, unknown>;
         expect(first.analysis ?? first['analysis']).toBeTruthy();

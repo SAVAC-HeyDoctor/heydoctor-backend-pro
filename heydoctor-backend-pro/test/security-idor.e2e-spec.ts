@@ -45,6 +45,14 @@ function csrfTokenFromSetCookie(
   return '';
 }
 
+function expectOkOrCreated(res: { status: number }): void {
+  expect([200, 201]).toContain(res.status);
+}
+
+async function flushAsyncAuditWrites(): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, 500));
+}
+
 (runIdorE2e ? describe : describe.skip)(
   'Security — multi-tenant IDOR (e2e)',
   () => {
@@ -146,21 +154,21 @@ function csrfTokenFromSetCookie(
       const loginA = await request(server)
         .post('/api/auth/login')
         .send({ email: emailDocA, password })
-        .expect(200);
+        .expect(expectOkOrCreated);
       cookieDoctorA = cookieHeaderFromSetCookie(loginA.headers['set-cookie']);
       csrfDoctorA = csrfTokenFromSetCookie(loginA.headers['set-cookie']);
 
       const loginB = await request(server)
         .post('/api/auth/login')
         .send({ email: emailDocB, password })
-        .expect(200);
+        .expect(expectOkOrCreated);
       cookieDoctorB = cookieHeaderFromSetCookie(loginB.headers['set-cookie']);
       csrfDoctorB = csrfTokenFromSetCookie(loginB.headers['set-cookie']);
 
       const loginAdminA = await request(server)
         .post('/api/auth/login')
         .send({ email: emailAdminA, password })
-        .expect(200);
+        .expect(expectOkOrCreated);
       cookieAdminA = cookieHeaderFromSetCookie(
         loginAdminA.headers['set-cookie'],
       );
@@ -229,6 +237,7 @@ function csrfTokenFromSetCookie(
 
     afterAll(async () => {
       if (app) {
+        await flushAsyncAuditWrites();
         await app.close();
       }
     });

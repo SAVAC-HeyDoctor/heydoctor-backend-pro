@@ -11,6 +11,10 @@ import { AppModule } from './../src/app.module';
 /** Activa smoke e2e con Postgres disponible: `DATABASE_E2E=1 npm run test:e2e`. */
 const runDbE2e = process.env.DATABASE_E2E === '1';
 
+async function flushAsyncAuditWrites(): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, 500));
+}
+
 (runDbE2e ? describe : describe.skip)('AppController (e2e)', () => {
   let app: INestApplication<App>;
 
@@ -50,6 +54,7 @@ const runDbE2e = process.env.DATABASE_E2E === '1';
 
   afterEach(async () => {
     if (app) {
+      await flushAsyncAuditWrites();
       await app.close();
     }
   });

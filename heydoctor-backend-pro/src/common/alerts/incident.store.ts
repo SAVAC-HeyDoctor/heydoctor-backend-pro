@@ -26,7 +26,7 @@ export function trackIncident(key: string): Incident {
   if (existing) {
     existing.lastSeenAt = now;
     existing.count += 1;
-    return existing;
+    return { ...existing };
   }
   const incident: Incident = {
     key,
@@ -35,7 +35,7 @@ export function trackIncident(key: string): Incident {
     count: 1,
   };
   incidents.set(key, incident);
-  return incident;
+  return { ...incident };
 }
 
 let cleanupInterval: ReturnType<typeof setInterval> | undefined;

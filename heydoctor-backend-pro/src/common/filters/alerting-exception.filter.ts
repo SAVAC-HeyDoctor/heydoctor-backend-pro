@@ -17,10 +17,10 @@ import { APP_LOGGER } from '../logger/logger.tokens';
 @Catch()
 export class AlertingExceptionFilter extends BaseExceptionFilter {
   constructor(
-    httpAdapterHost: HttpAdapterHost,
+    private readonly adapterHost: HttpAdapterHost,
     @Inject(APP_LOGGER) private readonly appLogger: LoggerService,
   ) {
-    super(httpAdapterHost.httpAdapter);
+    super();
   }
 
   catch(exception: unknown, host: ArgumentsHost): void {
@@ -57,6 +57,9 @@ export class AlertingExceptionFilter extends BaseExceptionFilter {
       );
     }
 
-    super.catch(exception, host);
+    new BaseExceptionFilter(this.adapterHost.httpAdapter).catch(
+      exception,
+      host,
+    );
   }
 }
