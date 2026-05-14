@@ -218,7 +218,9 @@ export class PaykuService {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
-                Authorization: `Bearer ${this.paykuApiKey}`,
+                ...(this.paykuApiKey
+                  ? { Authorization: `Bearer ${this.paykuApiKey}` }
+                  : {}),
               },
               body: JSON.stringify(body),
             });
