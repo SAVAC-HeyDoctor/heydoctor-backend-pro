@@ -189,9 +189,9 @@ export async function seedE2E(
     })) ?? null;
   if (!consPay) {
     consPay = consultRepo.create({
-      patientId: patient.id,
+      patient: { id: patient.id },
       clinicId: clinic.id,
-      consentId: consent.id,
+      consent: { id: consent.id },
       consentVersion: consent.version,
       consentGivenAt: consent.consentGivenAt,
       consentIp: consent.ip,
@@ -217,9 +217,9 @@ export async function seedE2E(
     })) ?? null;
   if (!consFail) {
     consFail = consultRepo.create({
-      patientId: patient.id,
+      patient: { id: patient.id },
       clinicId: clinic.id,
-      consentId: consent.id,
+      consent: { id: consent.id },
       consentVersion: consent.version,
       consentGivenAt: consent.consentGivenAt,
       consentIp: consent.ip,
