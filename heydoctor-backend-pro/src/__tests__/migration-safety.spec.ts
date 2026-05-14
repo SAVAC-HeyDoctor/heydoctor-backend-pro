@@ -1,6 +1,6 @@
 import type { QueryRunner } from 'typeorm';
-import { MultiTenantClinicIdCoreEntities1746300000000 } from './1746300000000-MultiTenantClinicIdCoreEntities';
-import { GrowthSeedDefaultFlagsAndExperiment1746900000000 } from './1746900000000-GrowthSeedDefaultFlagsAndExperiment';
+import { MultiTenantClinicIdCoreEntities1746300000000 } from '../migrations/1746300000000-MultiTenantClinicIdCoreEntities';
+import { GrowthSeedDefaultFlagsAndExperiment1746900000000 } from '../migrations/1746900000000-GrowthSeedDefaultFlagsAndExperiment';
 
 function createQueryRunnerMock(
   handler: (sql: string) => unknown[] = () => [],
@@ -37,7 +37,7 @@ describe('migration safety', () => {
     const migration = new MultiTenantClinicIdCoreEntities1746300000000();
     const { queryRunner } = createQueryRunnerMock();
 
-    await expect(migration.down(queryRunner)).resolves.toBeUndefined();
+    await expect(migration.down()).resolves.toBeUndefined();
     expect(queryRunner.query).not.toHaveBeenCalled();
   });
 
@@ -56,7 +56,7 @@ describe('migration safety', () => {
     const migration = new GrowthSeedDefaultFlagsAndExperiment1746900000000();
     const { queryRunner } = createQueryRunnerMock();
 
-    await expect(migration.down(queryRunner)).resolves.toBeUndefined();
+    await expect(migration.down()).resolves.toBeUndefined();
     expect(queryRunner.query).not.toHaveBeenCalled();
   });
 });

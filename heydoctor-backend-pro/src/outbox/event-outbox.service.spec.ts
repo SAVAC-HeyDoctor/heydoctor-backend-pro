@@ -9,6 +9,24 @@ import { EventOutbox, EventOutboxType } from './event-outbox.entity';
 import { EventOutboxService } from './event-outbox.service';
 
 describe('EventOutboxService', () => {
+  function createRow(overrides: Partial<EventOutbox>): EventOutbox {
+    return {
+      id: 'event-id',
+      type: EventOutboxType.PAYMENT_SUCCEEDED,
+      payload: {},
+      processed: false,
+      idempotencyKey: null,
+      retryCount: 0,
+      lastError: null,
+      failed: false,
+      failedAt: null,
+      nextAttemptAt: null,
+      processedAt: null,
+      createdAt: new Date(),
+      ...overrides,
+    };
+  }
+
   function createService(row: EventOutbox) {
     const claimedRow = {
       id: row.id,
@@ -18,6 +36,9 @@ describe('EventOutboxService', () => {
       idempotency_key: row.idempotencyKey ?? null,
       retry_count: row.retryCount,
       last_error: row.lastError,
+      failed: row.failed,
+      failed_at: row.failedAt,
+      next_attempt_at: row.nextAttemptAt,
       processed_at: row.processedAt,
       created_at: row.createdAt ?? new Date(),
     };
@@ -28,10 +49,18 @@ describe('EventOutboxService', () => {
       update: jest.fn().mockResolvedValue({ affected: 1 }),
     };
     const manager = {
-      query: jest
-        .fn()
-        .mockResolvedValueOnce([claimedRow])
-        .mockResolvedValueOnce([claimedRow]),
+      query: jest.fn((sql: string) => {
+        if (sql.includes('SELECT *') && sql.includes('FROM event_outbox')) {
+          return Promise.resolve([claimedRow]);
+        }
+        if (
+          sql.includes('UPDATE event_outbox') &&
+          sql.includes('SET processed = true')
+        ) {
+          return Promise.resolve([claimedRow]);
+        }
+        return Promise.resolve([]);
+      }),
     };
     const dataSource = {
       transaction: jest.fn(async (work: (manager: unknown) => Promise<void>) =>
@@ -59,7 +88,7 @@ describe('EventOutboxService', () => {
       }),
     };
     const subscriptionEventsService = {
-      appendWithManager: jest.fn().mockResolvedValue({ id: 'event-row-1' }),
+      appendOnceWithManager: jest.fn().mockResolvedValue({ id: 'event-row-1' }),
     };
     const subscriptionAlerts = {
       notifyPaymentFailed: jest.fn(),
@@ -88,7 +117,7 @@ describe('EventOutboxService', () => {
   }
 
   it('marks a payment success event processed after dispatch', async () => {
-    const row = {
+    const row = createRow({
       id: 'event-1',
       type: EventOutboxType.PAYMENT_SUCCEEDED,
       payload: {
@@ -100,15 +129,55 @@ describe('EventOutboxService', () => {
         transactionId: 'tx-1',
         incomingPaymentStatus: 'paid',
       },
-      processed: false,
-      processedAt: null,
-      retryCount: 0,
-      lastError: null,
-    } as EventOutbox;
-    const { service, manager, productEvents } = createService(row);
+    });
+    const {
+      service,
+      manager,
+      productEvents,
+      subscriptionEventsService,
+      subscriptionsService,
+    } = createService(row);
 
     await service.processOne(row);
 
+    expect(
+      subscriptionEventsService.appendOnceWithManager,
+    ).toHaveBeenCalledWith(
+      manager,
+      expect.objectContaining({
+        userId: 'user-1',
+        clinicId: 'clinic-1',
+        eventType: 'WEBHOOK_RECEIVED',
+        metadata: expect.objectContaining({
+          paymentId: 'payment-1',
+          incomingPaymentStatus: 'paid',
+        }),
+      }),
+    );
+    expect(subscriptionsService.updatePlanWithManager).toHaveBeenCalledWith(
+      manager,
+      'user-1',
+      SubscriptionPlan.PRO,
+      expect.objectContaining({ sub: 'system-payku-webhook' }),
+      'webhook',
+      'payku payment',
+    );
+    expect(
+      subscriptionEventsService.appendOnceWithManager,
+    ).toHaveBeenCalledWith(
+      manager,
+      expect.objectContaining({
+        userId: 'user-1',
+        clinicId: 'clinic-1',
+        eventType: 'PAYMENT_SUCCEEDED',
+        metadata: expect.objectContaining({
+          paymentId: 'payment-1',
+          consultationId: null,
+          amount: 15000,
+          transactionId: 'tx-1',
+        }),
+      }),
+    );
     expect(productEvents.track).toHaveBeenCalledWith(
       'user-1',
       GrowthFunnelEvents.PAYMENT_SUCCESS,
@@ -125,45 +194,47 @@ describe('EventOutboxService', () => {
   });
 
   it('keeps failed events unprocessed and increments attempts for retry', async () => {
-    const row = {
+    const row = createRow({
       id: 'event-2',
       type: EventOutboxType.PAYMENT_SUCCEEDED,
       payload: {
         userId: 123,
       },
-      processed: false,
-      processedAt: null,
-      retryCount: 0,
-      lastError: null,
-    } as EventOutbox;
+    });
     const { service, manager } = createService(row);
     manager.query.mockReset();
-    manager.query
-      .mockResolvedValueOnce([
-        {
-          id: row.id,
-          type: row.type,
-          payload: row.payload,
-          processed: false,
-          idempotency_key: null,
-          retry_count: 0,
-          last_error: null,
-          processed_at: null,
-          created_at: new Date(),
-        },
-      ])
-      .mockResolvedValueOnce([]);
+    manager.query.mockImplementation((sql: string) => {
+      if (sql.includes('SELECT *') && sql.includes('FROM event_outbox')) {
+        return Promise.resolve([
+          {
+            id: row.id,
+            type: row.type,
+            payload: row.payload,
+            processed: false,
+            idempotency_key: null,
+            retry_count: 0,
+            last_error: null,
+            failed: false,
+            failed_at: null,
+            next_attempt_at: null,
+            processed_at: null,
+            created_at: new Date(),
+          },
+        ]);
+      }
+      return Promise.resolve([]);
+    });
 
     await service.processOne(row);
 
     expect(manager.query).toHaveBeenCalledWith(
       expect.stringContaining('retry_count = retry_count + 1'),
-      ['event-2', 'Invalid payment_succeeded outbox payload'],
+      ['event-2', 'Invalid payment_succeeded outbox payload', 5, 1000],
     );
   });
 
   it('dispatches payment failure alerts through the outbox worker', async () => {
-    const row = {
+    const row = createRow({
       id: 'event-3',
       type: EventOutboxType.PAYMENT_FAILED,
       payload: {
@@ -175,15 +246,42 @@ describe('EventOutboxService', () => {
         transactionId: null,
         incomingPaymentStatus: 'failed',
       },
-      processed: false,
-      processedAt: null,
-      retryCount: 0,
-      lastError: null,
-    } as EventOutbox;
-    const { service, subscriptionAlerts } = createService(row);
+    });
+    const { service, manager, subscriptionAlerts, subscriptionEventsService } =
+      createService(row);
 
     await service.processOne(row);
 
+    expect(
+      subscriptionEventsService.appendOnceWithManager,
+    ).toHaveBeenCalledWith(
+      manager,
+      expect.objectContaining({
+        userId: 'user-1',
+        clinicId: 'clinic-1',
+        eventType: 'WEBHOOK_RECEIVED',
+        metadata: expect.objectContaining({
+          paymentId: 'payment-1',
+          incomingPaymentStatus: 'failed',
+        }),
+      }),
+    );
+    expect(
+      subscriptionEventsService.appendOnceWithManager,
+    ).toHaveBeenCalledWith(
+      manager,
+      expect.objectContaining({
+        userId: 'user-1',
+        clinicId: 'clinic-1',
+        eventType: 'PAYMENT_FAILED',
+        metadata: expect.objectContaining({
+          event: 'payku_payment_failed',
+          paymentId: 'payment-1',
+          consultationId: null,
+          clinicId: 'clinic-1',
+        }),
+      }),
+    );
     expect(subscriptionAlerts.notifyPaymentFailed).toHaveBeenCalledWith({
       userId: 'user-1',
       clinicId: 'clinic-1',
