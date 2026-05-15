@@ -101,7 +101,7 @@ const ormLogging: boolean | ('query' | 'error')[] =
       synchronize: false,
       logging: ormLogging,
       migrations: [join(__dirname, 'migrations', '*.{js,ts}')],
-      migrationsRun: true,
+      migrationsRun: process.env.NODE_ENV !== 'production',
     }),
     ScheduleModule.forRoot(),
     ThrottlerModule.forRootAsync({
