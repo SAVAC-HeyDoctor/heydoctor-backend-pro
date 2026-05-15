@@ -1,11 +1,12 @@
 import {
   IsEmail,
-  IsEnum,
   IsOptional,
   IsString,
   IsUUID,
   MinLength,
+  IsEnum,
 } from 'class-validator';
+
 import { UserRole } from '../../users/user-role.enum';
 
 export class RegisterDto {
@@ -13,14 +14,13 @@ export class RegisterDto {
   email: string;
 
   @IsString()
-  @MinLength(6, { message: 'password must be at least 6 characters' })
+  @MinLength(6)
   password: string;
 
-  /** Clínica existente (crear fila en `clinics` antes del primer admin). */
+  @IsOptional()
   @IsUUID()
-  clinicId: string;
+  clinicId?: string;
 
-  /** Por defecto `admin` para bootstrap del tenant. */
   @IsOptional()
   @IsEnum(UserRole)
   role?: UserRole;
