@@ -78,7 +78,7 @@ export class SubscriptionEventsService {
       return existing;
     }
 
-    const rows = (await manager.query(
+    const rows = await manager.query(
       `
         INSERT INTO subscription_events (
           clinic_id,
@@ -127,22 +127,10 @@ export class SubscriptionEventsService {
           : null,
         JSON.stringify({ paymentId }),
       ],
-    )) as Array<{
-      id: string;
-      clinic_id: string;
-      user_id: string;
-      event_type: SubscriptionEventType;
-      previous_plan: SubscriptionPlan | null;
-      new_plan: SubscriptionPlan | null;
-      previous_status: SubscriptionStatus | null;
-      new_status: SubscriptionStatus | null;
-      source: SubscriptionEventSource;
-      metadata: Record<string, unknown> | null;
-      created_at: Date | string;
-    }>;
+    );
 
     if (!rows[0]) {
-      const existingRows = (await manager.query(
+      const existingRows = await manager.query(
         `
           SELECT *
           FROM subscription_events
@@ -161,7 +149,7 @@ export class SubscriptionEventsService {
           dto.source,
           JSON.stringify({ paymentId }),
         ],
-      )) as typeof rows;
+      );
 
       if (!existingRows[0]) {
         return null;

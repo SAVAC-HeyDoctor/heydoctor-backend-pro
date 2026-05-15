@@ -10,13 +10,13 @@ import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateUserDto {
   @IsEmail()
-@ApiProperty()
+  @ApiProperty()
   email: string;
 
   @IsString()
   @MinLength(6, { message: 'password must be at least 6 characters' })
-@ApiProperty() 
- password: string;
+  @ApiProperty()
+  password: string;
 
   @IsOptional()
   @IsEnum(UserRole)
