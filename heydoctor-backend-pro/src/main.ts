@@ -2,7 +2,6 @@ import { Logger, RequestMethod, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import { IoAdapter } from '@nestjs/platform-socket.io';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import cookieParser from 'cookie-parser';
 import { registerSlackWebhookFromEnv } from './common/alerts/slack-webhook.sink';
@@ -15,6 +14,7 @@ import {
   assertRedisConfiguredForMultiInstanceProduction,
   productionReplicaCount,
 } from './config/redis-requirement';
+import { RedisIoAdapter } from './common/websocket/redis-io.adapter';
 import { allowedOrigins, corsOrigin } from './config/origin-allowlist';
 import type { Request, Response } from 'express';
 
@@ -106,7 +106,9 @@ async function bootstrap() {
   });
 
   app.use(cookieParser());
-  app.useWebSocketAdapter(new IoAdapter(app));
+  const redisIoAdapter = new RedisIoAdapter(app);
+  await redisIoAdapter.connectToRedis();
+  app.useWebSocketAdapter(redisIoAdapter);
 
   /**
    * Prefijo global antes de guards: rutas y Throttler alineados con `/api/...`

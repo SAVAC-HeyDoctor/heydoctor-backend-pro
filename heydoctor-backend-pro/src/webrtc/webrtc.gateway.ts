@@ -43,6 +43,19 @@ type IceStatePayload = SignalingPayload & {
   state: unknown;
 };
 
+type WebrtcSocketData = {
+  user?: AuthenticatedUser;
+};
+
+type RoomSocketSnapshot = {
+  data: WebrtcSocketData;
+};
+
+type RoomState = {
+  peerCount: number;
+  userSocketCount: number;
+};
+
 @SkipThrottle()
 @WebSocketGateway({
   namespace: '/webrtc',
@@ -106,11 +119,11 @@ export class WebrtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
-  handleDisconnect(client: Socket): void {
+  async handleDisconnect(client: Socket): Promise<void> {
     const u = (client.data as { user?: AuthenticatedUser }).user;
     if (u) {
       this.logger.debug(`WS disconnect user=${u.sub} socket=${client.id}`);
-      this.cleanupSocketRooms(client, u.sub, 'disconnect');
+      await this.cleanupSocketRooms(client, u.sub, 'disconnect');
     }
   }
 
@@ -137,7 +150,11 @@ export class WebrtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
         user,
       );
       await client.join(consultationId);
-      const roomState = this.trackJoin(client, user.sub, consultationId);
+      this.trackJoin(client, user.sub, consultationId);
+      const roomState = await this.getDistributedRoomState(
+        consultationId,
+        user.sub,
+      );
       this.logger.log(
         `join-consultation.joined user=${user.sub} consultation=${consultationId}`,
       );
@@ -145,7 +162,7 @@ export class WebrtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
         consultationId,
         peerCount: roomState.peerCount,
       });
-      if (roomState.firstUserJoin) {
+      if (roomState.userSocketCount <= 1) {
         client.to(consultationId).emit('peer-joined', { userId: user.sub });
       }
       return { ok: true, consultationId };
@@ -256,8 +273,12 @@ export class WebrtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const user = this.requireUser(client);
     const consultationId = this.requireConsultationId(body?.consultationId);
     await client.leave(consultationId);
-    const roomState = this.trackLeave(client, user.sub, consultationId);
-    if (roomState.lastUserLeave) {
+    this.trackLeave(client, user.sub, consultationId);
+    const roomState = await this.getDistributedRoomState(
+      consultationId,
+      user.sub,
+    );
+    if (roomState.userSocketCount === 0) {
       client.to(consultationId).emit('peer-left', { userId: user.sub });
     }
     this.logger.debug(`User ${user.sub} left room ${consultationId}`);
@@ -305,17 +326,14 @@ export class WebrtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
     client: Socket,
     userId: string,
     consultationId: string,
-  ): { firstUserJoin: boolean; peerCount: number } {
+  ): void {
     let rooms = this.socketRooms.get(client.id);
     if (!rooms) {
       rooms = new Set<string>();
       this.socketRooms.set(client.id, rooms);
     }
     if (rooms.has(consultationId)) {
-      return {
-        firstUserJoin: false,
-        peerCount: this.countParticipants(consultationId),
-      };
+      return;
     }
     rooms.add(consultationId);
 
@@ -326,24 +344,16 @@ export class WebrtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
     const previous = participants.get(userId) ?? 0;
     participants.set(userId, previous + 1);
-
-    return {
-      firstUserJoin: previous === 0,
-      peerCount: participants.size,
-    };
   }
 
   private trackLeave(
     client: Socket,
     userId: string,
     consultationId: string,
-  ): { lastUserLeave: boolean; peerCount: number } {
+  ): void {
     const rooms = this.socketRooms.get(client.id);
     if (!rooms?.has(consultationId)) {
-      return {
-        lastUserLeave: false,
-        peerCount: this.countParticipants(consultationId),
-      };
+      return;
     }
     rooms.delete(consultationId);
     if (rooms.size === 0) {
@@ -352,7 +362,7 @@ export class WebrtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     const participants = this.roomParticipants.get(consultationId);
     if (!participants) {
-      return { lastUserLeave: false, peerCount: 0 };
+      return;
     }
     const previous = participants.get(userId) ?? 0;
     if (previous <= 1) {
@@ -363,23 +373,59 @@ export class WebrtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (participants.size === 0) {
       this.roomParticipants.delete(consultationId);
     }
-    return {
-      lastUserLeave: previous <= 1,
-      peerCount: participants.size,
-    };
   }
 
-  private cleanupSocketRooms(
+  private async cleanupSocketRooms(
     client: Socket,
     userId: string,
     reason: 'disconnect',
-  ): void {
+  ): Promise<void> {
     const rooms = Array.from(this.socketRooms.get(client.id) ?? []);
     for (const consultationId of rooms) {
-      const roomState = this.trackLeave(client, userId, consultationId);
-      if (roomState.lastUserLeave) {
+      this.trackLeave(client, userId, consultationId);
+      const roomState = await this.getDistributedRoomState(
+        consultationId,
+        userId,
+      );
+      if (roomState.userSocketCount === 0) {
         this.server.to(consultationId).emit('peer-left', { userId, reason });
       }
+    }
+  }
+
+  private async getDistributedRoomState(
+    consultationId: string,
+    userId: string,
+  ): Promise<RoomState> {
+    try {
+      const sockets = (await this.server
+        .in(consultationId)
+        .fetchSockets()) as RoomSocketSnapshot[];
+      const users = new Set<string>();
+      let userSocketCount = 0;
+      for (const socket of sockets) {
+        const sub = socket.data.user?.sub;
+        if (!sub) {
+          continue;
+        }
+        users.add(sub);
+        if (sub === userId) {
+          userSocketCount += 1;
+        }
+      }
+      return { peerCount: users.size, userSocketCount };
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      this.logger.warn('webrtc_room_state_fetch_failed', {
+        event: 'webrtc_room_state_fetch_failed',
+        consultationId,
+        error: error.message,
+      });
+      return {
+        peerCount: this.countParticipants(consultationId),
+        userSocketCount:
+          this.roomParticipants.get(consultationId)?.get(userId) ?? 0,
+      };
     }
   }
 
