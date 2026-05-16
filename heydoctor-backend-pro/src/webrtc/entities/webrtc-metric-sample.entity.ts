@@ -53,6 +53,30 @@ export class WebrtcMetricSample {
   @Column({ name: 'packets_lost', type: 'integer', nullable: true })
   packetsLost!: number | null;
 
+  @Column({
+    name: 'ice_connection_state',
+    type: 'varchar',
+    length: 32,
+    nullable: true,
+  })
+  iceConnectionState!: string | null;
+
+  @Column({
+    name: 'connection_state',
+    type: 'varchar',
+    length: 32,
+    nullable: true,
+  })
+  connectionState!: string | null;
+
+  @Column({
+    name: 'signaling_state',
+    type: 'varchar',
+    length: 32,
+    nullable: true,
+  })
+  signalingState!: string | null;
+
   @CreateDateColumn({ name: 'recorded_at', type: 'timestamp with time zone' })
   recordedAt!: Date;
 }

@@ -17,6 +17,7 @@ import {
   mergeHttpLogContextFromUser,
 } from '../request-context.storage';
 import { RequestTraceIndexService } from '../observability/request-trace-index.service';
+import { addSentryBreadcrumb } from '../observability/sentry';
 
 @Injectable()
 export class HttpRequestLoggingInterceptor implements NestInterceptor {
@@ -63,6 +64,16 @@ export class HttpRequestLoggingInterceptor implements NestInterceptor {
           statusCode: res.statusCode,
           durationMs,
           serverDurationMs,
+          userId,
+        });
+
+        addSentryBreadcrumb('http', 'http_request_complete', {
+          method: req.method,
+          path: pathLogged,
+          statusCode: res.statusCode,
+          durationMs,
+          requestId,
+          traceId: requestId,
           userId,
         });
 

@@ -5,6 +5,7 @@
 'use client';
 
 import * as Sentry from '@sentry/nextjs';
+import { sanitizeTelemetry } from './sentry-redaction';
 
 function sentryEnabled(): boolean {
   return Boolean(
@@ -22,7 +23,9 @@ export function captureException(
   context?: Record<string, unknown>,
 ): void {
   if (!sentryEnabled()) return;
-  Sentry.captureException(error, { extra: context });
+  Sentry.captureException(error, {
+    extra: sanitizeTelemetry(context) as Record<string, unknown> | undefined,
+  });
 }
 
 export function captureMessage(
@@ -33,5 +36,8 @@ export function captureMessage(
   if (!sentryEnabled()) return;
   const lvl =
     level === 'error' ? 'error' : level === 'warning' ? 'warning' : 'info';
-  Sentry.captureMessage(message, { level: lvl, extra: context });
+  Sentry.captureMessage(message, {
+    level: lvl,
+    extra: sanitizeTelemetry(context) as Record<string, unknown> | undefined,
+  });
 }

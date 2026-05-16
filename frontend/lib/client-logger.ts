@@ -1,6 +1,7 @@
 /**
  * Logging cliente estructurado (sin PII). En producción: nivel mínimo; preparado para Sentry.
  */
+'use client';
 
 import { captureException, captureMessage, initSentry } from './sentry';
 

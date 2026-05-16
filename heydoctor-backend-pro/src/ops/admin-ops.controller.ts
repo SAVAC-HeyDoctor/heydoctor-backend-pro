@@ -4,6 +4,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '../users/user-role.enum';
 import { RequestTraceIndexService } from '../common/observability/request-trace-index.service';
+import { getSocketIoRedisHealth } from '../common/websocket/socket-io-health';
 import type { OpsOverviewDto } from './ops-overview.dto';
 import { OpsOverviewService } from './ops-overview.service';
 import type { OpsScalingDto } from './ops-scaling.service';
@@ -28,6 +29,12 @@ export class AdminOpsController {
   @Get('scaling')
   scaling(): Promise<OpsScalingDto> {
     return this.opsScaling.getScaling();
+  }
+
+  /** Estado del adapter distribuido Socket.IO (Redis) para diagnosticar señalización. */
+  @Get('socket-io')
+  socketIo() {
+    return getSocketIoRedisHealth();
   }
 
   /** Búsqueda de request por `X-Request-Id` / traceId (índice en memoria de esta réplica). */

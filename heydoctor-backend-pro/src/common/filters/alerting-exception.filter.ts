@@ -10,6 +10,7 @@ import { BaseExceptionFilter, HttpAdapterHost } from '@nestjs/core';
 import type { Request } from 'express';
 import { notifyAlert } from '../alerts/alert.hooks';
 import { APP_LOGGER } from '../logger/logger.tokens';
+import { captureException } from '../observability/sentry';
 
 /**
  * Registra errores HTTP ≥500 para logs estructurados + hook {@link notifyAlert} (Sentry/Datadog, etc.).
@@ -55,6 +56,13 @@ export class AlertingExceptionFilter extends BaseExceptionFilter {
         },
         { level: 'critical' },
       );
+      captureException(err, {
+        event: 'server_error',
+        statusCode: status,
+        path: typeof req.url === 'string' ? req.url : undefined,
+        method: req.method,
+        userId,
+      });
     }
 
     new BaseExceptionFilter(this.adapterHost.httpAdapter).catch(

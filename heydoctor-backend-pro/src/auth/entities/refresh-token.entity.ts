@@ -38,6 +38,13 @@ export class RefreshToken {
   @Column({ name: 'revoked_at', type: 'timestamptz', nullable: true })
   revokedAt: Date | null;
 
+  @Index()
+  @Column({ name: 'family_id', type: 'uuid', nullable: true })
+  familyId: string | null;
+
+  @Column({ name: 'replaced_by_token_id', type: 'uuid', nullable: true })
+  replacedByTokenId: string | null;
+
   @Column({ name: 'ip_address', type: 'varchar', length: 64, nullable: true })
   ipAddress: string | null;
 

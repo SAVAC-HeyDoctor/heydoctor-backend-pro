@@ -1,4 +1,4 @@
-import { Logger } from '@nestjs/common';
+import { Logger, UseFilters } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { SkipThrottle } from '@nestjs/throttler';
 import {
@@ -15,14 +15,19 @@ import type { Server, Socket } from 'socket.io';
 import type { JwtPayload } from '../auth/types/jwt-payload.interface';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import { ACCESS_TOKEN_COOKIE } from '../auth/auth-cookies';
+import { SentryWsExceptionFilter } from '../common/filters/sentry-ws-exception.filter';
+import { captureMessage } from '../common/observability/sentry';
 import { corsOrigin } from '../config/origin-allowlist';
 import { ConsultationsService } from '../consultations/consultations.service';
 import { SubscriptionPlan } from '../subscriptions/subscription.entity';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { UsersService } from '../users/users.service';
+import { ICE_CONNECTION_STATES } from './dto/record-webrtc-metric.dto';
 
 const UUID_V4 =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const MAX_SDP_BYTES = 128_000;
+const MAX_ICE_CANDIDATE_BYTES = 16_000;
 
 type SignalingPayload = {
   consultationId: string;
@@ -36,6 +41,23 @@ type IceCandidatePayload = SignalingPayload & {
   candidate: unknown;
 };
 
+type IceStatePayload = SignalingPayload & {
+  state: unknown;
+};
+
+type WebrtcSocketData = {
+  user?: AuthenticatedUser;
+};
+
+type RoomSocketSnapshot = {
+  data: WebrtcSocketData;
+};
+
+type RoomState = {
+  peerCount: number;
+  userSocketCount: number;
+};
+
 @SkipThrottle()
 @WebSocketGateway({
   namespace: '/webrtc',
@@ -44,6 +66,7 @@ type IceCandidatePayload = SignalingPayload & {
     credentials: true,
   },
 })
+@UseFilters(new SentryWsExceptionFilter())
 /**
  * No usar FeatureGuard / RequirePlan a nivel de gateway: en WS el guard puede
  * ejecutarse antes de que `handleConnection` asigne `client.data.user` → Forbidden sin ACK.
@@ -54,6 +77,8 @@ export class WebrtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
   server!: Server;
 
   private readonly logger = new Logger(WebrtcGateway.name);
+  private readonly socketRooms = new Map<string, Set<string>>();
+  private readonly roomParticipants = new Map<string, Map<string, number>>();
 
   constructor(
     private readonly jwtService: JwtService,
@@ -66,6 +91,11 @@ export class WebrtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const token = this.extractToken(client);
     if (!token) {
       this.logger.warn(`WS disconnect: no token (${client.id})`);
+      captureMessage('webrtc_socket_auth_failed', 'warning', {
+        event: 'webrtc_socket_auth_failed',
+        reason: 'missing_token',
+        socketId: client.id,
+      });
       client.disconnect(true);
       return;
     }
@@ -73,6 +103,11 @@ export class WebrtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
       const payload = await this.jwtService.verifyAsync<JwtPayload>(token);
       const user = await this.usersService.findById(payload.sub);
       if (!user || user.email !== payload.email || user.role !== payload.role) {
+        captureMessage('webrtc_socket_auth_failed', 'warning', {
+          event: 'webrtc_socket_auth_failed',
+          reason: 'user_payload_mismatch',
+          socketId: client.id,
+        });
         client.disconnect(true);
         return;
       }
@@ -88,19 +123,33 @@ export class WebrtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
       );
       if (!canUseWebrtc) {
         this.logger.warn(`WS disconnect: plan free (${client.id})`);
+        captureMessage('webrtc_socket_auth_failed', 'warning', {
+          event: 'webrtc_socket_auth_failed',
+          reason: 'plan_required',
+          socketId: client.id,
+          userId: authUser.sub,
+          clinicId: authUser.clinicId,
+        });
         client.disconnect(true);
         return;
       }
       (client.data as { user?: AuthenticatedUser }).user = authUser;
-    } catch {
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      captureMessage('webrtc_socket_auth_failed', 'warning', {
+        event: 'webrtc_socket_auth_failed',
+        reason: error.name,
+        socketId: client.id,
+      });
       client.disconnect(true);
     }
   }
 
-  handleDisconnect(client: Socket): void {
+  async handleDisconnect(client: Socket): Promise<void> {
     const u = (client.data as { user?: AuthenticatedUser }).user;
     if (u) {
       this.logger.debug(`WS disconnect user=${u.sub} socket=${client.id}`);
+      await this.cleanupSocketRooms(client, u.sub, 'disconnect');
     }
   }
 
@@ -127,31 +176,49 @@ export class WebrtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
         user,
       );
       await client.join(consultationId);
+      this.trackJoin(client, user.sub, consultationId);
+      const roomState = await this.getDistributedRoomState(
+        consultationId,
+        user.sub,
+      );
       this.logger.log(
         `join-consultation.joined user=${user.sub} consultation=${consultationId}`,
       );
-      client.to(consultationId).emit('peer-joined', { userId: user.sub });
+      client.emit('room-state', {
+        consultationId,
+        peerCount: roomState.peerCount,
+      });
+      if (roomState.userSocketCount <= 1) {
+        client.to(consultationId).emit('peer-joined', { userId: user.sub });
+      }
       return { ok: true, consultationId };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       this.logger.warn(
         `join-consultation.failed user=${user.sub} consultation=${consultationId}: ${msg}`,
       );
+      captureMessage('webrtc_join_consultation_failed', 'warning', {
+        event: 'webrtc_join_consultation_failed',
+        consultationId,
+        userId: user.sub,
+        error: msg,
+      });
       throw err;
     }
   }
 
   @SubscribeMessage('offer')
-  async relayOffer(
+  relayOffer(
     @ConnectedSocket() client: Socket,
     @MessageBody() body: OfferAnswerPayload,
-  ): Promise<void> {
+  ): void {
     const user = this.requireUser(client);
     const consultationId = this.requireConsultationId(body?.consultationId);
     this.assertInRoom(client, consultationId);
     if (body?.sdp === undefined) {
       throw new WsException('sdp required');
     }
+    this.assertPayloadSize(body.sdp, 'sdp', MAX_SDP_BYTES);
     client.to(consultationId).emit('offer', {
       sdp: body.sdp,
       fromUserId: user.sub,
@@ -159,16 +226,17 @@ export class WebrtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   @SubscribeMessage('answer')
-  async relayAnswer(
+  relayAnswer(
     @ConnectedSocket() client: Socket,
     @MessageBody() body: OfferAnswerPayload,
-  ): Promise<void> {
+  ): void {
     const user = this.requireUser(client);
     const consultationId = this.requireConsultationId(body?.consultationId);
     this.assertInRoom(client, consultationId);
     if (body?.sdp === undefined) {
       throw new WsException('sdp required');
     }
+    this.assertPayloadSize(body.sdp, 'sdp', MAX_SDP_BYTES);
     client.to(consultationId).emit('answer', {
       sdp: body.sdp,
       fromUserId: user.sub,
@@ -176,20 +244,65 @@ export class WebrtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   @SubscribeMessage('ice-candidate')
-  async relayIce(
+  relayIce(
     @ConnectedSocket() client: Socket,
     @MessageBody() body: IceCandidatePayload,
-  ): Promise<void> {
+  ): void {
     const user = this.requireUser(client);
     const consultationId = this.requireConsultationId(body?.consultationId);
     this.assertInRoom(client, consultationId);
     if (body?.candidate === undefined) {
       throw new WsException('candidate required');
     }
+    this.assertPayloadSize(
+      body.candidate,
+      'candidate',
+      MAX_ICE_CANDIDATE_BYTES,
+    );
     client.to(consultationId).emit('ice-candidate', {
       candidate: body.candidate,
       fromUserId: user.sub,
     });
+  }
+
+  @SubscribeMessage('ice-state')
+  recordIceState(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: IceStatePayload,
+  ): { ok: true } {
+    const user = this.requireUser(client);
+    const consultationId = this.requireConsultationId(body?.consultationId);
+    this.assertInRoom(client, consultationId);
+    if (
+      typeof body?.state !== 'string' ||
+      !ICE_CONNECTION_STATES.includes(
+        body.state as (typeof ICE_CONNECTION_STATES)[number],
+      )
+    ) {
+      throw new WsException('Invalid ICE state');
+    }
+    const state = body.state;
+    const level =
+      state === 'failed' || state === 'disconnected' ? 'warn' : 'debug';
+    this.logger[level]('webrtc_ice_state', {
+      event: 'webrtc_ice_state',
+      consultationId,
+      userId: user.sub,
+      state,
+    });
+    if (level === 'warn') {
+      captureMessage('webrtc_ice_state_degraded', 'warning', {
+        event: 'webrtc_ice_state_degraded',
+        consultationId,
+        userId: user.sub,
+        state,
+      });
+    }
+    client.to(consultationId).emit('peer-ice-state', {
+      fromUserId: user.sub,
+      state,
+    });
+    return { ok: true };
   }
 
   @SubscribeMessage('leave')
@@ -200,7 +313,14 @@ export class WebrtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const user = this.requireUser(client);
     const consultationId = this.requireConsultationId(body?.consultationId);
     await client.leave(consultationId);
-    client.to(consultationId).emit('peer-left', { userId: user.sub });
+    this.trackLeave(client, user.sub, consultationId);
+    const roomState = await this.getDistributedRoomState(
+      consultationId,
+      user.sub,
+    );
+    if (roomState.userSocketCount === 0) {
+      client.to(consultationId).emit('peer-left', { userId: user.sub });
+    }
     this.logger.debug(`User ${user.sub} left room ${consultationId}`);
     return { ok: true };
   }
@@ -224,6 +344,138 @@ export class WebrtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (!client.rooms.has(consultationId)) {
       throw new WsException('Join the consultation room first');
     }
+  }
+
+  private assertPayloadSize(
+    value: unknown,
+    field: string,
+    maxBytes: number,
+  ): void {
+    let bytes = 0;
+    try {
+      bytes = Buffer.byteLength(JSON.stringify(value), 'utf8');
+    } catch {
+      throw new WsException(`Invalid ${field}`);
+    }
+    if (bytes > maxBytes) {
+      throw new WsException(`${field} payload too large`);
+    }
+  }
+
+  private trackJoin(
+    client: Socket,
+    userId: string,
+    consultationId: string,
+  ): void {
+    let rooms = this.socketRooms.get(client.id);
+    if (!rooms) {
+      rooms = new Set<string>();
+      this.socketRooms.set(client.id, rooms);
+    }
+    if (rooms.has(consultationId)) {
+      return;
+    }
+    rooms.add(consultationId);
+
+    let participants = this.roomParticipants.get(consultationId);
+    if (!participants) {
+      participants = new Map<string, number>();
+      this.roomParticipants.set(consultationId, participants);
+    }
+    const previous = participants.get(userId) ?? 0;
+    participants.set(userId, previous + 1);
+  }
+
+  private trackLeave(
+    client: Socket,
+    userId: string,
+    consultationId: string,
+  ): void {
+    const rooms = this.socketRooms.get(client.id);
+    if (!rooms?.has(consultationId)) {
+      return;
+    }
+    rooms.delete(consultationId);
+    if (rooms.size === 0) {
+      this.socketRooms.delete(client.id);
+    }
+
+    const participants = this.roomParticipants.get(consultationId);
+    if (!participants) {
+      return;
+    }
+    const previous = participants.get(userId) ?? 0;
+    if (previous <= 1) {
+      participants.delete(userId);
+    } else {
+      participants.set(userId, previous - 1);
+    }
+    if (participants.size === 0) {
+      this.roomParticipants.delete(consultationId);
+    }
+  }
+
+  private async cleanupSocketRooms(
+    client: Socket,
+    userId: string,
+    reason: 'disconnect',
+  ): Promise<void> {
+    const rooms = Array.from(this.socketRooms.get(client.id) ?? []);
+    for (const consultationId of rooms) {
+      this.trackLeave(client, userId, consultationId);
+      const roomState = await this.getDistributedRoomState(
+        consultationId,
+        userId,
+      );
+      if (roomState.userSocketCount === 0) {
+        this.server.to(consultationId).emit('peer-left', { userId, reason });
+      }
+    }
+  }
+
+  private async getDistributedRoomState(
+    consultationId: string,
+    userId: string,
+  ): Promise<RoomState> {
+    try {
+      const sockets = (await this.server
+        .in(consultationId)
+        .fetchSockets()) as RoomSocketSnapshot[];
+      const users = new Set<string>();
+      let userSocketCount = 0;
+      for (const socket of sockets) {
+        const sub = socket.data.user?.sub;
+        if (!sub) {
+          continue;
+        }
+        users.add(sub);
+        if (sub === userId) {
+          userSocketCount += 1;
+        }
+      }
+      return { peerCount: users.size, userSocketCount };
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      this.logger.warn('webrtc_room_state_fetch_failed', {
+        event: 'webrtc_room_state_fetch_failed',
+        consultationId,
+        error: error.message,
+      });
+      captureMessage('webrtc_room_state_fetch_failed', 'warning', {
+        event: 'webrtc_room_state_fetch_failed',
+        consultationId,
+        error: error.message,
+      });
+      return {
+        peerCount: this.countParticipants(consultationId),
+        userSocketCount:
+          this.roomParticipants.get(consultationId)?.get(userId) ?? 0,
+      };
+    }
+  }
+
+  private countParticipants(consultationId: string): number {
+    return this.roomParticipants.get(consultationId)?.size ?? 0;
   }
 
   private extractToken(client: Socket): string | null {
@@ -251,12 +503,14 @@ export class WebrtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
     ) {
       return header.slice(7).trim();
     }
-    const q = client.handshake.query.token;
-    if (typeof q === 'string' && q.length > 0) {
-      return q;
-    }
-    if (Array.isArray(q) && typeof q[0] === 'string') {
-      return q[0];
+    if (process.env.NODE_ENV !== 'production') {
+      const q = client.handshake.query.token;
+      if (typeof q === 'string' && q.length > 0) {
+        return q;
+      }
+      if (Array.isArray(q) && typeof q[0] === 'string') {
+        return q[0];
+      }
     }
     return null;
   }

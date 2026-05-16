@@ -2,7 +2,6 @@ import { Logger, RequestMethod, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import { IoAdapter } from '@nestjs/platform-socket.io';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import cookieParser from 'cookie-parser';
 import { registerSlackWebhookFromEnv } from './common/alerts/slack-webhook.sink';
@@ -15,10 +14,28 @@ import {
   assertRedisConfiguredForMultiInstanceProduction,
   productionReplicaCount,
 } from './config/redis-requirement';
+import { RedisIoAdapter } from './common/websocket/redis-io.adapter';
 import { allowedOrigins, corsOrigin } from './config/origin-allowlist';
+import {
+  captureException,
+  captureMessage,
+  initSentry,
+} from './common/observability/sentry';
 import type { Request, Response } from 'express';
 
 const bootstrapLogger = new Logger('Bootstrap');
+initSentry();
+
+process.on('unhandledRejection', (reason) => {
+  const error = reason instanceof Error ? reason : new Error(String(reason));
+  bootstrapLogger.error('unhandled_promise_rejection', error.stack);
+  captureException(error, { event: 'unhandled_promise_rejection' });
+});
+
+process.on('uncaughtException', (error) => {
+  bootstrapLogger.error('uncaught_exception', error.stack);
+  captureException(error, { event: 'uncaught_exception' });
+});
 
 function isSwaggerEnabled(): boolean {
   return (
@@ -43,6 +60,10 @@ function sanitizeDatabaseUrlForLog(raw?: string): string {
 
 async function bootstrap() {
   registerSlackWebhookFromEnv();
+  captureMessage('backend_bootstrap_start', 'info', {
+    nodeEnv: process.env.NODE_ENV ?? null,
+    railwayEnvironment: process.env.RAILWAY_ENVIRONMENT ?? null,
+  });
 
   bootstrapLogger.log('bootstrap_context', {
     NODE_ENV: process.env.NODE_ENV ?? 'undefined',
@@ -106,7 +127,9 @@ async function bootstrap() {
   });
 
   app.use(cookieParser());
-  app.useWebSocketAdapter(new IoAdapter(app));
+  const redisIoAdapter = new RedisIoAdapter(app);
+  await redisIoAdapter.connectToRedis();
+  app.useWebSocketAdapter(redisIoAdapter);
 
   /**
    * Prefijo global antes de guards: rutas y Throttler alineados con `/api/...`
@@ -195,6 +218,7 @@ async function bootstrap() {
 }
 
 bootstrap().catch((err: unknown) => {
+  captureException(err, { event: 'bootstrap_fatal_error' });
   console.error('[HeyDoctor] Fatal startup error', err);
   process.exit(1);
 });
