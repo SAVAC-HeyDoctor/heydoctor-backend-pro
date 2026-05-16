@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { RequestTraceIndexService } from '../common/observability/request-trace-index.service';
+import { getSocketIoRedisHealth } from '../common/websocket/socket-io-health';
 import { ProductEvent } from '../growth/product-event.entity';
 import { SubscriptionsAnalyticsService } from '../subscriptions/subscriptions-analytics.service';
 import { OpsAlertsRecentService } from './ops-alerts-recent.service';
@@ -63,6 +64,7 @@ export class OpsOverviewService {
       paymentsToday: payStats.paymentCount,
       revenueToday: payStats.revenueClp,
       alertsLast24h,
+      socketIoRedis: getSocketIoRedisHealth(),
       requestsPerMinuteSeries: httpSnap.requestsPerMinuteSeries,
       errorsByEndpoint: httpSnap.errorsByEndpoint,
       topEndpointsByLatency,

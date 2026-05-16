@@ -7,6 +7,7 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
+import { captureMessage } from '../common/observability/sentry';
 import { ConsultationsService } from '../consultations/consultations.service';
 import { RecordWebrtcMetricDto } from './dto/record-webrtc-metric.dto';
 import { WebrtcMetricSample } from './entities/webrtc-metric-sample.entity';
@@ -97,6 +98,11 @@ export class WebrtcService {
           this.urlsFor(server).some((url) => url.startsWith('stun:')),
         ),
       });
+      captureMessage('webrtc_turn_missing_production_config', 'error', {
+        event: 'webrtc_turn_missing_production_config',
+        consultationId,
+        userId: authUser.sub,
+      });
       throw new ServiceUnavailableException(
         'TURN is required for production video calls',
       );
@@ -142,6 +148,16 @@ export class WebrtcService {
       (dto.connectionState && DEGRADED_ICE_STATES.has(dto.connectionState))
     ) {
       this.logger.warn('webrtc_connection_degraded', {
+        event: 'webrtc_connection_degraded',
+        consultationId: dto.consultationId,
+        userId: authUser.sub,
+        iceConnectionState: dto.iceConnectionState ?? null,
+        connectionState: dto.connectionState ?? null,
+        signalingState: dto.signalingState ?? null,
+        rtt: dto.rtt ?? null,
+        packetLossRatio: ratio,
+      });
+      captureMessage('webrtc_connection_degraded', 'warning', {
         event: 'webrtc_connection_degraded',
         consultationId: dto.consultationId,
         userId: authUser.sub,

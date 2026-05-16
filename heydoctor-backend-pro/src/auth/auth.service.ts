@@ -25,6 +25,7 @@ import {
   assertClinicIdForSave,
 } from '../common/entity-clinic.util';
 import { APP_LOGGER } from '../common/logger/logger.tokens';
+import { captureMessage } from '../common/observability/sentry';
 import { ClinicService } from '../clinic/clinic.service';
 import { UsersService } from '../users/users.service';
 import { RefreshToken } from './entities/refresh-token.entity';
@@ -156,6 +157,10 @@ export class AuthService {
       this.logger.warn('User login failed', {
         reason: 'invalid_credentials',
       });
+      captureMessage('auth_login_failed', 'warning', {
+        event: 'auth_login_failed',
+        reason: 'invalid_credentials',
+      });
       throw new UnauthorizedException('Invalid credentials');
     }
 
@@ -264,6 +269,10 @@ export class AuthService {
             tokenHashPrefix: tokenHash.slice(0, 8),
             ip: ctx.ip,
           });
+          captureMessage('auth_refresh_failed', 'warning', {
+            event: 'auth_refresh_failed',
+            reason: 'token_not_found',
+          });
           throw new UnauthorizedException('Invalid refresh token');
         }
 
@@ -304,6 +313,11 @@ export class AuthService {
             familyId: stored.familyId,
             ip: ctx.ip,
           });
+          captureMessage('auth_refresh_reuse_detected', 'warning', {
+            event: 'auth_refresh_reuse_detected',
+            userId: stored.userId,
+            familyId: stored.familyId,
+          });
           return { status: 'reuse' };
         }
 
@@ -318,6 +332,11 @@ export class AuthService {
             expiresAt: stored.expiresAt.toISOString(),
             now: now.toISOString(),
             ip: ctx.ip,
+          });
+          captureMessage('auth_refresh_failed', 'warning', {
+            event: 'auth_refresh_failed',
+            reason: 'token_expired',
+            userId: stored.userId,
           });
           return { status: 'expired' };
         }

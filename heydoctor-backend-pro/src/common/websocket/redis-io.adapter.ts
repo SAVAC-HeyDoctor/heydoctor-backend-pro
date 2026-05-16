@@ -4,6 +4,8 @@ import type { INestApplicationContext } from '@nestjs/common';
 import { createAdapter } from '@socket.io/redis-adapter';
 import Redis from 'ioredis';
 import type { Server, ServerOptions } from 'socket.io';
+import { captureException, captureMessage } from '../observability/sentry';
+import { setSocketIoRedisHealth } from './socket-io-health';
 
 type SocketIoRedisAdapter = ReturnType<typeof createAdapter>;
 
@@ -26,9 +28,26 @@ export class RedisIoAdapter extends IoAdapter {
       this.logger.warn(
         'socket_io_redis_adapter_disabled: REDIS_URL is not configured; WebSocket rooms are local to this process',
       );
+      setSocketIoRedisHealth({
+        adapter: 'local',
+        status: 'disabled',
+        redisConfigured: false,
+        pubStatus: null,
+        subStatus: null,
+        lastError: 'REDIS_URL not configured',
+      });
+      captureMessage('socket_io_redis_adapter_disabled', 'warning', {
+        event: 'socket_io_redis_adapter_disabled',
+      });
       return;
     }
 
+    setSocketIoRedisHealth({
+      adapter: 'redis',
+      status: 'connecting',
+      redisConfigured: true,
+      lastError: null,
+    });
     const pubClient = this.createRedisClient(redisUrl, 'pub');
     const subClient = pubClient.duplicate();
     this.attachRedisLogging(pubClient, 'pub');
@@ -56,6 +75,17 @@ export class RedisIoAdapter extends IoAdapter {
       });
       this.disconnectRedisClients(pubClient, subClient);
       this.adapterConstructor = null;
+      setSocketIoRedisHealth({
+        adapter: 'local',
+        status: 'unavailable',
+        redisConfigured: true,
+        pubStatus: pubClient.status,
+        subStatus: subClient.status,
+        lastError: error.message,
+      });
+      captureException(error, {
+        event: 'socket_io_redis_adapter_unavailable',
+      });
     }
   }
 
@@ -70,6 +100,11 @@ export class RedisIoAdapter extends IoAdapter {
       this.logger.warn(
         'socket_io_local_adapter_active: distributed WebSocket room sync is disabled',
       );
+      setSocketIoRedisHealth({
+        adapter: 'local',
+        status: 'degraded',
+        lastError: 'Socket.IO Redis adapter not active',
+      });
     }
     return server;
   }
@@ -96,21 +131,47 @@ export class RedisIoAdapter extends IoAdapter {
   private attachRedisLogging(client: Redis, role: 'pub' | 'sub'): void {
     client.on('connect', () => {
       this.logger.log(`socket_io_redis_${role}_connect`);
+      this.updateRedisHealth(role, client.status, 'connecting');
     });
     client.on('ready', () => {
       this.logger.log(`socket_io_redis_${role}_ready`);
+      this.updateRedisHealth(role, client.status, 'ready');
     });
     client.on('reconnecting', () => {
       this.logger.warn(`socket_io_redis_${role}_reconnecting`);
+      this.updateRedisHealth(role, client.status, 'degraded');
+      captureMessage(`socket_io_redis_${role}_reconnecting`, 'warning', {
+        event: `socket_io_redis_${role}_reconnecting`,
+      });
     });
     client.on('end', () => {
       this.logger.warn(`socket_io_redis_${role}_end`);
+      this.updateRedisHealth(role, client.status, 'ended');
     });
     client.on('error', (err: Error) => {
       this.logger.error(`socket_io_redis_${role}_error`, {
         event: `socket_io_redis_${role}_error`,
         error: err.message,
       });
+      this.updateRedisHealth(role, client.status, 'degraded', err.message);
+      captureException(err, {
+        event: `socket_io_redis_${role}_error`,
+      });
+    });
+  }
+
+  private updateRedisHealth(
+    role: 'pub' | 'sub',
+    status: string,
+    adapterStatus: 'connecting' | 'ready' | 'degraded' | 'ended',
+    error?: string,
+  ): void {
+    setSocketIoRedisHealth({
+      adapter: 'redis',
+      status: adapterStatus,
+      redisConfigured: true,
+      ...(role === 'pub' ? { pubStatus: status } : { subStatus: status }),
+      ...(error ? { lastError: error } : { lastError: null }),
     });
   }
 

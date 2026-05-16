@@ -18,6 +18,7 @@ import { CSRF_COOKIE } from '../common/csrf/csrf.constants';
 import { Throttle } from '@nestjs/throttler';
 import { getCurrentRequestId } from '../common/request-context.storage';
 import { APP_LOGGER } from '../common/logger/logger.tokens';
+import { captureMessage } from '../common/observability/sentry';
 import type { Request, Response } from 'express';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { Public } from './decorators/public.decorator';
@@ -246,6 +247,11 @@ export class AuthController {
         hasAuthHeader: Boolean(authHeader),
         ip: req.ip ?? null,
       });
+      captureMessage('auth_refresh_no_token', 'warning', {
+        event: 'auth_refresh_no_token',
+        requestId,
+        hasAuthHeader: Boolean(authHeader),
+      });
       throw new UnauthorizedException('No refresh token');
     }
 
@@ -277,6 +283,12 @@ export class AuthController {
         error: error.message,
         source: cookieToken ? 'cookie' : 'bearer',
         ip: ctx.ip,
+      });
+      captureMessage('auth_refresh_failed', 'warning', {
+        event: 'auth_refresh_failed',
+        requestId,
+        errorName: error.name,
+        source: cookieToken ? 'cookie' : 'bearer',
       });
       throw err;
     }

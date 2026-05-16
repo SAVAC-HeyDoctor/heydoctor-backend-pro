@@ -1,4 +1,4 @@
-import { Logger } from '@nestjs/common';
+import { Logger, UseFilters } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { SkipThrottle } from '@nestjs/throttler';
 import {
@@ -15,6 +15,8 @@ import type { Server, Socket } from 'socket.io';
 import type { JwtPayload } from '../auth/types/jwt-payload.interface';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import { ACCESS_TOKEN_COOKIE } from '../auth/auth-cookies';
+import { SentryWsExceptionFilter } from '../common/filters/sentry-ws-exception.filter';
+import { captureMessage } from '../common/observability/sentry';
 import { corsOrigin } from '../config/origin-allowlist';
 import { ConsultationsService } from '../consultations/consultations.service';
 import { SubscriptionPlan } from '../subscriptions/subscription.entity';
@@ -64,6 +66,7 @@ type RoomState = {
     credentials: true,
   },
 })
+@UseFilters(new SentryWsExceptionFilter())
 /**
  * No usar FeatureGuard / RequirePlan a nivel de gateway: en WS el guard puede
  * ejecutarse antes de que `handleConnection` asigne `client.data.user` → Forbidden sin ACK.
@@ -88,6 +91,11 @@ export class WebrtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const token = this.extractToken(client);
     if (!token) {
       this.logger.warn(`WS disconnect: no token (${client.id})`);
+      captureMessage('webrtc_socket_auth_failed', 'warning', {
+        event: 'webrtc_socket_auth_failed',
+        reason: 'missing_token',
+        socketId: client.id,
+      });
       client.disconnect(true);
       return;
     }
@@ -95,6 +103,11 @@ export class WebrtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
       const payload = await this.jwtService.verifyAsync<JwtPayload>(token);
       const user = await this.usersService.findById(payload.sub);
       if (!user || user.email !== payload.email || user.role !== payload.role) {
+        captureMessage('webrtc_socket_auth_failed', 'warning', {
+          event: 'webrtc_socket_auth_failed',
+          reason: 'user_payload_mismatch',
+          socketId: client.id,
+        });
         client.disconnect(true);
         return;
       }
@@ -110,11 +123,24 @@ export class WebrtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
       );
       if (!canUseWebrtc) {
         this.logger.warn(`WS disconnect: plan free (${client.id})`);
+        captureMessage('webrtc_socket_auth_failed', 'warning', {
+          event: 'webrtc_socket_auth_failed',
+          reason: 'plan_required',
+          socketId: client.id,
+          userId: authUser.sub,
+          clinicId: authUser.clinicId,
+        });
         client.disconnect(true);
         return;
       }
       (client.data as { user?: AuthenticatedUser }).user = authUser;
-    } catch {
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      captureMessage('webrtc_socket_auth_failed', 'warning', {
+        event: 'webrtc_socket_auth_failed',
+        reason: error.name,
+        socketId: client.id,
+      });
       client.disconnect(true);
     }
   }
@@ -171,6 +197,12 @@ export class WebrtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.logger.warn(
         `join-consultation.failed user=${user.sub} consultation=${consultationId}: ${msg}`,
       );
+      captureMessage('webrtc_join_consultation_failed', 'warning', {
+        event: 'webrtc_join_consultation_failed',
+        consultationId,
+        userId: user.sub,
+        error: msg,
+      });
       throw err;
     }
   }
@@ -258,6 +290,14 @@ export class WebrtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
       userId: user.sub,
       state,
     });
+    if (level === 'warn') {
+      captureMessage('webrtc_ice_state_degraded', 'warning', {
+        event: 'webrtc_ice_state_degraded',
+        consultationId,
+        userId: user.sub,
+        state,
+      });
+    }
     client.to(consultationId).emit('peer-ice-state', {
       fromUserId: user.sub,
       state,
@@ -417,6 +457,11 @@ export class WebrtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
       this.logger.warn('webrtc_room_state_fetch_failed', {
+        event: 'webrtc_room_state_fetch_failed',
+        consultationId,
+        error: error.message,
+      });
+      captureMessage('webrtc_room_state_fetch_failed', 'warning', {
         event: 'webrtc_room_state_fetch_failed',
         consultationId,
         error: error.message,

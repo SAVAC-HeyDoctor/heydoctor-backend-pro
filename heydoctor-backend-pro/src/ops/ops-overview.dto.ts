@@ -10,6 +10,15 @@ export type OpsOverviewDto = {
   paymentsToday: number;
   revenueToday: number;
   alertsLast24h: number;
+  socketIoRedis: {
+    adapter: 'redis' | 'local';
+    status: string;
+    redisConfigured: boolean;
+    pubStatus: string | null;
+    subStatus: string | null;
+    lastEventAt: string;
+    lastError: string | null;
+  };
   /** Últimos 30 minutos, bucket por minuto (UTC), para gráficos. */
   requestsPerMinuteSeries: { minute: string; count: number }[];
   /** Top endpoints con 5xx en la ventana de métricas HTTP (~5 min). */
