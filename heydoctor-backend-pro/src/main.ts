@@ -96,6 +96,7 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     rawBody: true,
   });
+  app.enableShutdownHooks(['SIGTERM', 'SIGINT']);
 
   if (isSwaggerEnabled()) {
     const swaggerConfig = new DocumentBuilder()
@@ -140,6 +141,8 @@ async function bootstrap() {
       { path: '/', method: RequestMethod.GET },
       { path: 'health', method: RequestMethod.GET },
       { path: 'healthz', method: RequestMethod.GET },
+      { path: 'livez', method: RequestMethod.GET },
+      { path: 'readyz', method: RequestMethod.GET },
       /** Links mágicos para pacientes (sin `/api` en SMS/email). */
       { path: 'appointments/confirm/(.*)', method: RequestMethod.GET },
       { path: 'appointments/cancel/(.*)', method: RequestMethod.GET },
