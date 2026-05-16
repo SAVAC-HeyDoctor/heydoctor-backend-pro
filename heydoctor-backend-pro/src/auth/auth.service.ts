@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
-import { createHash, randomBytes } from 'crypto';
+import { createHash, randomBytes, randomUUID } from 'crypto';
 import { IsNull, MoreThan, Repository } from 'typeorm';
 import { AuditLog } from '../audit/audit-log.entity';
 import { AuditOutcome } from '../audit/audit-outcome.enum';
@@ -69,6 +69,21 @@ export type MeResponse = {
   subscriptionStatus: SubscriptionStatus | null;
 };
 
+type CreatedRefreshToken = {
+  raw: string;
+  entity: RefreshToken;
+};
+
+type RefreshRotationResult =
+  | {
+      status: 'ok';
+      accessToken: string;
+      newRefreshToken: string;
+    }
+  | {
+      status: 'expired' | 'reuse';
+    };
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -124,6 +139,7 @@ export class AuthService {
       dto.currentPassword,
       dto.newPassword,
     );
+    await this.revokeAllUserTokens(userId);
   }
 
   async login(dto: LoginDto, ctx: RequestContext) {
@@ -170,6 +186,22 @@ export class AuthService {
     ctx: RequestContext,
     repoOrManager: Repository<RefreshToken> = this.refreshTokenRepository,
   ): Promise<string> {
+    const { raw } = await this.createRefreshTokenRecord(
+      userId,
+      ctx,
+      repoOrManager,
+      randomUUID(),
+    );
+
+    return raw;
+  }
+
+  private async createRefreshTokenRecord(
+    userId: string,
+    ctx: RequestContext,
+    repoOrManager: Repository<RefreshToken>,
+    familyId: string,
+  ): Promise<CreatedRefreshToken> {
     await this.enforceSessionLimit(userId, repoOrManager);
 
     const raw = generateRawToken();
@@ -189,13 +221,14 @@ export class AuthService {
       tokenHash,
       userId,
       expiresAt,
+      familyId,
       ipAddress: ctx.ip,
       userAgent: ctx.userAgent ? ctx.userAgent.slice(0, 512) : null,
     });
     assignClinic(entity, user.clinicId);
-    await repoOrManager.save(entity);
+    const saved = await repoOrManager.save(entity);
 
-    return raw;
+    return { raw, entity: saved };
   }
 
   /**
@@ -217,114 +250,174 @@ export class AuthService {
       userAgent: ctx.userAgent?.slice(0, 128) ?? null,
     });
 
-    return this.refreshTokenRepository.manager.transaction(async (manager) => {
+    const result = await this.refreshTokenRepository.manager.transaction(
+      async (manager): Promise<RefreshRotationResult> => {
+        const repo = manager.getRepository(RefreshToken);
+        const stored = await repo.findOne({
+          where: { tokenHash },
+          lock: { mode: 'pessimistic_write' },
+        });
+
+        if (!stored) {
+          this.logger.warn('refresh_token_not_found', {
+            event: 'refresh_token_not_found',
+            tokenHashPrefix: tokenHash.slice(0, 8),
+            ip: ctx.ip,
+          });
+          throw new UnauthorizedException('Invalid refresh token');
+        }
+
+        this.logger.log('refresh_token_found', {
+          event: 'refresh_token_found',
+          tokenId: stored.id,
+          userId: stored.userId,
+          expiresAt: stored.expiresAt.toISOString(),
+          revokedAt: stored.revokedAt ? stored.revokedAt.toISOString() : null,
+          now: new Date().toISOString(),
+        });
+
+        const now = new Date();
+
+        if (stored.revokedAt) {
+          if (stored.familyId) {
+            await this.revokeRefreshTokenFamily(repo, stored, now);
+          } else {
+            await repo.update(
+              { userId: stored.userId, revokedAt: IsNull() },
+              { revokedAt: now },
+            );
+          }
+          await this.logSecurityEvent(
+            'AUTH_REFRESH_REUSE_DETECTED',
+            stored.userId,
+            ctx,
+            {
+              tokenId: stored.id,
+              familyId: stored.familyId,
+              revokedAt: stored.revokedAt.toISOString(),
+            },
+          );
+          this.logger.warn('refresh_token_reuse_detected', {
+            event: 'refresh_token_reuse_detected',
+            tokenId: stored.id,
+            userId: stored.userId,
+            familyId: stored.familyId,
+            ip: ctx.ip,
+          });
+          return { status: 'reuse' };
+        }
+
+        if (stored.expiresAt < now) {
+          stored.revokedAt = now;
+          stored.lastUsedAt = now;
+          await repo.save(stored);
+          this.logger.warn('refresh_token_expired', {
+            event: 'refresh_token_expired',
+            tokenId: stored.id,
+            userId: stored.userId,
+            expiresAt: stored.expiresAt.toISOString(),
+            now: now.toISOString(),
+            ip: ctx.ip,
+          });
+          return { status: 'expired' };
+        }
+
+        const user = await this.usersService.findById(stored.userId);
+        if (!user) {
+          this.logger.error('refresh_token_user_not_found', {
+            event: 'refresh_token_user_not_found',
+            userId: stored.userId,
+            tokenId: stored.id,
+          });
+          throw new UnauthorizedException('User not found');
+        }
+
+        if (user.isActive === false) {
+          this.logger.warn('refresh_token_user_inactive', {
+            event: 'refresh_token_user_inactive',
+            userId: user.id,
+            tokenId: stored.id,
+          });
+          throw new UnauthorizedException('User account is inactive');
+        }
+
+        if (!user.clinicId) {
+          this.logger.error('refresh_token_user_no_clinic', {
+            event: 'refresh_token_user_no_clinic',
+            userId: user.id,
+            tokenId: stored.id,
+          });
+          throw new UnauthorizedException(
+            'User has no clinic assigned; cannot refresh session',
+          );
+        }
+
+        const payload: JwtPayload = {
+          sub: user.id,
+          email: user.email,
+          role: user.role,
+          clinicId: user.clinicId ?? null,
+        };
+        const accessToken = await this.jwtService.signAsync(payload);
+        const familyId = stored.familyId ?? stored.id;
+        stored.familyId = familyId;
+        stored.revokedAt = now;
+        stored.lastUsedAt = now;
+        await repo.save(stored);
+
+        const { raw: newRefreshToken, entity: newStored } =
+          await this.createRefreshTokenRecord(user.id, ctx, repo, familyId);
+
+        stored.replacedByTokenId = newStored.id;
+        await repo.save(stored);
+
+        await this.logSecurityEvent('AUTH_REFRESH_SUCCESS', user.id, ctx, {
+          previousTokenId: stored.id,
+          newTokenId: newStored.id,
+          familyId,
+        });
+
+        this.logger.log('refresh_token_rotated', {
+          event: 'refresh_token_rotated',
+          userId: user.id,
+          previousTokenId: stored.id,
+          newTokenId: newStored.id,
+          familyId,
+          ip: ctx.ip,
+        });
+
+        return { status: 'ok', accessToken, newRefreshToken };
+      },
+    );
+
+    if (result.status !== 'ok') {
+      throw new UnauthorizedException(
+        result.status === 'reuse'
+          ? 'Refresh token reuse detected'
+          : 'Refresh token expired',
+      );
+    }
+
+    return {
+      accessToken: result.accessToken,
+      newRefreshToken: result.newRefreshToken,
+    };
+  }
+
+  async revokeRefreshToken(rawToken: string): Promise<void> {
+    const tokenHash = hashToken(rawToken);
+    await this.refreshTokenRepository.manager.transaction(async (manager) => {
       const repo = manager.getRepository(RefreshToken);
       const stored = await repo.findOne({
         where: { tokenHash },
         lock: { mode: 'pessimistic_write' },
       });
-
       if (!stored) {
-        this.logger.warn('refresh_token_not_found', {
-          event: 'refresh_token_not_found',
-          tokenHashPrefix: tokenHash.slice(0, 8),
-          ip: ctx.ip,
-        });
-        throw new UnauthorizedException('Invalid refresh token');
+        return;
       }
 
-      this.logger.log('refresh_token_found', {
-        event: 'refresh_token_found',
-        tokenId: stored.id,
-        userId: stored.userId,
-        expiresAt: stored.expiresAt.toISOString(),
-        revokedAt: stored.revokedAt ? stored.revokedAt.toISOString() : null,
-        now: new Date().toISOString(),
-      });
-
-      // TEMP: disable reuse/revoked checks — restores stability; re-enable rotation later.
-      // if (stored.revokedAt) { ... UnauthorizedException ... }
-
-      if (stored.expiresAt < new Date()) {
-        this.logger.warn('refresh_token_expired', {
-          event: 'refresh_token_expired',
-          tokenId: stored.id,
-          userId: stored.userId,
-          expiresAt: stored.expiresAt.toISOString(),
-          now: new Date().toISOString(),
-          ip: ctx.ip,
-        });
-        throw new UnauthorizedException('Refresh token expired');
-      }
-
-      // TEMP: do not revoke or touch row on rotate (avoid spurious 401); restore later.
-      // stored.revokedAt = new Date();
-      // stored.lastUsedAt = new Date();
-      // await repo.save(stored);
-
-      const user = await this.usersService.findById(stored.userId);
-      if (!user) {
-        this.logger.error('refresh_token_user_not_found', {
-          event: 'refresh_token_user_not_found',
-          userId: stored.userId,
-          tokenId: stored.id,
-        });
-        throw new UnauthorizedException('User not found');
-      }
-
-      if (user.isActive === false) {
-        this.logger.warn('refresh_token_user_inactive', {
-          event: 'refresh_token_user_inactive',
-          userId: user.id,
-          tokenId: stored.id,
-        });
-        throw new UnauthorizedException('User account is inactive');
-      }
-
-      if (!user.clinicId) {
-        this.logger.error('refresh_token_user_no_clinic', {
-          event: 'refresh_token_user_no_clinic',
-          userId: user.id,
-          tokenId: stored.id,
-        });
-        throw new UnauthorizedException(
-          'User has no clinic assigned; cannot refresh session',
-        );
-      }
-
-      const payload: JwtPayload = {
-        sub: user.id,
-        email: user.email,
-        role: user.role,
-        clinicId: user.clinicId ?? null,
-      };
-      const accessToken = await this.jwtService.signAsync(payload);
-      const newRefreshToken = await this.createRefreshToken(user.id, ctx, repo);
-
-      await this.logSecurityEvent('AUTH_REFRESH_SUCCESS', user.id, ctx, {
-        previousTokenId: stored.id,
-      });
-
-      this.logger.log('refresh_token_rotated', {
-        event: 'refresh_token_rotated',
-        userId: user.id,
-        previousTokenId: stored.id,
-        ip: ctx.ip,
-      });
-
-      return { accessToken, newRefreshToken };
+      await this.revokeRefreshTokenFamily(repo, stored, new Date());
     });
-  }
-
-  async revokeRefreshToken(rawToken: string): Promise<void> {
-    const tokenHash = hashToken(rawToken);
-    const stored = await this.refreshTokenRepository.findOne({
-      where: { tokenHash },
-    });
-    if (stored && !stored.revokedAt) {
-      stored.revokedAt = new Date();
-      await this.refreshTokenRepository.save(stored);
-    }
   }
 
   async revokeAllUserTokens(userId: string): Promise<void> {
@@ -332,6 +425,29 @@ export class AuthService {
       { userId, revokedAt: IsNull() },
       { revokedAt: new Date() },
     );
+  }
+
+  private async revokeRefreshTokenFamily(
+    repo: Repository<RefreshToken>,
+    token: RefreshToken,
+    revokedAt: Date,
+  ): Promise<void> {
+    if (token.familyId) {
+      await repo.update(
+        {
+          userId: token.userId,
+          familyId: token.familyId,
+          revokedAt: IsNull(),
+        },
+        { revokedAt },
+      );
+      return;
+    }
+
+    if (!token.revokedAt) {
+      token.revokedAt = revokedAt;
+      await repo.save(token);
+    }
   }
 
   // ── Session limit enforcement ─────────────────────────────────
@@ -413,7 +529,8 @@ export class AuthService {
           action.includes('FAIL') || action.includes('REUSE')
             ? AuditOutcome.ERROR
             : AuditOutcome.SUCCESS,
-        httpStatus: action.includes('FAIL') ? 401 : 200,
+        httpStatus:
+          action.includes('FAIL') || action.includes('REUSE') ? 401 : 200,
         errorMessage: null,
         metadata: {
           ip: ctx.ip,

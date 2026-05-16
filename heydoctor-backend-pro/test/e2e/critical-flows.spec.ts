@@ -221,13 +221,29 @@ async function flushAsyncAuditWrites(): Promise<void> {
           .expect(401);
       });
 
-      it('refresh con cookie emite nuevo access_token', async () => {
+      it('refresh rota token y detecta replay del token anterior', async () => {
+        const originalCookie = cookieAdmin;
         const res = await request(app.getHttpServer())
           .post('/api/auth/refresh')
-          .set('Cookie', cookieAdmin)
+          .set('Cookie', originalCookie)
           .expect(expectOkOrCreated);
         expect(res.body.access_token).toBeTruthy();
         expect(res.body.ok).toBe(true);
+
+        const rotatedCookie = cookieHeaderFromSetCookie(
+          res.headers['set-cookie'],
+        );
+        expect(rotatedCookie).toContain('refresh_token=');
+
+        await request(app.getHttpServer())
+          .post('/api/auth/refresh')
+          .set('Cookie', originalCookie)
+          .expect(401);
+
+        await request(app.getHttpServer())
+          .post('/api/auth/refresh')
+          .set('Cookie', rotatedCookie)
+          .expect(401);
       });
 
       it('acceso sin auth a recurso protegido → 401', () => {
