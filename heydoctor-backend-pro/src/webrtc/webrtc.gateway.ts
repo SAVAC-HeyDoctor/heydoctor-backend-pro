@@ -17,7 +17,7 @@ import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import { ACCESS_TOKEN_COOKIE } from '../auth/auth-cookies';
 import { SentryWsExceptionFilter } from '../common/filters/sentry-ws-exception.filter';
 import { captureMessage } from '../common/observability/sentry';
-import { corsOrigin } from '../config/origin-allowlist';
+import { corsOrigin, socketAllowRequest } from '../config/origin-allowlist';
 import { ConsultationsService } from '../consultations/consultations.service';
 import { SubscriptionPlan } from '../subscriptions/subscription.entity';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
@@ -65,6 +65,7 @@ type RoomState = {
     origin: corsOrigin,
     credentials: true,
   },
+  allowRequest: socketAllowRequest,
 })
 @UseFilters(new SentryWsExceptionFilter())
 /**
