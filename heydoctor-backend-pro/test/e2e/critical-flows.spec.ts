@@ -9,7 +9,11 @@
  * - `INCIDENT_CORRELATION_REDIS=false` — correlación de alertas en memoria (tests más estables).
  */
 
-import { INestApplication, RequestMethod, ValidationPipe } from '@nestjs/common';
+import {
+  INestApplication,
+  RequestMethod,
+  ValidationPipe,
+} from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import type { Server as HttpServer } from 'node:http';
 import cookieParser from 'cookie-parser';
@@ -90,10 +94,11 @@ async function flushAsyncAuditWrites(): Promise<void> {
   () => {
     let app: INestApplication<App>;
     const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
-    const anonSessionId = `anon_sess_${suffix.replace(/[^a-zA-Z0-9_]/g, '').padEnd(16, 'x')}`.slice(
-      0,
-      80,
-    );
+    const anonSessionId =
+      `anon_sess_${suffix.replace(/[^a-zA-Z0-9_]/g, '').padEnd(16, 'x')}`.slice(
+        0,
+        80,
+      );
 
     let cookieAdmin: string;
     let csrfAdmin: string;
@@ -384,6 +389,7 @@ async function flushAsyncAuditWrites(): Promise<void> {
       it('join-consultation con usuario PRO autorizado', async () => {
         const gateway = app.get(WebrtcGateway);
         const socket = {
+          id: `socket-${suffix}`,
           data: {
             user: {
               sub: doctorId,
@@ -396,6 +402,7 @@ async function flushAsyncAuditWrites(): Promise<void> {
           to: jest.fn().mockReturnValue({
             emit: jest.fn(),
           }),
+          emit: jest.fn(),
         } as unknown as Socket;
 
         const ack = await gateway.joinConsultation(socket, {

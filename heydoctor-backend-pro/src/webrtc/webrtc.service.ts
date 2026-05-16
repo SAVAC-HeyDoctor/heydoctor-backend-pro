@@ -1,4 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -34,6 +38,7 @@ export type WebrtcMetricsSummary = {
 const TREND_LIMIT = 50;
 
 const DEFAULT_STUN: IceServer[] = [{ urls: 'stun:stun.l.google.com:19302' }];
+const DEGRADED_ICE_STATES = new Set(['failed', 'disconnected']);
 
 @Injectable()
 export class WebrtcService {
@@ -84,6 +89,19 @@ export class WebrtcService {
       });
     }
 
+    if (this.isProductionRuntime() && !this.hasTurnServer(servers)) {
+      this.logger.error('webrtc_turn_missing_production_config', {
+        event: 'webrtc_turn_missing_production_config',
+        consultationId,
+        stunConfigured: servers.some((server) =>
+          this.urlsFor(server).some((url) => url.startsWith('stun:')),
+        ),
+      });
+      throw new ServiceUnavailableException(
+        'TURN is required for production video calls',
+      );
+    }
+
     return servers;
   }
 
@@ -111,9 +129,29 @@ export class WebrtcService {
       outboundBitrateBps: dto.bitrate ?? null,
       jitterMs: dto.jitter ?? null,
       packetsLost: dto.packetsLost ?? null,
+      iceConnectionState: dto.iceConnectionState ?? null,
+      connectionState: dto.connectionState ?? null,
+      signalingState: dto.signalingState ?? null,
     });
 
     await this.metricsRepository.save(sample);
+
+    if (
+      (dto.iceConnectionState &&
+        DEGRADED_ICE_STATES.has(dto.iceConnectionState)) ||
+      (dto.connectionState && DEGRADED_ICE_STATES.has(dto.connectionState))
+    ) {
+      this.logger.warn('webrtc_connection_degraded', {
+        event: 'webrtc_connection_degraded',
+        consultationId: dto.consultationId,
+        userId: authUser.sub,
+        iceConnectionState: dto.iceConnectionState ?? null,
+        connectionState: dto.connectionState ?? null,
+        signalingState: dto.signalingState ?? null,
+        rtt: dto.rtt ?? null,
+        packetLossRatio: ratio,
+      });
+    }
   }
 
   async getMetricsSummary(
@@ -180,6 +218,25 @@ export class WebrtcService {
       .split(',')
       .map((part) => part.trim())
       .filter((part) => part.length > 0);
+  }
+
+  private isProductionRuntime(): boolean {
+    return (
+      this.configService.get<string>('NODE_ENV') === 'production' ||
+      this.configService.get<string>('RAILWAY_ENVIRONMENT') === 'production'
+    );
+  }
+
+  private hasTurnServer(servers: IceServer[]): boolean {
+    return servers.some((server) =>
+      this.urlsFor(server).some(
+        (url) => url.startsWith('turn:') || url.startsWith('turns:'),
+      ),
+    );
+  }
+
+  private urlsFor(server: IceServer): string[] {
+    return Array.isArray(server.urls) ? server.urls : [server.urls];
   }
 
   private deriveLossRatio(

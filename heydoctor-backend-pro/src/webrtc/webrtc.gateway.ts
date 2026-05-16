@@ -20,9 +20,12 @@ import { ConsultationsService } from '../consultations/consultations.service';
 import { SubscriptionPlan } from '../subscriptions/subscription.entity';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { UsersService } from '../users/users.service';
+import { ICE_CONNECTION_STATES } from './dto/record-webrtc-metric.dto';
 
 const UUID_V4 =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const MAX_SDP_BYTES = 128_000;
+const MAX_ICE_CANDIDATE_BYTES = 16_000;
 
 type SignalingPayload = {
   consultationId: string;
@@ -34,6 +37,10 @@ type OfferAnswerPayload = SignalingPayload & {
 
 type IceCandidatePayload = SignalingPayload & {
   candidate: unknown;
+};
+
+type IceStatePayload = SignalingPayload & {
+  state: unknown;
 };
 
 @SkipThrottle()
@@ -54,6 +61,8 @@ export class WebrtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
   server!: Server;
 
   private readonly logger = new Logger(WebrtcGateway.name);
+  private readonly socketRooms = new Map<string, Set<string>>();
+  private readonly roomParticipants = new Map<string, Map<string, number>>();
 
   constructor(
     private readonly jwtService: JwtService,
@@ -101,6 +110,7 @@ export class WebrtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const u = (client.data as { user?: AuthenticatedUser }).user;
     if (u) {
       this.logger.debug(`WS disconnect user=${u.sub} socket=${client.id}`);
+      this.cleanupSocketRooms(client, u.sub, 'disconnect');
     }
   }
 
@@ -127,10 +137,17 @@ export class WebrtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
         user,
       );
       await client.join(consultationId);
+      const roomState = this.trackJoin(client, user.sub, consultationId);
       this.logger.log(
         `join-consultation.joined user=${user.sub} consultation=${consultationId}`,
       );
-      client.to(consultationId).emit('peer-joined', { userId: user.sub });
+      client.emit('room-state', {
+        consultationId,
+        peerCount: roomState.peerCount,
+      });
+      if (roomState.firstUserJoin) {
+        client.to(consultationId).emit('peer-joined', { userId: user.sub });
+      }
       return { ok: true, consultationId };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -142,16 +159,17 @@ export class WebrtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   @SubscribeMessage('offer')
-  async relayOffer(
+  relayOffer(
     @ConnectedSocket() client: Socket,
     @MessageBody() body: OfferAnswerPayload,
-  ): Promise<void> {
+  ): void {
     const user = this.requireUser(client);
     const consultationId = this.requireConsultationId(body?.consultationId);
     this.assertInRoom(client, consultationId);
     if (body?.sdp === undefined) {
       throw new WsException('sdp required');
     }
+    this.assertPayloadSize(body.sdp, 'sdp', MAX_SDP_BYTES);
     client.to(consultationId).emit('offer', {
       sdp: body.sdp,
       fromUserId: user.sub,
@@ -159,16 +177,17 @@ export class WebrtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   @SubscribeMessage('answer')
-  async relayAnswer(
+  relayAnswer(
     @ConnectedSocket() client: Socket,
     @MessageBody() body: OfferAnswerPayload,
-  ): Promise<void> {
+  ): void {
     const user = this.requireUser(client);
     const consultationId = this.requireConsultationId(body?.consultationId);
     this.assertInRoom(client, consultationId);
     if (body?.sdp === undefined) {
       throw new WsException('sdp required');
     }
+    this.assertPayloadSize(body.sdp, 'sdp', MAX_SDP_BYTES);
     client.to(consultationId).emit('answer', {
       sdp: body.sdp,
       fromUserId: user.sub,
@@ -176,20 +195,57 @@ export class WebrtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   @SubscribeMessage('ice-candidate')
-  async relayIce(
+  relayIce(
     @ConnectedSocket() client: Socket,
     @MessageBody() body: IceCandidatePayload,
-  ): Promise<void> {
+  ): void {
     const user = this.requireUser(client);
     const consultationId = this.requireConsultationId(body?.consultationId);
     this.assertInRoom(client, consultationId);
     if (body?.candidate === undefined) {
       throw new WsException('candidate required');
     }
+    this.assertPayloadSize(
+      body.candidate,
+      'candidate',
+      MAX_ICE_CANDIDATE_BYTES,
+    );
     client.to(consultationId).emit('ice-candidate', {
       candidate: body.candidate,
       fromUserId: user.sub,
     });
+  }
+
+  @SubscribeMessage('ice-state')
+  recordIceState(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: IceStatePayload,
+  ): { ok: true } {
+    const user = this.requireUser(client);
+    const consultationId = this.requireConsultationId(body?.consultationId);
+    this.assertInRoom(client, consultationId);
+    if (
+      typeof body?.state !== 'string' ||
+      !ICE_CONNECTION_STATES.includes(
+        body.state as (typeof ICE_CONNECTION_STATES)[number],
+      )
+    ) {
+      throw new WsException('Invalid ICE state');
+    }
+    const state = body.state;
+    const level =
+      state === 'failed' || state === 'disconnected' ? 'warn' : 'debug';
+    this.logger[level]('webrtc_ice_state', {
+      event: 'webrtc_ice_state',
+      consultationId,
+      userId: user.sub,
+      state,
+    });
+    client.to(consultationId).emit('peer-ice-state', {
+      fromUserId: user.sub,
+      state,
+    });
+    return { ok: true };
   }
 
   @SubscribeMessage('leave')
@@ -200,7 +256,10 @@ export class WebrtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const user = this.requireUser(client);
     const consultationId = this.requireConsultationId(body?.consultationId);
     await client.leave(consultationId);
-    client.to(consultationId).emit('peer-left', { userId: user.sub });
+    const roomState = this.trackLeave(client, user.sub, consultationId);
+    if (roomState.lastUserLeave) {
+      client.to(consultationId).emit('peer-left', { userId: user.sub });
+    }
     this.logger.debug(`User ${user.sub} left room ${consultationId}`);
     return { ok: true };
   }
@@ -224,6 +283,108 @@ export class WebrtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (!client.rooms.has(consultationId)) {
       throw new WsException('Join the consultation room first');
     }
+  }
+
+  private assertPayloadSize(
+    value: unknown,
+    field: string,
+    maxBytes: number,
+  ): void {
+    let bytes = 0;
+    try {
+      bytes = Buffer.byteLength(JSON.stringify(value), 'utf8');
+    } catch {
+      throw new WsException(`Invalid ${field}`);
+    }
+    if (bytes > maxBytes) {
+      throw new WsException(`${field} payload too large`);
+    }
+  }
+
+  private trackJoin(
+    client: Socket,
+    userId: string,
+    consultationId: string,
+  ): { firstUserJoin: boolean; peerCount: number } {
+    let rooms = this.socketRooms.get(client.id);
+    if (!rooms) {
+      rooms = new Set<string>();
+      this.socketRooms.set(client.id, rooms);
+    }
+    if (rooms.has(consultationId)) {
+      return {
+        firstUserJoin: false,
+        peerCount: this.countParticipants(consultationId),
+      };
+    }
+    rooms.add(consultationId);
+
+    let participants = this.roomParticipants.get(consultationId);
+    if (!participants) {
+      participants = new Map<string, number>();
+      this.roomParticipants.set(consultationId, participants);
+    }
+    const previous = participants.get(userId) ?? 0;
+    participants.set(userId, previous + 1);
+
+    return {
+      firstUserJoin: previous === 0,
+      peerCount: participants.size,
+    };
+  }
+
+  private trackLeave(
+    client: Socket,
+    userId: string,
+    consultationId: string,
+  ): { lastUserLeave: boolean; peerCount: number } {
+    const rooms = this.socketRooms.get(client.id);
+    if (!rooms?.has(consultationId)) {
+      return {
+        lastUserLeave: false,
+        peerCount: this.countParticipants(consultationId),
+      };
+    }
+    rooms.delete(consultationId);
+    if (rooms.size === 0) {
+      this.socketRooms.delete(client.id);
+    }
+
+    const participants = this.roomParticipants.get(consultationId);
+    if (!participants) {
+      return { lastUserLeave: false, peerCount: 0 };
+    }
+    const previous = participants.get(userId) ?? 0;
+    if (previous <= 1) {
+      participants.delete(userId);
+    } else {
+      participants.set(userId, previous - 1);
+    }
+    if (participants.size === 0) {
+      this.roomParticipants.delete(consultationId);
+    }
+    return {
+      lastUserLeave: previous <= 1,
+      peerCount: participants.size,
+    };
+  }
+
+  private cleanupSocketRooms(
+    client: Socket,
+    userId: string,
+    reason: 'disconnect',
+  ): void {
+    const rooms = Array.from(this.socketRooms.get(client.id) ?? []);
+    for (const consultationId of rooms) {
+      const roomState = this.trackLeave(client, userId, consultationId);
+      if (roomState.lastUserLeave) {
+        this.server.to(consultationId).emit('peer-left', { userId, reason });
+      }
+    }
+  }
+
+  private countParticipants(consultationId: string): number {
+    return this.roomParticipants.get(consultationId)?.size ?? 0;
   }
 
   private extractToken(client: Socket): string | null {
@@ -251,12 +412,14 @@ export class WebrtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
     ) {
       return header.slice(7).trim();
     }
-    const q = client.handshake.query.token;
-    if (typeof q === 'string' && q.length > 0) {
-      return q;
-    }
-    if (Array.isArray(q) && typeof q[0] === 'string') {
-      return q[0];
+    if (process.env.NODE_ENV !== 'production') {
+      const q = client.handshake.query.token;
+      if (typeof q === 'string' && q.length > 0) {
+        return q;
+      }
+      if (Array.isArray(q) && typeof q[0] === 'string') {
+        return q[0];
+      }
     }
     return null;
   }
