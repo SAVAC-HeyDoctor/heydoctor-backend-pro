@@ -29,8 +29,11 @@
 - GitHub Actions pipelines
 - Railway deployments
 - PostgreSQL migrations
-- Swagger/OpenAPI
-- Production CORS hardening
+- Swagger/OpenAPI disabled in production unless explicitly enabled
+- Production CORS hardening with explicit origin allowlist
+- Socket.IO/WebRTC origin validation aligned with REST CORS
+- HttpOnly refresh/access cookies with Railway trust proxy support
+- CSP/security headers on backend and frontend
 
 ---
 
@@ -66,6 +69,18 @@
 - CI green
 - Railway deployment healthy
 - migrations aligned
+- production-safe edge security hardening in place
+
+---
+
+## Sprint 1 Security Edge
+- CORS source of truth: `CORS_ALLOWED_ORIGINS` comma-separated HTTPS origins.
+- Backward-compatible CORS aliases: `CORS_ORIGIN`, `FRONTEND_URL`, `PUBLIC_APP_URL`, `NEXT_PUBLIC_APP_URL`, `VERCEL_FRONTEND_URL`, `VERCEL_URL`.
+- Localhost origins are allowed only outside `NODE_ENV=production`.
+- Socket.IO `/webrtc` uses the same origin allowlist and Redis adapter when `REDIS_URL` is configured.
+- Swagger is available in local/dev and disabled in production unless `ENABLE_SWAGGER=true`.
+- Production cookies require `Secure` + `SameSite=None`; `AUTH_COOKIE_DOMAIN` controls shared domain scope.
+- Frontend CSP is emitted by middleware per request with nonce support and explicit API/WebSocket/Sentry/TURN/STUN connect sources.
 
 ---
 

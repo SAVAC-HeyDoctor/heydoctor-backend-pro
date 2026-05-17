@@ -65,7 +65,11 @@ export class EnvConfig {
     this.databaseUrl = dbUrl;
 
     this.jwtSecret = config.get<string>('JWT_SECRET') ?? '';
-    this.corsOrigin = (config.get<string>('CORS_ORIGIN') ?? '')
+    this.corsOrigin = (
+      config.get<string>('CORS_ALLOWED_ORIGINS') ??
+      config.get<string>('CORS_ORIGIN') ??
+      ''
+    )
       .split(',')
       .map((s) => s.trim())
       .filter(Boolean);
