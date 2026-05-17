@@ -77,6 +77,17 @@ export class WebrtcMetricSample {
   })
   signalingState!: string | null;
 
+  @Column({
+    name: 'event_type',
+    type: 'varchar',
+    length: 64,
+    nullable: true,
+  })
+  eventType!: string | null;
+
+  @Column({ name: 'event_count', type: 'integer', nullable: true })
+  eventCount!: number | null;
+
   @CreateDateColumn({ name: 'recorded_at', type: 'timestamp with time zone' })
   recordedAt!: Date;
 }

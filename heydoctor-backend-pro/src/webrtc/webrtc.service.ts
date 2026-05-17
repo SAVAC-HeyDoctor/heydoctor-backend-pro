@@ -138,6 +138,8 @@ export class WebrtcService {
       iceConnectionState: dto.iceConnectionState ?? null,
       connectionState: dto.connectionState ?? null,
       signalingState: dto.signalingState ?? null,
+      eventType: dto.eventType ?? null,
+      eventCount: dto.eventCount ?? null,
     });
 
     await this.metricsRepository.save(sample);
@@ -168,6 +170,18 @@ export class WebrtcService {
         packetLossRatio: ratio,
       });
     }
+
+    if (dto.eventType) {
+      const eventLevel =
+        dto.eventType === 'media_recovery_failures' ? 'warn' : 'debug';
+      this.logger[eventLevel]('webrtc_resilience_metric', {
+        event: 'webrtc_resilience_metric',
+        consultationId: dto.consultationId,
+        userId: authUser.sub,
+        eventType: dto.eventType,
+        eventCount: dto.eventCount ?? 1,
+      });
+    }
   }
 
   async getMetricsSummary(
@@ -185,7 +199,11 @@ export class WebrtcService {
       take: TREND_LIMIT,
     });
 
-    if (samples.length === 0) {
+    const qualitySamples = samples.filter((sample) =>
+      this.hasQualityMetric(sample),
+    );
+
+    if (qualitySamples.length === 0) {
       return {
         consultationId,
         sampleCount: 0,
@@ -200,10 +218,12 @@ export class WebrtcService {
     }
 
     const averages = {
-      rttMs: this.average(samples.map((s) => s.rttMs)),
-      packetLossRatio: this.average(samples.map((s) => s.packetLossRatio)),
+      rttMs: this.average(qualitySamples.map((s) => s.rttMs)),
+      packetLossRatio: this.average(
+        qualitySamples.map((s) => s.packetLossRatio),
+      ),
       outboundBitrateBps: this.average(
-        samples.map((s) => s.outboundBitrateBps),
+        qualitySamples.map((s) => s.outboundBitrateBps),
       ),
     };
 
@@ -214,11 +234,11 @@ export class WebrtcService {
 
     return {
       consultationId,
-      sampleCount: samples.length,
+      sampleCount: qualitySamples.length,
       averages,
       qualityAggregate:
         aggregate === 'unknown' ? 'insufficient_data' : aggregate,
-      trends: samples.map((s) => ({
+      trends: qualitySamples.map((s) => ({
         recordedAt: s.recordedAt.toISOString(),
         rttMs: s.rttMs,
         packetLossRatio: s.packetLossRatio,
@@ -272,6 +292,19 @@ export class WebrtcService {
     if (present.length === 0) return null;
     const sum = present.reduce((acc, v) => acc + v, 0);
     return sum / present.length;
+  }
+
+  private hasQualityMetric(sample: WebrtcMetricSample): boolean {
+    return (
+      sample.rttMs !== null ||
+      sample.packetLossRatio !== null ||
+      sample.outboundBitrateBps !== null ||
+      sample.jitterMs !== null ||
+      sample.packetsLost !== null ||
+      sample.iceConnectionState !== null ||
+      sample.connectionState !== null ||
+      sample.signalingState !== null
+    );
   }
 
   private classifyQuality(

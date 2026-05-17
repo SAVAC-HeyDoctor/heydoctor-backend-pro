@@ -1,4 +1,6 @@
 import { clientLogger } from './client-logger';
+import { getApiBase, jsonHeaders } from './api-client';
+import { apiFetchWithRefresh } from './session-fetch';
 
 type WebrtcFailureContext = {
   consultationId?: string | null;
@@ -43,6 +45,52 @@ export function reportWebrtcState(
       consultationId: context.consultationId ?? null,
       requestId: context.requestId ?? null,
       state,
+    });
+  }
+}
+
+export type WebrtcResilienceMetric =
+  | 'reconnect_attempts'
+  | 'reconnect_success'
+  | 'ice_restart_count'
+  | 'media_recovery_failures';
+
+type WebrtcResilienceMetricContext = WebrtcFailureContext & {
+  count?: number;
+};
+
+export async function reportWebrtcResilienceMetric(
+  eventType: WebrtcResilienceMetric,
+  context: WebrtcResilienceMetricContext,
+): Promise<void> {
+  clientLogger.info('webrtc_resilience_metric', {
+    consultationId: context.consultationId ?? null,
+    requestId: context.requestId ?? null,
+    eventType,
+    count: context.count ?? 1,
+    reason: context.reason ?? null,
+  });
+
+  if (!context.consultationId) {
+    return;
+  }
+
+  try {
+    await apiFetchWithRefresh(`${getApiBase()}/api/webrtc/metrics`, {
+      method: 'POST',
+      headers: jsonHeaders(),
+      body: JSON.stringify({
+        consultationId: context.consultationId,
+        eventType,
+        eventCount: context.count ?? 1,
+      }),
+    });
+  } catch (error) {
+    clientLogger.warn('webrtc_resilience_metric_report_failed', {
+      consultationId: context.consultationId,
+      requestId: context.requestId ?? null,
+      eventType,
+      errorName: error instanceof Error ? error.name : typeof error,
     });
   }
 }
