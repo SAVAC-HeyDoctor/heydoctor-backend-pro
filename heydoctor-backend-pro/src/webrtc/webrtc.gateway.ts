@@ -16,7 +16,12 @@ import type { JwtPayload } from '../auth/types/jwt-payload.interface';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import { ACCESS_TOKEN_COOKIE } from '../auth/auth-cookies';
 import { SentryWsExceptionFilter } from '../common/filters/sentry-ws-exception.filter';
-import { captureMessage } from '../common/observability/sentry';
+import { randomUUID } from 'crypto';
+import {
+  addSentryBreadcrumb,
+  captureMessage,
+} from '../common/observability/sentry';
+import { getCurrentRequestId } from '../common/request-context.storage';
 import { corsOrigin, socketAllowRequest } from '../config/origin-allowlist';
 import { ConsultationsService } from '../consultations/consultations.service';
 import { SubscriptionPlan } from '../subscriptions/subscription.entity';
@@ -158,7 +163,7 @@ export class WebrtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
   async joinConsultation(
     @ConnectedSocket() client: Socket,
     @MessageBody() body: SignalingPayload,
-  ): Promise<{ ok: true; consultationId: string }> {
+  ): Promise<{ ok: true; consultationId: string; traceId: string }> {
     const user = this.requireUser(client);
     const planOk = await this.subscriptionsService.hasRequiredPlan(
       user.sub,
@@ -192,7 +197,14 @@ export class WebrtcGateway implements OnGatewayConnection, OnGatewayDisconnect {
       if (roomState.userSocketCount <= 1) {
         client.to(consultationId).emit('peer-joined', { userId: user.sub });
       }
-      return { ok: true, consultationId };
+      const traceId = getCurrentRequestId() ?? randomUUID();
+      addSentryBreadcrumb('webrtc', 'join_consultation', {
+        consultationId,
+        userId: user.sub,
+        socketId: client.id,
+        traceId,
+      });
+      return { ok: true, consultationId, traceId };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       this.logger.warn(

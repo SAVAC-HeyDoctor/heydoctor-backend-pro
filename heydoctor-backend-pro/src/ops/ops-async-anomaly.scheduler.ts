@@ -9,6 +9,7 @@ import {
   PaykuPaymentStatus,
 } from '../payku/payku-payment.entity';
 import { OpsAsyncMetricsService } from './ops-async-metrics.service';
+import { OpsDeadLettersService } from './ops-dead-letters.service';
 import { OpsHttpMetricsService } from './ops-http-metrics.service';
 
 const RETRY_RATE_MAX = (): number =>
@@ -22,6 +23,8 @@ const WEBHOOK_FAIL_RATE_MAX = (): number =>
 const STUCK_RETRY_MS = Number(
   process.env.ASYNC_OUTBOX_STUCK_RETRY_MS ?? 15 * 60 * 1000,
 );
+const QUEUE_LAG_MS_MAX = (): number =>
+  Number(process.env.OPS_QUEUE_LAG_MS_MAX ?? 120_000);
 
 @Injectable()
 export class OpsAsyncAnomalyScheduler {
@@ -30,6 +33,7 @@ export class OpsAsyncAnomalyScheduler {
   constructor(
     private readonly asyncMetrics: OpsAsyncMetricsService,
     private readonly httpMetrics: OpsHttpMetricsService,
+    private readonly deadLetters: OpsDeadLettersService,
     @InjectRepository(EventOutbox)
     private readonly outboxRepo: Repository<EventOutbox>,
     @InjectRepository(PaykuPayment)
@@ -43,19 +47,33 @@ export class OpsAsyncAnomalyScheduler {
     }
     try {
       const stuckCutoff = new Date(Date.now() - STUCK_RETRY_MS);
-      const [metrics, stuck, pendingCount, httpSnap] = await Promise.all([
-        this.asyncMetrics.getDistributedSnapshot(),
-        this.outboxRepo
-          .createQueryBuilder('e')
-          .where('e.processed = false AND e.failed = false')
-          .andWhere('e.retryCount > 0')
-          .andWhere('e.nextAttemptAt < :cutoff', { cutoff: stuckCutoff })
-          .getCount(),
-        this.paymentsRepo.count({
-          where: { status: PaykuPaymentStatus.PENDING },
-        }),
-        this.httpMetrics.getSnapshot(),
-      ]);
+      const [metrics, stuck, pendingCount, httpSnap, queueLagMs] =
+        await Promise.all([
+          this.asyncMetrics.getDistributedSnapshot(),
+          this.outboxRepo
+            .createQueryBuilder('e')
+            .where('e.processed = false AND e.failed = false')
+            .andWhere('e.retryCount > 0')
+            .andWhere('e.nextAttemptAt < :cutoff', { cutoff: stuckCutoff })
+            .getCount(),
+          this.paymentsRepo.count({
+            where: { status: PaykuPaymentStatus.PENDING },
+          }),
+          this.httpMetrics.getSnapshot(),
+          this.deadLetters.getQueueLagMs(),
+        ]);
+
+      if (queueLagMs >= QUEUE_LAG_MS_MAX()) {
+        notifyAlert(
+          {
+            event: 'ops_outbox_queue_lag',
+            severity: 'warning',
+            message: `Lag outbox SQL elevado (${Math.round(queueLagMs / 1000)}s promedio)`,
+            queueLagMs,
+          },
+          { level: 'warning', key: 'ops:async:queue_lag' },
+        );
+      }
 
       if (metrics.retryRate >= RETRY_RATE_MAX()) {
         notifyAlert(

@@ -1,4 +1,5 @@
 import { Controller, Get, Param, UseGuards } from '@nestjs/common';
+import { getRailwayDeploymentDiagnostics } from '../common/observability/railway-diagnostics.util';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -66,6 +67,12 @@ export class AdminOpsController {
   @Get('dead-letters')
   deadLetters(): Promise<DeadLettersDto> {
     return this.deadLettersService.getDeadLetters();
+  }
+
+  /** Metadatos Railway/release (PHI-safe). */
+  @Get('deployment')
+  deploymentDiagnostics() {
+    return getRailwayDeploymentDiagnostics();
   }
 
   /** Búsqueda de request por `X-Request-Id` / traceId (índice en memoria de esta réplica). */

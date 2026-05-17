@@ -22,6 +22,8 @@ function serializeContext(meta: Record<string, unknown>): string {
   }
 }
 
+const USE_JSON_LOGS = process.env.LOG_FORMAT === 'json';
+
 /**
  * Wraps Nest Logger and prefixes plain-text log lines with the HTTP correlation ID when
  * {@link getCurrentRequestId} is set (RequestIdMiddleware + AsyncLocalStorage).
@@ -105,6 +107,15 @@ export class AppLoggerService implements LoggerService {
     const base = this.plainText(rawMessage);
     const merged = this.mergeRequestMeta(meta);
     const ts = new Date().toISOString();
+    if (USE_JSON_LOGS) {
+      const payload: Record<string, unknown> = {
+        level,
+        ts,
+        message: base,
+        ...(merged ?? {}),
+      };
+      return serializeContext(payload);
+    }
     let out = `[${level}] ${ts} ${base}`;
     if (merged !== undefined && Object.keys(merged).length > 0) {
       out += ` | ${serializeContext(merged)}`;

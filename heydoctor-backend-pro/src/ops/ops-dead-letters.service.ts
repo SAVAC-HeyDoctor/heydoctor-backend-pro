@@ -2,6 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
+  extractTraceRequestId,
+  extractTraceSource,
+} from '../common/observability/trace-envelope.util';
+import {
   sanitizeErrorMessage,
   sanitizeOutboxPayload,
 } from '../common/phi/phi-safe-payload.util';
@@ -29,6 +33,15 @@ export class OpsDeadLettersService {
     @InjectRepository(PaykuPayment)
     private readonly paymentsRepo: Repository<PaykuPayment>,
   ) {}
+
+  async getQueueLagMs(): Promise<number> {
+    const row = await this.outboxRepo
+      .createQueryBuilder('e')
+      .select('AVG(EXTRACT(EPOCH FROM (NOW() - e.createdAt)) * 1000)', 'lagMs')
+      .where('e.processed = false')
+      .getRawOne<{ lagMs: string | null }>();
+    return Math.round(Number(row?.lagMs ?? 0));
+  }
 
   async getDeadLetters(): Promise<DeadLettersDto> {
     const stuckCutoff = new Date(Date.now() - STUCK_RETRY_MS);
@@ -140,6 +153,8 @@ export class OpsDeadLettersService {
       attemptCount: row.retryCount,
       maxAttempts: OUTBOX_MAX_ATTEMPTS,
       lastError: row.lastError ? sanitizeErrorMessage(row.lastError) : null,
+      requestId: extractTraceRequestId(row.payload) ?? null,
+      traceSource: extractTraceSource(row.payload) ?? null,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.createdAt.toISOString(),
       deadLetteredAt: row.failedAt?.toISOString() ?? null,
@@ -156,6 +171,8 @@ export class OpsDeadLettersService {
       attemptCount: row.retryCount,
       maxAttempts: OUTBOX_MAX_ATTEMPTS,
       lastError: row.lastError ? sanitizeErrorMessage(row.lastError) : null,
+      requestId: extractTraceRequestId(row.payload) ?? null,
+      traceSource: extractTraceSource(row.payload) ?? null,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.createdAt.toISOString(),
       deadLetteredAt: null,

@@ -47,6 +47,30 @@ export function getCurrentClinicIdForLog(): string | null | undefined {
 /**
  * Tras guards JWT, enlaza usuario al contexto de logs (AsyncLocalStorage).
  */
+/** Ejecuta trabajo async con correlación (outbox worker, cron). */
+export function runWithRequestContext<T>(requestId: string, fn: () => T): T {
+  return storage.run(
+    {
+      requestId,
+      startedAtMs: Date.now(),
+    },
+    fn,
+  );
+}
+
+export async function runWithRequestContextAsync<T>(
+  requestId: string,
+  fn: () => Promise<T>,
+): Promise<T> {
+  return storage.run(
+    {
+      requestId,
+      startedAtMs: Date.now(),
+    },
+    fn,
+  );
+}
+
 export function mergeHttpLogContextFromUser(user: {
   sub: string;
   clinicId?: string | null;

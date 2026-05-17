@@ -106,4 +106,14 @@ export class RecordWebrtcMetricDto {
   @Min(1)
   @Max(1_000)
   eventCount?: number;
+
+  /** Correlación cliente (`X-Request-Id` / trace de llamada). Sin SDP. */
+  @IsOptional()
+  @IsString()
+  clientTraceId?: string;
+
+  /** Motivo operacional corto (reconnect, ice_failed, …). Sin texto libre PHI. */
+  @IsOptional()
+  @IsString()
+  resilienceReason?: string;
 }

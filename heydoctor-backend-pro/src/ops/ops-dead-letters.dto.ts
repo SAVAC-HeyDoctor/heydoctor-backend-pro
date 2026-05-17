@@ -6,6 +6,8 @@ export type DeadLetterItemDto = {
   attemptCount: number;
   maxAttempts: number;
   lastError: string | null;
+  requestId: string | null;
+  traceSource: string | null;
   createdAt: string;
   updatedAt: string;
   deadLetteredAt: string | null;
