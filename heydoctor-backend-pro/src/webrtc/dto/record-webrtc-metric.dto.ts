@@ -37,6 +37,13 @@ export const SIGNALING_STATES = [
   'closed',
 ] as const;
 
+export const WEBRTC_RESILIENCE_EVENT_TYPES = [
+  'reconnect_attempts',
+  'reconnect_success',
+  'ice_restart_count',
+  'media_recovery_failures',
+] as const;
+
 /**
  * Body accepted by `POST /api/webrtc/metrics`. All quality fields are optional
  * because some browsers don't expose every stat. We keep the shape aligned with
@@ -88,4 +95,15 @@ export class RecordWebrtcMetricDto {
   @IsString()
   @IsIn(SIGNALING_STATES)
   signalingState?: (typeof SIGNALING_STATES)[number];
+
+  @IsOptional()
+  @IsString()
+  @IsIn(WEBRTC_RESILIENCE_EVENT_TYPES)
+  eventType?: (typeof WEBRTC_RESILIENCE_EVENT_TYPES)[number];
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(1_000)
+  eventCount?: number;
 }
