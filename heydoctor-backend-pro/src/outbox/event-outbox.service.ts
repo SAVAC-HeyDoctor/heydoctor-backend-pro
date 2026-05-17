@@ -19,6 +19,7 @@ import {
 } from '../subscriptions/subscription-event.entity';
 import { SubscriptionEventsService } from '../subscriptions/subscription-events.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
+import { OpsAsyncMetricsService } from '../ops/ops-async-metrics.service';
 import { UserRole } from '../users/user-role.enum';
 import { EventOutbox, EventOutboxType } from './event-outbox.entity';
 
@@ -156,6 +157,7 @@ export class EventOutboxService {
     private readonly subscriptionsService: SubscriptionsService,
     private readonly subscriptionEventsService: SubscriptionEventsService,
     private readonly subscriptionAlerts: SubscriptionAlertsService,
+    private readonly asyncMetrics: OpsAsyncMetricsService,
   ) {}
 
   @Interval(OUTBOX_POLL_INTERVAL_MS)
@@ -191,6 +193,7 @@ export class EventOutboxService {
     );
 
     if (rows[0]) {
+      this.asyncMetrics.recordEnqueued();
       return this.toEntity(rows[0]);
     }
 
@@ -228,6 +231,7 @@ export class EventOutboxService {
     }
 
     for (const row of rows) {
+      this.asyncMetrics.recordRetryAttempt();
       await this.processEvent(this.toEntity(row));
     }
 
@@ -309,6 +313,8 @@ export class EventOutboxService {
           type: event.type,
           idempotencyKey: event.idempotencyKey,
         });
+        const latencyMs = Date.now() - event.createdAt.getTime();
+        this.asyncMetrics.recordProcessed(latencyMs);
       } catch (err) {
         const lastError = errorMessage(err);
         const nextRetryCount = event.retryCount + 1;
@@ -337,12 +343,15 @@ export class EventOutboxService {
           },
         );
         if (nextRetryCount >= OUTBOX_MAX_ATTEMPTS) {
+          this.asyncMetrics.recordDeadLetter();
           this.logger.warn('event_outbox_dead_letter', {
             eventId: event.id,
             type: event.type,
             retryCount: nextRetryCount,
             lastError,
           });
+        } else {
+          this.asyncMetrics.recordFailedRetry();
         }
       }
     });

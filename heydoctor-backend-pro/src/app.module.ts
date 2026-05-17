@@ -33,6 +33,7 @@ import { LegalPdfModule } from './legal-pdf/legal-pdf.module';
 import { LegalModule } from './legal/legal.module';
 import { MetricsModule } from './metrics/metrics.module';
 import { OpsModule } from './ops/ops.module';
+import { OpsMetricsSharedModule } from './ops/ops-metrics-shared.module';
 import { OutboxModule } from './outbox/outbox.module';
 import { PaykuModule } from './payku/payku.module';
 import { PatientsModule } from './patients/patients.module';
@@ -92,6 +93,7 @@ const ormLogging: boolean | ('query' | 'error')[] =
     }),
     LoggerModule,
     ObservabilityModule,
+    OpsMetricsSharedModule,
     AppCacheModule,
     JwtUserCacheModule,
     TypeOrmModule.forRoot({

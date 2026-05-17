@@ -17,6 +17,8 @@ import {
 import { OpsOverviewService } from './ops-overview.service';
 import type { OpsScalingDto } from './ops-scaling.service';
 import { OpsScalingService } from './ops-scaling.service';
+import type { DeadLettersDto } from './ops-dead-letters.dto';
+import { OpsDeadLettersService } from './ops-dead-letters.service';
 
 @Controller('admin/ops')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -28,6 +30,7 @@ export class AdminOpsController {
     private readonly dataReliability: OpsDataReliabilityService,
     private readonly asyncReliability: OpsAsyncReliabilityService,
     private readonly requestTraceIndex: RequestTraceIndexService,
+    private readonly deadLettersService: OpsDeadLettersService,
   ) {}
 
   @Get('overview')
@@ -57,6 +60,12 @@ export class AdminOpsController {
   @Get('async-reliability')
   asyncReliabilityDiagnostics(): Promise<AsyncReliabilityDiagnostics> {
     return this.asyncReliability.getDiagnostics();
+  }
+
+  /** Dead-letters, reintentos agotados, poison y métricas async (PHI-safe). */
+  @Get('dead-letters')
+  deadLetters(): Promise<DeadLettersDto> {
+    return this.deadLettersService.getDeadLetters();
   }
 
   /** Búsqueda de request por `X-Request-Id` / traceId (índice en memoria de esta réplica). */

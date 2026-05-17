@@ -93,6 +93,13 @@ describe('EventOutboxService', () => {
     const subscriptionAlerts = {
       notifyPaymentFailed: jest.fn(),
     };
+    const asyncMetrics = {
+      recordEnqueued: jest.fn(),
+      recordRetryAttempt: jest.fn(),
+      recordProcessed: jest.fn(),
+      recordFailedRetry: jest.fn(),
+      recordDeadLetter: jest.fn(),
+    };
 
     const service = new EventOutboxService(
       repo as never,
@@ -102,6 +109,7 @@ describe('EventOutboxService', () => {
       subscriptionsService as never,
       subscriptionEventsService as never,
       subscriptionAlerts as unknown as SubscriptionAlertsService,
+      asyncMetrics as never,
     );
 
     return {

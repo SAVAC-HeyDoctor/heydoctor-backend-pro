@@ -7,6 +7,7 @@ import {
 import type { Request, Response } from 'express';
 import type { Observable } from 'rxjs';
 import { finalize } from 'rxjs/operators';
+import { OpsAsyncMetricsService } from './ops-async-metrics.service';
 import { OpsHttpMetricsService } from './ops-http-metrics.service';
 
 /**
@@ -14,7 +15,10 @@ import { OpsHttpMetricsService } from './ops-http-metrics.service';
  */
 @Injectable()
 export class OpsMetricsInterceptor implements NestInterceptor {
-  constructor(private readonly opsHttp: OpsHttpMetricsService) {}
+  constructor(
+    private readonly opsHttp: OpsHttpMetricsService,
+    private readonly asyncMetrics: OpsAsyncMetricsService,
+  ) {}
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     if (context.getType() !== 'http') {
@@ -39,7 +43,11 @@ export class OpsMetricsInterceptor implements NestInterceptor {
     return next.handle().pipe(
       finalize(() => {
         const ms = Date.now() - start;
-        this.opsHttp.record(path, res.statusCode ?? 0, ms);
+        const status = res.statusCode ?? 0;
+        this.opsHttp.record(path, status, ms);
+        if (path.includes('payku/webhook') && status >= 400) {
+          this.asyncMetrics.recordWebhookFailure();
+        }
       }),
     );
   }
