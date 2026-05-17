@@ -58,6 +58,35 @@ function sanitizeDatabaseUrlForLog(raw?: string): string {
   }
 }
 
+function websocketOrigin(origin: string): string {
+  return origin
+    .replace(/^https:\/\//i, 'wss://')
+    .replace(/^http:\/\//i, 'ws://');
+}
+
+function backendContentSecurityPolicy(): string {
+  const connectOrigins = Array.from(
+    new Set([
+      "'self'",
+      ...allowedOrigins(),
+      ...allowedOrigins().map((origin) => websocketOrigin(origin)),
+    ]),
+  );
+
+  return [
+    "default-src 'none'",
+    "base-uri 'none'",
+    "object-src 'none'",
+    "frame-ancestors 'none'",
+    "img-src 'self' data:",
+    "font-src 'self'",
+    "style-src 'self'",
+    "script-src 'self'",
+    `connect-src ${connectOrigins.join(' ')}`,
+    "form-action 'none'",
+  ].join('; ');
+}
+
 async function bootstrap() {
   registerSlackWebhookFromEnv();
   captureMessage('backend_bootstrap_start', 'info', {
@@ -96,6 +125,8 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     rawBody: true,
   });
+  app.disable('x-powered-by');
+  app.enableShutdownHooks(['SIGTERM', 'SIGINT']);
 
   if (isSwaggerEnabled()) {
     const swaggerConfig = new DocumentBuilder()
@@ -140,6 +171,8 @@ async function bootstrap() {
       { path: '/', method: RequestMethod.GET },
       { path: 'health', method: RequestMethod.GET },
       { path: 'healthz', method: RequestMethod.GET },
+      { path: 'livez', method: RequestMethod.GET },
+      { path: 'readyz', method: RequestMethod.GET },
       /** Links mágicos para pacientes (sin `/api` en SMS/email). */
       { path: 'appointments/confirm/(.*)', method: RequestMethod.GET },
       { path: 'appointments/cancel/(.*)', method: RequestMethod.GET },
@@ -187,6 +220,16 @@ async function bootstrap() {
         'Permissions-Policy',
         'camera=(self), microphone=(self), geolocation=()',
       );
+      if (process.env.NODE_ENV === 'production') {
+        res.setHeader(
+          'Strict-Transport-Security',
+          'max-age=63072000; includeSubDomains; preload',
+        );
+        res.setHeader(
+          'Content-Security-Policy',
+          backendContentSecurityPolicy(),
+        );
+      }
       next();
     },
   );

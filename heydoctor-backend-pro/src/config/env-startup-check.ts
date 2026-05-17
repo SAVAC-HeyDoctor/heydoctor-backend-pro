@@ -43,13 +43,13 @@ export function validateAndLogEnv(env: EnvConfig): string[] {
       required: true,
     },
     {
-      name: 'CORS_ORIGIN',
+      name: 'CORS_ALLOWED_ORIGINS',
       status: env.corsOrigin.length > 0 ? 'SET' : 'DEFAULT',
       required: false,
       value:
         env.corsOrigin.length > 0
           ? `${env.corsOrigin.length} origins`
-          : 'default localhost:3000',
+          : 'default production domains + localhost in non-production',
     },
     {
       name: 'REDIS_URL',

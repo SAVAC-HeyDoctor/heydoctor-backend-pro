@@ -6,6 +6,8 @@ import { ProductEvent } from '../growth/product-event.entity';
 import { AdminOpsController } from './admin-ops.controller';
 import { OpsAlertsRecentService } from './ops-alerts-recent.service';
 import { OpsAnomalyScheduler } from './ops-anomaly.scheduler';
+import { OpsAsyncReliabilityService } from './ops-async-reliability.service';
+import { OpsDataReliabilityService } from './ops-data-reliability.service';
 import { OpsHttpMetricsService } from './ops-http-metrics.service';
 import { OpsMetricsInterceptor } from './ops-metrics.interceptor';
 import { OpsOverviewService } from './ops-overview.service';
@@ -18,6 +20,8 @@ import { OpsScalingService } from './ops-scaling.service';
     OpsHttpMetricsService,
     OpsAlertsRecentService,
     OpsScalingService,
+    OpsAsyncReliabilityService,
+    OpsDataReliabilityService,
     OpsAnomalyScheduler,
     OpsOverviewService,
     OpsMetricsInterceptor,

@@ -56,6 +56,8 @@ import {
   buildTypeOrmSslConfig,
 } from './config/typeorm-ssl';
 import { assertRedisConfiguredForMultiInstanceProduction } from './config/redis-requirement';
+import { HealthService } from './health/health.service';
+import { ReleaseLifecycleService } from './common/bootstrap/release-lifecycle.service';
 
 const DEFAULT_DEV_DATABASE_URL =
   'postgres://postgres:postgres@localhost:5432/heydoctor';
@@ -166,6 +168,8 @@ const ormLogging: boolean | ('query' | 'error')[] =
         new AlertingExceptionFilter(httpAdapterHost, logger),
       inject: [HttpAdapterHost, APP_LOGGER],
     },
+    HealthService,
+    ReleaseLifecycleService,
   ],
 })
 export class AppModule {}
