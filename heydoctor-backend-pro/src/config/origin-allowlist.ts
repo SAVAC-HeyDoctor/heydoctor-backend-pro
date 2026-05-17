@@ -4,9 +4,24 @@ import type { IncomingMessage } from 'http';
 const PRODUCTION_ORIGINS = [
   'https://heydoctor.cl',
   'https://app.heydoctor.cl',
+  'https://heydoctor.health',
+  'https://www.heydoctor.health',
+  'https://app.heydoctor.health',
   'https://heydoctor.vercel.app',
   'https://heydoctor-frontend.vercel.app',
 ];
+
+/** Vercel preview deployments (`*.vercel.app`), production only. */
+function isVercelPreviewOrigin(origin: string): boolean {
+  try {
+    const parsed = new URL(origin);
+    return (
+      parsed.protocol === 'https:' && parsed.hostname.endsWith('.vercel.app')
+    );
+  } catch {
+    return false;
+  }
+}
 
 const DEVELOPMENT_ORIGINS = [
   'http://localhost:3000',
@@ -79,7 +94,17 @@ export function isOriginAllowed(origin: string | undefined): boolean {
   if (!origin) {
     return true;
   }
-  return allowedOrigins().includes(normalizeOrigin(origin));
+  const normalized = normalizeOrigin(origin);
+  if (allowedOrigins().includes(normalized)) {
+    return true;
+  }
+  if (
+    process.env.NODE_ENV === 'production' &&
+    isVercelPreviewOrigin(normalized)
+  ) {
+    return true;
+  }
+  return false;
 }
 
 export function logBlockedOrigin(

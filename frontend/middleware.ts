@@ -22,7 +22,8 @@ export function middleware(request: NextRequest) {
   requestHeaders.set('x-nonce', nonce);
 
   const isProd = process.env.NODE_ENV === 'production';
-  const csp = buildCspWithNonce(nonce, isProd);
+  const reportUri = new URL('/api/csp-report', request.url).toString();
+  const csp = buildCspWithNonce({ nonce, isProd, reportUri });
 
   const { pathname } = request.nextUrl;
 
@@ -50,6 +51,6 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|api/csp-report|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)',
   ],
 };
