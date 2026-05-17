@@ -72,6 +72,11 @@ Sprint edge-security for NestJS (Railway) and Next.js (Vercel). No secrets or PH
 - Unknown browser origins rejected for REST and Socket.IO (except allowed Vercel previews).
 - Refresh tokens only in HttpOnly cookies or mobile Bearer; no browser `localStorage` refresh storage.
 
+## WebRTC client (production app)
+- Videollamada activa en el repo **`jairosc23/heydoctor-frontend`** (no en `frontend/` del monorepo kit).
+- Entrada UI: `TeleconsultaVideoSession` → `VideoCall` → `useTelemedicineCall` (Socket.IO `/webrtc`, `GET /api/webrtc/ice-servers`).
+- Resiliencia: `lib/webrtc-resilience.ts` (`WebrtcResilienceManager`) integrado en el hook de llamada.
+
 ## Remaining risks / unsafe directives
 - `style-src 'unsafe-inline'` on frontend (common for Tailwind/Next).
 - Dev-only `unsafe-inline` / `unsafe-eval` on scripts.

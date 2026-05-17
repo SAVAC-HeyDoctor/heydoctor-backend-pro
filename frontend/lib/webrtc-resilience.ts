@@ -17,6 +17,8 @@ export type WebrtcResilienceManagerOptions = {
   stalePeerMs?: number;
   reconnectBaseMs?: number;
   reconnectMaxMs?: number;
+  /** Si devuelve false, no se programa ICE restart (p. ej. lado no iniciador en 1:1). */
+  iceRestartAllowed?: () => boolean;
   onSendOffer: (
     peerId: WebrtcPeerId,
     description: RTCSessionDescriptionInit,
@@ -118,9 +120,9 @@ export class WebrtcResilienceManager {
         requestId: this.options.requestId,
         state,
       });
-      if (state === 'failed') {
+      if (state === 'failed' && this.mayRestartIce()) {
         void this.restartIce(peerId, 'ice_failed');
-      } else if (state === 'disconnected') {
+      } else if (state === 'disconnected' && this.mayRestartIce()) {
         this.scheduleReconnect(peerId, 'ice_disconnected');
       }
     };
@@ -133,9 +135,9 @@ export class WebrtcResilienceManager {
         requestId: this.options.requestId,
         state,
       });
-      if (state === 'failed') {
+      if (state === 'failed' && this.mayRestartIce()) {
         void this.restartIce(peerId, 'connection_failed');
-      } else if (state === 'disconnected') {
+      } else if (state === 'disconnected' && this.mayRestartIce()) {
         this.scheduleReconnect(peerId, 'connection_disconnected');
       } else if (state === 'connected') {
         void this.recordReconnectSuccess(peerId);
@@ -157,7 +159,10 @@ export class WebrtcResilienceManager {
     const staleTimer = setInterval(() => {
       const runtime = this.peers.get(peerId);
       if (!runtime) return;
-      if (Date.now() - runtime.lastSeenAt >= this.stalePeerMs) {
+      if (
+        this.mayRestartIce() &&
+        Date.now() - runtime.lastSeenAt >= this.stalePeerMs
+      ) {
         this.scheduleReconnect(peerId, 'stale_peer');
       }
     }, Math.min(this.stalePeerMs, 15_000));
@@ -196,6 +201,9 @@ export class WebrtcResilienceManager {
   }
 
   async restartIce(peerId: WebrtcPeerId, reason: string): Promise<void> {
+    if (!this.mayRestartIce()) {
+      return;
+    }
     const runtime = this.peers.get(peerId);
     if (!runtime || runtime.renegotiating) {
       return;
@@ -273,8 +281,10 @@ export class WebrtcResilienceManager {
         return;
       }
       void this.recoverLocalMedia('page_visible');
-      for (const peerId of this.peers.keys()) {
-        this.scheduleReconnect(peerId, 'page_visible');
+      if (this.mayRestartIce()) {
+        for (const peerId of this.peers.keys()) {
+          this.scheduleReconnect(peerId, 'page_visible');
+        }
       }
     };
     document.addEventListener('visibilitychange', this.pageVisibilityHandler);
@@ -302,7 +312,14 @@ export class WebrtcResilienceManager {
     }
   }
 
+  private mayRestartIce(): boolean {
+    return this.options.iceRestartAllowed?.() ?? true;
+  }
+
   private scheduleReconnect(peerId: WebrtcPeerId, reason: string): void {
+    if (!this.mayRestartIce()) {
+      return;
+    }
     const runtime = this.peers.get(peerId);
     if (!runtime || runtime.reconnectTimer) {
       return;
