@@ -116,6 +116,8 @@ export class UsersService {
       const error = err instanceof Error ? err : new Error(String(err));
       this.logger.error('validate_credentials_lookup_failed', error, {
         event: 'validate_credentials_lookup_failed',
+        errorName: error.name,
+        errorCode: (err as Record<string, unknown>)?.code ?? null,
       });
       throw error;
     }
@@ -133,6 +135,8 @@ export class UsersService {
       this.logger.error('validate_credentials_bcrypt_failed', error, {
         event: 'validate_credentials_bcrypt_failed',
         userId: user.id,
+        clinicId: user.clinicId ?? null,
+        errorName: error.name,
       });
       throw error;
     }
