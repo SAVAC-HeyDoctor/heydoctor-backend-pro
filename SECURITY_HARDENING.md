@@ -1,70 +1,85 @@
 # HeyDoctor Security Hardening
 
 ## Scope
-This document captures Sprint 1 edge-security expectations for the NestJS backend on Railway and the Next.js frontend on Vercel. It avoids secrets and PHI.
+Sprint edge-security for NestJS (Railway) and Next.js (Vercel). No secrets or PHI in logs.
 
 ## CORS Strategy
-- Production REST CORS uses an explicit allowlist.
-- Preferred env var: `CORS_ALLOWED_ORIGINS=https://app.heydoctor.cl,https://heydoctor.cl`.
-- Backward-compatible env aliases remain supported: `CORS_ORIGIN`, `FRONTEND_URL`, `PUBLIC_APP_URL`, `NEXT_PUBLIC_APP_URL`, `VERCEL_FRONTEND_URL`, `VERCEL_URL`.
-- Wildcard origins are rejected.
-- Localhost origins are added only outside `NODE_ENV=production`.
-- Blocked production origins are logged as scheme/host only.
+- Production REST CORS uses an explicit allowlist plus **Vercel preview** origins (`https://*.vercel.app`).
+- Fixed production hosts include `heydoctor.cl`, `app.heydoctor.cl`, `heydoctor.health`, `app.heydoctor.health`, and stable Vercel production URLs.
+- Preferred env var: `CORS_ALLOWED_ORIGINS=https://app.heydoctor.health,https://app.heydoctor.cl`.
+- Aliases: `CORS_ORIGIN`, `FRONTEND_URL`, `PUBLIC_APP_URL`, `NEXT_PUBLIC_APP_URL`, `VERCEL_FRONTEND_URL`, `VERCEL_URL`.
+- Wildcard env values are rejected; preview wildcards are implemented in code (hostname suffix `.vercel.app`).
+- Localhost origins apply only when `NODE_ENV !== 'production'`.
+- Blocked production origins log scheme/host only.
 
 ## Socket.IO / WebRTC Origin Strategy
-- `/webrtc` Socket.IO CORS uses the same backend allowlist as REST.
-- Socket.IO also validates origins through `allowRequest`, so Engine.IO upgrades cannot bypass the REST CORS policy.
-- Missing `Origin` is allowed for non-browser clients, but JWT auth and plan checks still apply.
-- Production multi-instance signaling requires `REDIS_URL` for distributed room synchronization.
+- `/webrtc` Socket.IO CORS matches REST allowlist + Vercel previews.
+- `allowRequest` enforces the same policy on Engine.IO upgrades.
+- Missing `Origin` is allowed for non-browser clients; JWT and plan checks still apply.
+- `REDIS_URL` required for multi-instance signaling in production.
 
 ## Swagger Policy
-- Swagger UI is enabled by default in local/dev.
-- In production, Swagger is disabled unless `ENABLE_SWAGGER=true`.
-- Production deployments should leave `ENABLE_SWAGGER` unset unless access is additionally restricted at the network or identity layer.
+- Enabled in local/dev by default.
+- Production: disabled unless `ENABLE_SWAGGER=true` (restrict at network/identity layer if enabled).
 
 ## Cookie Strategy
-- Auth uses HttpOnly `access_token` and `refresh_token` cookies.
-- Production cookies use `Secure` and `SameSite=None` for cross-domain Vercel/Railway flows.
-- Local development uses non-secure `SameSite=Lax` cookies.
-- `AUTH_COOKIE_DOMAIN` controls production cookie domain. Use `AUTH_COOKIE_DOMAIN=none` for host-only production cookies when domains do not share an eTLD+1.
-- Railway requires `trust proxy` so Express treats HTTPS requests correctly behind the proxy.
+- HttpOnly `access_token` and `refresh_token`.
+- Production: `Secure`, `SameSite=None`, optional `Domain=.heydoctor.health` (override with `AUTH_COOKIE_DOMAIN`; use `none` for host-only cookies).
+- Development: `SameSite=Lax`, not `Secure`.
+- Railway: `trust proxy` so `Secure` cookies work behind HTTPS termination.
+- Cross-site cookies require frontend and API on a shared eTLD+1 (e.g. `app.heydoctor.health` + `api.heydoctor.health`).
 
-## CSP Policy
-- Backend production responses include a restrictive CSP for API assets and browser clients.
-- Frontend middleware emits a per-request nonce CSP.
-- Frontend `connect-src` includes:
-  - `self`
-  - `NEXT_PUBLIC_API_URL`
-  - `NEXT_PUBLIC_WS_URL`
-  - `BACKEND_PROXY_TARGET`
-  - `NEXT_PUBLIC_CSP_CONNECT_SRC`
-  - `NEXT_PUBLIC_TURN_URLS`
-  - `stun:`, `stuns:`, `turn:`, `turns:`
-  - Sentry ingest origins when `NEXT_PUBLIC_SENTRY_DSN` is set
-- `unsafe-eval` is development-only.
-- `unsafe-inline` remains for styles and transitional script compatibility; remove only after all scripts/styles are nonce-compatible.
+## CSP Policy (frontend)
+- Per-request nonce via `middleware.ts` → `Content-Security-Policy`.
+- Production `script-src`: `'self' 'nonce-…' 'strict-dynamic'` (no `unsafe-inline` / `unsafe-eval` on scripts).
+- Development: adds `'unsafe-inline'` and `'unsafe-eval'` for Next HMR.
+- `style-src`: `'unsafe-inline'` (Tailwind / Next inline styles until full style nonces).
+- `frame-ancestors 'none'`, `frame-src 'none'`, `object-src 'none'`.
+- `connect-src`: self, API/WS env URLs, production defaults (`api.heydoctor.health`, `app.heydoctor.health`, …), `https://*.vercel.app` + `wss://*.vercel.app`, TURN/STUN (`NEXT_PUBLIC_TURN_URLS`, `WEBRTC_STUN_URLS`, scheme wildcards), Sentry ingest when `NEXT_PUBLIC_SENTRY_DSN` is set.
+- `worker-src 'self' blob:` (Sentry session replay / workers).
+- `media-src 'self' blob:` (WebRTC `MediaStream`).
+- `upgrade-insecure-requests` in production.
+- **Reporting:** `report-uri /api/csp-report` (same origin). POST `application/csp-report`; sanitized log line `csp_violation_report` (no query strings, no emails). Not stored in DB.
+
+## CSP Policy (backend API)
+- Production only: restrictive CSP on JSON/API responses (`default-src 'none'`, `frame-ancestors 'none'`, `connect-src` from CORS allowlist + ws/wss mirrors).
+- `worker-src 'none'`, `media-src 'none'` (API does not run media workers).
+
+## Permissions-Policy
+- Frontend (Vercel): `camera=(self), microphone=(self)` for telemedicine; geolocation/payment/usb denied.
+- Backend: same camera/microphone allowance on API responses.
 
 ## Required Railway Env Vars
 - `NODE_ENV=production`
-- `DATABASE_URL`
-- `JWT_SECRET`
-- `CORS_ALLOWED_ORIGINS`
-- `FRONTEND_URL`
-- `BACKEND_PUBLIC_URL`
+- `DATABASE_URL`, `JWT_SECRET`
+- `CORS_ALLOWED_ORIGINS`, `FRONTEND_URL`, `BACKEND_PUBLIC_URL`
 - `AUTH_COOKIE_DOMAIN` when shared-domain cookies are required
-- `REDIS_URL` before scaling beyond one Railway replica
-- `TURN_URLS`, `TURN_USERNAME`, `TURN_CREDENTIAL` for production WebRTC
+- `REDIS_URL` before scaling beyond one replica
+- `TURN_URLS`, `TURN_USERNAME`, `TURN_CREDENTIAL` for WebRTC
 - `SENTRY_DSN` when backend Sentry is enabled
 
 ## Required Vercel Env Vars
 - `NEXT_PUBLIC_API_URL` or `BACKEND_PROXY_TARGET` + proxy mode
-- `NEXT_PUBLIC_WS_URL` when WebSocket origin differs from API origin
-- `NEXT_PUBLIC_TURN_URLS` for CSP compatibility with TURN/STUN
-- `NEXT_PUBLIC_SENTRY_DSN` when frontend Sentry is enabled
-- Do not expose server-only secrets with `NEXT_PUBLIC_`.
+- `NEXT_PUBLIC_WS_URL` if WebSocket origin differs from API
+- `NEXT_PUBLIC_APP_URL` for CSP connect defaults alignment
+- `NEXT_PUBLIC_TURN_URLS` / `WEBRTC_STUN_URLS` for CSP + WebRTC
+- `NEXT_PUBLIC_SENTRY_DSN` for error reporting (adds Sentry hosts to `connect-src`)
+- `NEXT_PUBLIC_CSP_CONNECT_SRC` for extra comma-separated origins (staging only if needed)
+- Never expose server secrets with `NEXT_PUBLIC_`.
 
 ## Deployment Expectations
-- Migrations run in CI/CD or a release job, not implicitly during production boot.
-- Swagger remains disabled on public production.
-- Unknown production browser origins are rejected for both REST and Socket.IO.
-- Refresh tokens stay in HttpOnly cookies or mobile Bearer fallback only; no browser localStorage/sessionStorage refresh-token storage.
+- Migrations in CI/release jobs, not implicit production boot.
+- Unknown browser origins rejected for REST and Socket.IO (except allowed Vercel previews).
+- Refresh tokens only in HttpOnly cookies or mobile Bearer; no browser `localStorage` refresh storage.
+
+## WebRTC client (production app)
+- Videollamada activa en el repo **`jairosc23/heydoctor-frontend`** (no en `frontend/` del monorepo kit).
+- Entrada UI: `TeleconsultaVideoSession` → `VideoCall` → `useTelemedicineCall` (Socket.IO `/webrtc`, `GET /api/webrtc/ice-servers`).
+- Resiliencia: `lib/webrtc-resilience.ts` (`WebrtcResilienceManager`) integrado en el hook de llamada.
+
+## Remaining risks / unsafe directives
+- `style-src 'unsafe-inline'` on frontend (common for Tailwind/Next).
+- Dev-only `unsafe-inline` / `unsafe-eval` on scripts.
+- CSP `connect-src` scheme wildcards (`turn:`, `stun:`) are broad by design for arbitrary TURN hosts.
+- `strict-dynamic` requires browsers that honor CSP3; legacy browsers may need monitoring via `csp_violation_report` logs.
+- Third-party scripts not nonce-tagged will fail until fixed (watch CSP reports after deploy).

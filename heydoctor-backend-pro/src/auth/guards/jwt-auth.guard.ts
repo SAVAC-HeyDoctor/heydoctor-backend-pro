@@ -1,7 +1,13 @@
-import { ContextType, ExecutionContext, Injectable } from '@nestjs/common';
+import {
+  ContextType,
+  ExecutionContext,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { AuthGuard } from '@nestjs/passport';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
+import type { AuthenticatedUser } from '../strategies/jwt.strategy';
 
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {
@@ -25,5 +31,28 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
       return true;
     }
     return super.canActivate(context) as boolean | Promise<boolean>;
+  }
+
+  /**
+   * Passport pasa `JsonWebTokenError` / `TokenExpiredError` como `err` no-HTTP → 500 si se re-lanza tal cual.
+   * Siempre responder 401 para fallos de verificación JWT.
+   */
+  override handleRequest<TUser = AuthenticatedUser>(
+    err: Error,
+    user: TUser,
+    info: unknown,
+    context: ExecutionContext,
+    status?: unknown,
+  ): TUser {
+    void info;
+    void context;
+    void status;
+    if (err || !user) {
+      if (err instanceof UnauthorizedException) {
+        throw err;
+      }
+      throw new UnauthorizedException();
+    }
+    return user;
   }
 }

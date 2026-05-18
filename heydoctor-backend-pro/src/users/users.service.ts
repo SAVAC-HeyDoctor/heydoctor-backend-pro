@@ -109,15 +109,37 @@ export class UsersService {
     email: string,
     plainPassword: string,
   ): Promise<User | null> {
-    const user = await this.findByEmailWithPasswordHash(email);
+    let user: User | null;
+    try {
+      user = await this.findByEmailWithPasswordHash(email);
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      this.logger.error('validate_credentials_lookup_failed', error, {
+        event: 'validate_credentials_lookup_failed',
+        errorName: error.name,
+        errorCode: (err as Record<string, unknown>)?.code ?? null,
+      });
+      throw error;
+    }
     if (!user?.passwordHash) {
       return null;
     }
     if (user.isActive === false) {
       return null;
     }
-    const match = await bcrypt.compare(plainPassword, user.passwordHash);
-    return match ? user : null;
+    try {
+      const match = await bcrypt.compare(plainPassword, user.passwordHash);
+      return match ? user : null;
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      this.logger.error('validate_credentials_bcrypt_failed', error, {
+        event: 'validate_credentials_bcrypt_failed',
+        userId: user.id,
+        clinicId: user.clinicId ?? null,
+        errorName: error.name,
+      });
+      throw error;
+    }
   }
 
   /**

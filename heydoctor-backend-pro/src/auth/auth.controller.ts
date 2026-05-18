@@ -95,6 +95,11 @@ function extractContext(req: Request): RequestContext {
   return { ip, userAgent };
 }
 
+/**
+ * Rutas de sesión públicas por defecto (login, refresh, csrf).
+ * Las que requieren JWT usan `@UseGuards(JwtAuthGuard)` a nivel de handler.
+ */
+@Public()
 @Controller('auth')
 export class AuthController {
   constructor(
@@ -185,29 +190,66 @@ export class AuthController {
 
   @Public()
   @Post('login')
+  @HttpCode(HttpStatus.OK)
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   async login(
     @Body() dto: LoginDto,
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
+    this.logger.log('auth_login_request', {
+      event: 'auth_login_request',
+      requestId: getCurrentRequestId(),
+      path: req.path,
+      origin: req.headers.origin ?? null,
+      hasAccessCookie: readCookie(req, ACCESS_TOKEN_COOKIE) !== undefined,
+      hasRefreshCookie: readCookie(req, REFRESH_TOKEN_COOKIE) !== undefined,
+    });
     const ctx = extractContext(req);
-    const result = await this.authService.login(dto, ctx);
-    const refreshToken = await this.authService.createRefreshToken(
-      result.user.id,
-      ctx,
-    );
-    if (process.env.DEBUG_AUTH_COOKIES === '1') {
-      console.log('Set-Cookie options:', getSessionCookieOptions());
+    const requestId = getCurrentRequestId();
+    const emailDomain = dto.email.includes('@')
+      ? dto.email.split('@')[1]?.toLowerCase()
+      : null;
+
+    this.logger.log('auth_login_request', {
+      event: 'auth_login_request',
+      requestId,
+      emailDomain,
+    });
+
+    try {
+      const result = await this.authService.login(dto, ctx);
+      const refreshToken = await this.authService.createRefreshToken(
+        result.user.id,
+        ctx,
+      );
+      if (process.env.DEBUG_AUTH_COOKIES === '1') {
+        console.log('Set-Cookie options:', getSessionCookieOptions());
+      }
+      setRefreshCookie(res, refreshToken);
+      setAccessCookie(res, result.access_token);
+      const csrfToken = setCsrfCookie(res);
+      this.logger.log('auth_login_response_ok', {
+        event: 'auth_login_response_ok',
+        requestId,
+        userId: result.user.id,
+        clinicId: result.user.clinicId ?? null,
+      });
+      return {
+        user: result.user,
+        access_token: result.access_token,
+        csrfToken,
+      };
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      this.logger.error('auth_login_request_failed', error, {
+        event: 'auth_login_request_failed',
+        requestId,
+        emailDomain,
+        errorName: error.name,
+      });
+      throw err;
     }
-    setRefreshCookie(res, refreshToken);
-    setAccessCookie(res, result.access_token);
-    const csrfToken = setCsrfCookie(res);
-    return {
-      user: result.user,
-      access_token: result.access_token,
-      csrfToken,
-    };
   }
 
   @Public()

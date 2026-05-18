@@ -23,6 +23,7 @@ import { ConsultationStatus } from '../consultations/consultation-status.enum';
 import { GrowthFunnelEvents } from '../growth/growth-event-names';
 import { ProductEventsService } from '../growth/product-events.service';
 import { EventOutboxType } from '../outbox/event-outbox.entity';
+import { attachTraceEnvelope } from '../common/observability/trace-envelope.util';
 import { createSpan } from '../common/tracing/span';
 import { notifyAlert } from '../common/alerts/alert.hooks';
 import { CircuitBreaker } from '../common/resilience/circuit-breaker';
@@ -877,15 +878,20 @@ export class PaykuService {
           [
             outboxType,
             outboxKey,
-            JSON.stringify({
-              userId: payment.userId,
-              clinicId: payment.clinicId,
-              paymentId,
-              consultationId: payment.consultationId,
-              amount: payment.amount,
-              transactionId: payment.transactionId ?? null,
-              incomingPaymentStatus: incomingStatus,
-            }),
+            JSON.stringify(
+              attachTraceEnvelope(
+                {
+                  userId: payment.userId,
+                  clinicId: payment.clinicId,
+                  paymentId,
+                  consultationId: payment.consultationId,
+                  amount: payment.amount,
+                  transactionId: payment.transactionId ?? null,
+                  incomingPaymentStatus: incomingStatus,
+                },
+                'webhook',
+              ),
+            ),
           ],
         );
 

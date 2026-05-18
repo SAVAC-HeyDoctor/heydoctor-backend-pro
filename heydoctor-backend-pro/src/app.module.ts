@@ -33,6 +33,7 @@ import { LegalPdfModule } from './legal-pdf/legal-pdf.module';
 import { LegalModule } from './legal/legal.module';
 import { MetricsModule } from './metrics/metrics.module';
 import { OpsModule } from './ops/ops.module';
+import { OpsMetricsSharedModule } from './ops/ops-metrics-shared.module';
 import { OutboxModule } from './outbox/outbox.module';
 import { PaykuModule } from './payku/payku.module';
 import { PatientsModule } from './patients/patients.module';
@@ -84,6 +85,18 @@ const ormLogging: boolean | ('query' | 'error')[] =
       ? ['error']
       : true;
 
+/** Temporal: DEBUG_DISABLE_AUTH_GUARDS=true deja solo ThrottlerGuard global (aislar 500 en login). */
+const debugDisableAuthGuards =
+  process.env.DEBUG_DISABLE_AUTH_GUARDS === 'true';
+
+const authAppGuards = debugDisableAuthGuards
+  ? []
+  : [
+      { provide: APP_GUARD, useExisting: JwtAuthGuard },
+      { provide: APP_GUARD, useClass: ClinicGuard },
+      { provide: APP_GUARD, useClass: CsrfGuard },
+    ];
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -92,6 +105,7 @@ const ormLogging: boolean | ('query' | 'error')[] =
     }),
     LoggerModule,
     ObservabilityModule,
+    OpsMetricsSharedModule,
     AppCacheModule,
     JwtUserCacheModule,
     TypeOrmModule.forRoot({
@@ -157,9 +171,8 @@ const ormLogging: boolean | ('query' | 'error')[] =
   controllers: [AppController, HealthController, HealthApiController],
   providers: [
     ThrottlerGuard,
-    { provide: APP_GUARD, useExisting: JwtAuthGuard },
-    { provide: APP_GUARD, useClass: ClinicGuard },
-    { provide: APP_GUARD, useClass: CsrfGuard },
+    { provide: APP_GUARD, useExisting: ThrottlerGuard },
+    ...authAppGuards,
     { provide: APP_INTERCEPTOR, useClass: HttpRequestLoggingInterceptor },
     { provide: APP_INTERCEPTOR, useClass: CsrfCookieInterceptor },
     {

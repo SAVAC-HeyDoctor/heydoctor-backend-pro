@@ -144,10 +144,31 @@ export class AuthService {
   }
 
   async login(dto: LoginDto, ctx: RequestContext) {
-    const user = await this.usersService.validateCredentials(
-      dto.email,
-      dto.password,
-    );
+    let user: Awaited<
+      ReturnType<typeof this.usersService.validateCredentials>
+    > = null;
+
+    try {
+      user = await this.usersService.validateCredentials(
+        dto.email,
+        dto.password,
+      );
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      this.logger.error('auth_login_validate_credentials_failed', error, {
+        event: 'auth_login_validate_credentials_failed',
+        errorName: error.name,
+      });
+      captureMessage('auth_login_failed', 'warning', {
+        event: 'auth_login_failed',
+        reason: 'validate_credentials_threw',
+        errorName: error.name,
+      });
+      // Surface all credential-validation failures as 401 — never leak a 500
+      // to the client for a login attempt, regardless of the underlying cause.
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
     if (!user) {
       await this.logSecurityEvent('AUTH_LOGIN_FAILED', null, ctx, {
         email: dto.email,
@@ -231,9 +252,18 @@ export class AuthService {
       userAgent: ctx.userAgent ? ctx.userAgent.slice(0, 512) : null,
     });
     assignClinic(entity, user.clinicId);
-    const saved = await repoOrManager.save(entity);
-
-    return { raw, entity: saved };
+    try {
+      const saved = await repoOrManager.save(entity);
+      return { raw, entity: saved };
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      this.logger.error('create_refresh_token_save_failed', error, {
+        event: 'create_refresh_token_save_failed',
+        userId,
+        clinicId: user.clinicId ?? null,
+      });
+      throw error;
+    }
   }
 
   /**

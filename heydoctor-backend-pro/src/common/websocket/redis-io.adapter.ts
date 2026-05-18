@@ -7,13 +7,12 @@ import type { Server, ServerOptions } from 'socket.io';
 import { captureException, captureMessage } from '../observability/sentry';
 import { setSocketIoRedisHealth } from './socket-io-health';
 
-type SocketIoRedisAdapter = ReturnType<typeof createAdapter>;
-
 const REDIS_CONNECT_TIMEOUT_MS = 2_500;
 
 export class RedisIoAdapter extends IoAdapter {
   private readonly logger = new Logger(RedisIoAdapter.name);
-  private adapterConstructor: SocketIoRedisAdapter | null = null;
+  // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents -- createAdapter typings resolve to any
+  private adapterConstructor: ReturnType<typeof createAdapter> | null = null;
   private pubClient: Redis | null = null;
   private subClient: Redis | null = null;
   private loggedLocalAdapter = false;

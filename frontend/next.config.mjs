@@ -28,7 +28,8 @@ const nextConfig = {
       { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
       {
         key: 'Permissions-Policy',
-        value: 'camera=(), microphone=(), geolocation=()',
+        value:
+          'camera=(self), microphone=(self), geolocation=(), payment=(), usb=()',
       },
       /** CSP (nonce + connect-src): ver `middleware.ts` para no duplicar directivas. */
     ];

@@ -19,6 +19,14 @@ import {
 } from '../subscriptions/subscription-event.entity';
 import { SubscriptionEventsService } from '../subscriptions/subscription-events.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
+import { captureMessage } from '../common/observability/sentry';
+import {
+  attachTraceEnvelope,
+  extractTraceRequestId,
+  type TraceSource,
+} from '../common/observability/trace-envelope.util';
+import { runWithRequestContextAsync } from '../common/request-context.storage';
+import { OpsAsyncMetricsService } from '../ops/ops-async-metrics.service';
 import { UserRole } from '../users/user-role.enum';
 import { EventOutbox, EventOutboxType } from './event-outbox.entity';
 
@@ -129,6 +137,7 @@ type EnqueueOutboxEvent = {
   type: EventOutboxType;
   payload: Record<string, unknown>;
   idempotencyKey?: string | null;
+  traceSource?: TraceSource;
 };
 
 const OUTBOX_POLL_INTERVAL_MS = 5_000;
@@ -156,6 +165,7 @@ export class EventOutboxService {
     private readonly subscriptionsService: SubscriptionsService,
     private readonly subscriptionEventsService: SubscriptionEventsService,
     private readonly subscriptionAlerts: SubscriptionAlertsService,
+    private readonly asyncMetrics: OpsAsyncMetricsService,
   ) {}
 
   @Interval(OUTBOX_POLL_INTERVAL_MS)
@@ -180,6 +190,10 @@ export class EventOutboxService {
   }
 
   async enqueue(event: EnqueueOutboxEvent): Promise<EventOutbox | null> {
+    const payload = attachTraceEnvelope(
+      event.payload,
+      event.traceSource ?? 'http',
+    );
     const rows = await this.repo.query<ClaimedOutboxRow[]>(
       `
         INSERT INTO event_outbox (type, idempotency_key, payload)
@@ -187,10 +201,11 @@ export class EventOutboxService {
         ON CONFLICT DO NOTHING
         RETURNING *
       `,
-      [event.type, event.idempotencyKey ?? null, JSON.stringify(event.payload)],
+      [event.type, event.idempotencyKey ?? null, JSON.stringify(payload)],
     );
 
     if (rows[0]) {
+      this.asyncMetrics.recordEnqueued();
       return this.toEntity(rows[0]);
     }
 
@@ -228,6 +243,7 @@ export class EventOutboxService {
     }
 
     for (const row of rows) {
+      this.asyncMetrics.recordRetryAttempt();
       await this.processEvent(this.toEntity(row));
     }
 
@@ -284,8 +300,13 @@ export class EventOutboxService {
 
       const event = this.toEntity(claimed);
 
+      const traceRequestId =
+        extractTraceRequestId(event.payload) ?? `outbox:${event.id}`;
+
       try {
-        await this.dispatch(event);
+        await runWithRequestContextAsync(traceRequestId, async () => {
+          await this.dispatch(event);
+        });
         const markedRows = await manager.query<ClaimedOutboxRow[]>(
           `
             UPDATE event_outbox
@@ -308,7 +329,10 @@ export class EventOutboxService {
           eventId: event.id,
           type: event.type,
           idempotencyKey: event.idempotencyKey,
+          requestId: traceRequestId,
         });
+        const latencyMs = Date.now() - event.createdAt.getTime();
+        this.asyncMetrics.recordProcessed(latencyMs);
       } catch (err) {
         const lastError = errorMessage(err);
         const nextRetryCount = event.retryCount + 1;
@@ -337,12 +361,23 @@ export class EventOutboxService {
           },
         );
         if (nextRetryCount >= OUTBOX_MAX_ATTEMPTS) {
+          this.asyncMetrics.recordDeadLetter();
           this.logger.warn('event_outbox_dead_letter', {
             eventId: event.id,
             type: event.type,
             retryCount: nextRetryCount,
             lastError,
+            requestId: traceRequestId,
           });
+          captureMessage('event_outbox_dead_letter', 'error', {
+            event: 'event_outbox_dead_letter',
+            eventId: event.id,
+            eventType: event.type,
+            retryCount: nextRetryCount,
+            requestId: traceRequestId,
+          });
+        } else {
+          this.asyncMetrics.recordFailedRetry();
         }
       }
     });

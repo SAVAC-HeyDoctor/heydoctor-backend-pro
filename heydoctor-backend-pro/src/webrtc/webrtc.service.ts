@@ -174,13 +174,23 @@ export class WebrtcService {
     if (dto.eventType) {
       const eventLevel =
         dto.eventType === 'media_recovery_failures' ? 'warn' : 'debug';
-      this.logger[eventLevel]('webrtc_resilience_metric', {
+      const resilienceMeta = {
         event: 'webrtc_resilience_metric',
         consultationId: dto.consultationId,
         userId: authUser.sub,
         eventType: dto.eventType,
         eventCount: dto.eventCount ?? 1,
-      });
+        clientTraceId: dto.clientTraceId ?? null,
+        resilienceReason: dto.resilienceReason?.slice(0, 64) ?? null,
+      };
+      this.logger[eventLevel]('webrtc_resilience_metric', resilienceMeta);
+      if (
+        dto.eventType === 'reconnect_attempts' ||
+        dto.eventType === 'media_recovery_failures' ||
+        (dto.eventCount ?? 1) >= 3
+      ) {
+        captureMessage('webrtc_resilience_metric', 'info', resilienceMeta);
+      }
     }
   }
 

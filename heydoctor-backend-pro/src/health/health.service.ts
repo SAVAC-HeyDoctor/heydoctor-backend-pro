@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
+import { getRailwayDeploymentDiagnostics } from '../common/observability/railway-diagnostics.util';
 import { productionReplicaCount } from '../config/redis-requirement';
 import { getSocketIoRedisHealth } from '../common/websocket/socket-io-health';
 
@@ -13,6 +14,7 @@ export type ReleaseMetadata = {
   commitShortSha: string | null;
   startedAt: string;
   uptimeSeconds: number;
+  deployment?: Record<string, unknown>;
 };
 
 export type DependencyHealth = {
@@ -81,7 +83,12 @@ export class HealthService {
       commitShortSha: shortSha(commitSha),
       startedAt: STARTED_AT.toISOString(),
       uptimeSeconds: Math.floor(process.uptime()),
+      deployment: getRailwayDeploymentDiagnostics(),
     };
+  }
+
+  deploymentDiagnostics(): Record<string, unknown> {
+    return getRailwayDeploymentDiagnostics();
   }
 
   async readiness(): Promise<ReadinessResponse> {
