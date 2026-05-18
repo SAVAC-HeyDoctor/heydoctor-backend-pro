@@ -86,8 +86,7 @@ const ormLogging: boolean | ('query' | 'error')[] =
       : true;
 
 /** Temporal: DEBUG_DISABLE_AUTH_GUARDS=true deja solo ThrottlerGuard global (aislar 500 en login). */
-const debugDisableAuthGuards =
-  process.env.DEBUG_DISABLE_AUTH_GUARDS === 'true';
+const debugDisableAuthGuards = process.env.DEBUG_DISABLE_AUTH_GUARDS === 'true';
 
 const authAppGuards = debugDisableAuthGuards
   ? []

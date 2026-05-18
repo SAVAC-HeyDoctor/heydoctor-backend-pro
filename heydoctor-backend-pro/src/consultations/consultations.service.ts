@@ -740,7 +740,7 @@ export class ConsultationsService {
             suggestedDiagnosisKeys:
               result.suggestedDiagnosis != null &&
               typeof result.suggestedDiagnosis === 'object'
-                ? Object.keys(result.suggestedDiagnosis as object).length
+                ? Object.keys(result.suggestedDiagnosis).length
                 : 0,
           },
         });
