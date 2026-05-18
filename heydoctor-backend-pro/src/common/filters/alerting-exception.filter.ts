@@ -30,9 +30,23 @@ export class AlertingExceptionFilter extends BaseExceptionFilter {
       exception instanceof HttpException
         ? exception.getStatus()
         : HttpStatus.INTERNAL_SERVER_ERROR;
+    const req = ctx.getRequest<Request>();
+    const path = typeof req.url === 'string' ? req.url : undefined;
+    const isAuthPath = path?.split('?')[0]?.startsWith('/api/auth/') === true;
+
+    if (isAuthPath) {
+      const err =
+        exception instanceof Error ? exception : new Error(String(exception));
+      this.appLogger.warn('auth_pipeline_exception', {
+        event: 'auth_pipeline_exception',
+        statusCode: status,
+        path,
+        method: req.method,
+        errorName: err.name,
+      });
+    }
 
     if (status >= 500) {
-      const req = ctx.getRequest<Request>();
       const err =
         exception instanceof Error ? exception : new Error(String(exception));
       const authUser = req.user as { sub?: string } | undefined;
@@ -41,7 +55,7 @@ export class AlertingExceptionFilter extends BaseExceptionFilter {
       this.appLogger.error('server_error', err, {
         event: 'server_error',
         statusCode: status,
-        path: typeof req.url === 'string' ? req.url : undefined,
+        path,
         method: req.method,
         userId,
         errorName: err.name,
@@ -52,7 +66,7 @@ export class AlertingExceptionFilter extends BaseExceptionFilter {
         {
           event: 'server_error',
           statusCode: status,
-          path: typeof req.url === 'string' ? req.url : undefined,
+          path,
           method: req.method,
           errorName: err.name,
           userId,
@@ -62,7 +76,7 @@ export class AlertingExceptionFilter extends BaseExceptionFilter {
       captureException(err, {
         event: 'server_error',
         statusCode: status,
-        path: typeof req.url === 'string' ? req.url : undefined,
+        path,
         method: req.method,
         userId,
       });

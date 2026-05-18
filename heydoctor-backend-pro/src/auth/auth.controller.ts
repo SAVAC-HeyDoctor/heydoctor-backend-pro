@@ -197,6 +197,14 @@ export class AuthController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
+    this.logger.log('auth_login_request', {
+      event: 'auth_login_request',
+      requestId: getCurrentRequestId(),
+      path: req.path,
+      origin: req.headers.origin ?? null,
+      hasAccessCookie: readCookie(req, ACCESS_TOKEN_COOKIE) !== undefined,
+      hasRefreshCookie: readCookie(req, REFRESH_TOKEN_COOKIE) !== undefined,
+    });
     const ctx = extractContext(req);
     const requestId = getCurrentRequestId();
     const emailDomain = dto.email.includes('@')
