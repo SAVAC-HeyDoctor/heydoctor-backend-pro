@@ -9,7 +9,7 @@ function stableStringify(obj: unknown): string {
   if (Array.isArray(obj)) {
     return '[' + obj.map(stableStringify).join(',') + ']';
   }
-  const sorted = Object.keys(obj as Record<string, unknown>).sort();
+  const sorted = Object.keys(obj).sort();
   const pairs = sorted.map(
     (k) =>
       JSON.stringify(k) +

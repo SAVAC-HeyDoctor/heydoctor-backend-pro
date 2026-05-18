@@ -11,7 +11,7 @@ const REDIS_CONNECT_TIMEOUT_MS = 2_500;
 
 export class RedisIoAdapter extends IoAdapter {
   private readonly logger = new Logger(RedisIoAdapter.name);
-  // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents -- createAdapter typings resolve to any
+
   private adapterConstructor: ReturnType<typeof createAdapter> | null = null;
   private pubClient: Redis | null = null;
   private subClient: Redis | null = null;
