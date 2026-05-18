@@ -2,7 +2,6 @@ import { Logger, RequestMethod, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import { ThrottlerGuard } from '@nestjs/throttler';
 import cookieParser from 'cookie-parser';
 import { registerSlackWebhookFromEnv } from './common/alerts/slack-webhook.sink';
 import { logExpressRouteStackIfEnabled } from './common/bootstrap/log-express-routes';
@@ -184,8 +183,7 @@ async function bootstrap() {
   });
 
   app.use(new RequestIdMiddleware().use);
-  /** Throttler global; JWT + clínica vía APP_GUARD en AppModule; rutas públicas con @Public(). */
-  app.useGlobalGuards(app.get(ThrottlerGuard));
+  /** Throttler vía APP_GUARD en AppModule (evita doble registro con useGlobalGuards). */
 
   const envConfig = app.get<EnvConfig>(ENV_CONFIG_TOKEN);
   const missingVars = validateAndLogEnv(envConfig);

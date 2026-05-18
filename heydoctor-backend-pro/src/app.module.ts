@@ -85,6 +85,18 @@ const ormLogging: boolean | ('query' | 'error')[] =
       ? ['error']
       : true;
 
+/** Temporal: DEBUG_DISABLE_AUTH_GUARDS=true deja solo ThrottlerGuard global (aislar 500 en login). */
+const debugDisableAuthGuards =
+  process.env.DEBUG_DISABLE_AUTH_GUARDS === 'true';
+
+const authAppGuards = debugDisableAuthGuards
+  ? []
+  : [
+      { provide: APP_GUARD, useExisting: JwtAuthGuard },
+      { provide: APP_GUARD, useClass: ClinicGuard },
+      { provide: APP_GUARD, useClass: CsrfGuard },
+    ];
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -159,9 +171,8 @@ const ormLogging: boolean | ('query' | 'error')[] =
   controllers: [AppController, HealthController, HealthApiController],
   providers: [
     ThrottlerGuard,
-    { provide: APP_GUARD, useExisting: JwtAuthGuard },
-    { provide: APP_GUARD, useClass: ClinicGuard },
-    { provide: APP_GUARD, useClass: CsrfGuard },
+    { provide: APP_GUARD, useExisting: ThrottlerGuard },
+    ...authAppGuards,
     { provide: APP_INTERCEPTOR, useClass: HttpRequestLoggingInterceptor },
     { provide: APP_INTERCEPTOR, useClass: CsrfCookieInterceptor },
     {
