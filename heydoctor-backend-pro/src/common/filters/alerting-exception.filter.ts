@@ -44,6 +44,9 @@ export class AlertingExceptionFilter extends BaseExceptionFilter {
         path: typeof req.url === 'string' ? req.url : undefined,
         method: req.method,
         userId,
+        errorName: err.name,
+        errorMessage: err.message,
+        stack: err.stack,
       });
       notifyAlert(
         {

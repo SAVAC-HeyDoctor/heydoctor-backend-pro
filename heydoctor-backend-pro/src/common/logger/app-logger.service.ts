@@ -160,9 +160,20 @@ export class AppLoggerService implements LoggerService {
       let meta: Record<string, unknown> | undefined;
       let nestCtx: string | undefined;
       if (isStructuredContext(third)) {
-        meta = third;
+        meta = {
+          ...third,
+          errorName: third.errorName ?? second.name,
+          errorMessage: third.errorMessage ?? second.message,
+          stack: third.stack ?? stack,
+        };
       } else if (typeof third === 'string') {
         nestCtx = third;
+      } else {
+        meta = {
+          errorName: second.name,
+          errorMessage: second.message,
+          stack,
+        };
       }
       const line = this.formatStructuredLine('ERROR', text, meta);
       this.nestLogger.error(line, stack, nestCtx);

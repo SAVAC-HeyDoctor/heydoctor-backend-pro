@@ -231,9 +231,18 @@ export class AuthService {
       userAgent: ctx.userAgent ? ctx.userAgent.slice(0, 512) : null,
     });
     assignClinic(entity, user.clinicId);
-    const saved = await repoOrManager.save(entity);
-
-    return { raw, entity: saved };
+    try {
+      const saved = await repoOrManager.save(entity);
+      return { raw, entity: saved };
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      this.logger.error('create_refresh_token_save_failed', error, {
+        event: 'create_refresh_token_save_failed',
+        userId,
+        clinicId: user.clinicId ?? null,
+      });
+      throw error;
+    }
   }
 
   /**
