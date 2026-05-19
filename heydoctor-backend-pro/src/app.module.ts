@@ -85,8 +85,14 @@ const ormLogging: boolean | ('query' | 'error')[] =
       ? ['error']
       : true;
 
-/** Temporal: DEBUG_DISABLE_AUTH_GUARDS=true deja solo ThrottlerGuard global (aislar 500 en login). */
-const debugDisableAuthGuards = process.env.DEBUG_DISABLE_AUTH_GUARDS === 'true';
+/**
+ * Debug local únicamente. Nunca debe desactivar auth en CI ni producción:
+ * permitirlo hace que handlers protegidos reciban `req.user` undefined.
+ */
+const debugDisableAuthGuards =
+  process.env.DEBUG_DISABLE_AUTH_GUARDS === 'true' &&
+  process.env.NODE_ENV !== 'production' &&
+  process.env.CI !== 'true';
 
 const authAppGuards = debugDisableAuthGuards
   ? []

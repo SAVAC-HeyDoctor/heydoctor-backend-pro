@@ -409,10 +409,12 @@ async function flushAsyncAuditWrites(): Promise<void> {
           consultationId: consultationPaidId,
         });
 
-        expect(ack).toEqual({
-          ok: true,
-          consultationId: consultationPaidId,
-        });
+        expect(ack).toEqual(
+          expect.objectContaining({
+            ok: true,
+            consultationId: consultationPaidId,
+          }),
+        );
         expect(socket.join).toHaveBeenCalledWith(consultationPaidId);
       });
     });

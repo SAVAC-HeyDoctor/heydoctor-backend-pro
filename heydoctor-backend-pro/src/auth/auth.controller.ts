@@ -96,10 +96,9 @@ function extractContext(req: Request): RequestContext {
 }
 
 /**
- * Rutas de sesión públicas por defecto (login, refresh, csrf).
- * Las que requieren JWT usan `@UseGuards(JwtAuthGuard)` a nivel de handler.
+ * Rutas públicas marcadas por handler. No marcar la clase completa como
+ * pública: /auth/me y /auth/change-password deben ejecutar JwtAuthGuard.
  */
-@Public()
 @Controller('auth')
 export class AuthController {
   constructor(

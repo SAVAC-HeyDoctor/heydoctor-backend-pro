@@ -1,5 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 
+const MIN_STRONG_SECRET_LENGTH = 32;
+
 /**
  * Secreto compartido por `JwtModule` (firma en login/refresh) y `JwtStrategy`
  * (verificación en /auth/me). Debe ser exactamente el mismo string.
@@ -22,6 +24,15 @@ export function resolveJwtSecret(config: ConfigService): string {
   if (!secret) {
     throw new Error(
       'JWT_SECRET is required: login signs with JwtModule and /auth/me verifies with JwtStrategy using this same value.',
+    );
+  }
+
+  if (
+    (process.env.NODE_ENV === 'production' || process.env.CI === 'true') &&
+    secret.length < MIN_STRONG_SECRET_LENGTH
+  ) {
+    throw new Error(
+      `JWT_SECRET must be at least ${MIN_STRONG_SECRET_LENGTH} characters in production/CI.`,
     );
   }
 
