@@ -121,20 +121,6 @@ export function logBlockedOrigin(
   });
 }
 
-export function logBlockedOrigin(
-  origin: string | undefined,
-  transport: 'http' | 'websocket',
-): void {
-  if (process.env.NODE_ENV !== 'production') {
-    return;
-  }
-  originLogger.warn('origin_blocked', {
-    event: 'origin_blocked',
-    transport,
-    origin: safeOriginForLog(origin),
-  });
-}
-
 export function corsOrigin(
   origin: string | undefined,
   callback: OriginCallback,
