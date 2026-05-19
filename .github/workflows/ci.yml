@@ -35,7 +35,7 @@ jobs:
 
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/heydoctor_test
-      JWT_SECRET: test_secret
+      JWT_SECRET: ci-test-jwt-secret-minimum-32-chars
       CI: 'true'
 
     defaults:
